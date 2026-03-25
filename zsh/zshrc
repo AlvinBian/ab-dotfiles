@@ -21,7 +21,7 @@ if _command_exists pyenv; then
   eval "$(pyenv init - zsh)"
 fi
 
-# ── 動態載入 ~/.zsh/modules/ 所有模組（按編號順序）──────────────
+# ── 動態載入 ~/.zsh/modules/ 所有模組（按字母順序）──────────────
 for _zsh_module in ~/.zsh/modules/*.zsh(N); do
   source "$_zsh_module"
 done

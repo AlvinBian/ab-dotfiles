@@ -2,6 +2,7 @@
 /**
  * ab-dotfiles 統一安裝 CLI
  * 使用 @clack/prompts 提供美觀的互動式選單
+ * 使用 cli-progress 提供實時安裝進度條
  *
  * 用法：
  *   pnpm run setup              ← 互動式選擇
@@ -12,7 +13,9 @@
  */
 
 import * as p from '@clack/prompts'
-import { spawnSync } from 'child_process'
+import { spawn } from 'child_process'
+import cliProgress from 'cli-progress'
+import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -56,18 +59,65 @@ const ZSH_MODULES = [
   { value: 'tools',       label: 'tools',       hint: '現代 CLI（bat / eza / zoxide / fd / ripgrep / tldr）' },
 ]
 
+// ── ANSI 清除工具 ─────────────────────────────────────────────────
+const ANSI_RE = /\x1B\[[0-9;]*[mGKHF]/g
+const stripAnsi = s => s.replace(ANSI_RE, '').replace(/\r/g, '')
+
+// ── 計算 repo 內 rules 數量（用於進度 total）──────────────────────
+function countRules() {
+  try {
+    return fs.readdirSync(path.join(REPO, 'claude/rules'))
+      .filter(f => f.endsWith('.md')).length
+  } catch { return 0 }
+}
+
+// ── 實時進度條執行 ───────────────────────────────────────────────
+// parseProgress(cleanLine) 回傳值：
+//   string                        → 進度 +1，更新狀態文字
+//   { statusOnly: true, label }   → 只更新狀態文字，不計進度（如 brew 安裝）
+//   null                          → 略過此行
+function runWithProgress(cmd, { cwd = REPO, total, initStatus = '準備中...', parseProgress }) {
+  return new Promise((resolve, reject) => {
+    const bar = new cliProgress.SingleBar({
+      format: '  [{bar}] {percentage}%  {value}/{total}  {status}',
+      barCompleteChar: '█',
+      barIncompleteChar: '░',
+      hideCursor: true,
+      clearOnComplete: false,
+      stopOnComplete: false,
+      barsize: 26,
+    })
+    bar.start(total, 0, { status: initStatus })
+
+    const child = spawn(cmd, { shell: true, cwd })
+    let buf = ''
+
+    child.stdout.on('data', chunk => {
+      buf += chunk.toString()
+      const lines = buf.split('\n')
+      buf = lines.pop()
+      for (const line of lines) {
+        const result = parseProgress(stripAnsi(line))
+        if (result === null) continue
+        if (typeof result === 'object' && result.statusOnly) {
+          bar.update(bar.value, { status: result.label })
+        } else if (bar.value < total) {
+          bar.increment(1, { status: typeof result === 'string' ? result : result.label })
+        }
+      }
+    })
+    child.stderr.on('data', () => {})
+
+    child.on('close', code => {
+      bar.update(total, { status: '✔ 完成' })
+      bar.stop()
+      process.stdout.write('\n')
+      code !== 0 ? reject(new Error(`exit ${code}`)) : resolve()
+    })
+  })
+}
+
 // ── 工具函式 ────────────────────────────────────────────────────
-function run(cmd, { cwd = REPO, stdio = 'inherit' } = {}) {
-  const result = spawnSync(cmd, { shell: true, cwd, stdio })
-  if (result.status !== 0) process.exit(result.status ?? 1)
-}
-
-// 不 exit，失敗時拋出例外供 try/catch 使用
-function runSafe(cmd, { cwd = REPO, stdio = 'inherit' } = {}) {
-  const result = spawnSync(cmd, { shell: true, cwd, stdio })
-  if (result.status !== 0) throw new Error(`exit ${result.status}`)
-}
-
 function handleCancel(value) {
   if (p.isCancel(value)) {
     p.cancel('已取消安裝')
@@ -161,28 +211,58 @@ async function main() {
           initialValue: true,
         }))
 
-    // 執行安裝
-    const s = p.spinner()
-    const hooksLabel = installHooks ? ' · hooks' : ''
-    s.start(`${sp}[1/2] 安裝 ${selectedCommands.length} commands · ${selectedAgents.length} agents${hooksLabel} · rules → ~/.claude/`)
+    // ── [1/2] install-claude.sh with progress ──────────────────
+    const hooksLabel  = installHooks ? ' · hooks' : ''
+    const cmdsArg     = selectedCommands.join(',')
+    const agentsArg   = selectedAgents.join(',')
+    const hooksFlag   = installHooks ? '--hooks' : ''
+    const rulesCount  = countRules()
+    const installTotal = selectedCommands.length + selectedAgents.length + (installHooks ? 1 : 0) + rulesCount
 
-    const cmdsArg   = selectedCommands.join(',')
-    const agentsArg = selectedAgents.join(',')
-    const hooksFlag = installHooks ? '--hooks' : ''
-
-    run(`bash scripts/install-claude.sh --commands "${cmdsArg}" --agents "${agentsArg}" --rules "all" ${hooksFlag}`, { stdio: 'pipe' })
-
-    s.stop(`${sp}[1/2] ✔ ${selectedCommands.length} commands · ${selectedAgents.length} agents${hooksLabel} · rules 已安裝`)
-
-    // ── 生成 ab-claude-dev.plugin ─────────────────────────────────
     console.log()
-    const s2 = p.spinner()
-    s2.start(`${sp}[2/2] 打包 ab-claude-dev.plugin（含 KKday 上下文，需約 30 秒）...`)
+    p.log.info(`${sp}[1/2] 安裝 ${selectedCommands.length} commands · ${selectedAgents.length} agents${hooksLabel} · rules → ~/.claude/`)
+
+    await runWithProgress(
+      `bash scripts/install-claude.sh --commands "${cmdsArg}" --agents "${agentsArg}" --rules "all" ${hooksFlag}`,
+      {
+        total: installTotal,
+        initStatus: '初始化...',
+        parseProgress(line) {
+          // item lines: `  ✅ /name`, `  ─ name（...）`, `  ⚠ name`
+          const m = line.match(/^\s+[✅─⚠]\s+(.+?)(?:[（(]|$)/)
+          return m ? m[1].trim() : null
+        },
+      },
+    )
+
+    p.log.success(`${sp}[1/2] ✔ ${selectedCommands.length} commands · ${selectedAgents.length} agents${hooksLabel} · rules 已安裝`)
+
+    // ── [2/2] build-claude-dev-plugin.sh with progress ─────────
+    console.log()
+    p.log.info(`${sp}[2/2] 打包 ab-claude-dev.plugin（含 KKday 上下文，需約 30 秒）...`)
+
+    const buildPhases = { skills: false, agents: false, hooks: false, rules: false, kkday: false, done: false }
+
     try {
-      runSafe('bash scripts/build-claude-dev-plugin.sh', { stdio: 'pipe' })
-      s2.stop(`${sp}[2/2] ✔ ab-claude-dev.plugin 打包完成 → dist/ab-claude-dev.plugin`)
+      await runWithProgress(
+        'bash scripts/build-claude-dev-plugin.sh',
+        {
+          total: 6,
+          initStatus: '初始化...',
+          parseProgress(line) {
+            if (!buildPhases.skills && line.includes('Skills')) { buildPhases.skills = true; return '📦 Skills' }
+            if (!buildPhases.agents && line.includes('Agents')) { buildPhases.agents = true; return '🤖 Agents' }
+            if (!buildPhases.hooks  && line.includes('Hooks'))  { buildPhases.hooks  = true; return '🪝 Hooks'  }
+            if (!buildPhases.rules  && line.includes('Rules'))  { buildPhases.rules  = true; return '📋 Rules'  }
+            if (!buildPhases.kkday  && line.includes('KKday'))  { buildPhases.kkday  = true; return '🏢 KKday'  }
+            if (!buildPhases.done   && line.includes('╔'))      { buildPhases.done   = true; return '✔ 完成'    }
+            return null
+          },
+        },
+      )
+      p.log.success(`${sp}[2/2] ✔ ab-claude-dev.plugin 打包完成 → dist/ab-claude-dev.plugin`)
     } catch (e) {
-      s2.stop(`${sp}[2/2] plugin 打包失敗，略過`)
+      p.log.warn(`${sp}[2/2] plugin 打包失敗，略過`)
       p.log.warn(e.message)
     }
   }
@@ -201,29 +281,55 @@ async function main() {
         initialValue: false,
       }))
 
-      const s = p.spinner()
       const slackHooksLabel = installHooksSlack ? ' · hooks' : ''
-      s.start(`${sp}[1/2] 安裝 ${SLACK_COMMANDS.length} Slack commands · slack-mrkdwn rule${slackHooksLabel} → ~/.claude/`)
-
       const slackCmds = SLACK_COMMANDS.map(c => c.value).join(',')
       const hooksFlag = installHooksSlack ? '--hooks' : ''
+      // total: commands + 1 rule (slack-mrkdwn) + (hooks ? 1 : 0)
+      const slackTotal = SLACK_COMMANDS.length + 1 + (installHooksSlack ? 1 : 0)
 
-      run(`bash scripts/install-claude.sh --commands "${slackCmds}" --rules "slack-mrkdwn" ${hooksFlag}`, { stdio: 'pipe' })
+      console.log()
+      p.log.info(`${sp}[1/2] 安裝 ${SLACK_COMMANDS.length} Slack commands · slack-mrkdwn rule${slackHooksLabel} → ~/.claude/`)
 
-      s.stop(`${sp}[1/2] ✔ ${SLACK_COMMANDS.length} commands · slack-mrkdwn rule${slackHooksLabel} 已安裝`)
+      await runWithProgress(
+        `bash scripts/install-claude.sh --commands "${slackCmds}" --rules "slack-mrkdwn" ${hooksFlag}`,
+        {
+          total: slackTotal,
+          initStatus: '初始化...',
+          parseProgress(line) {
+            const m = line.match(/^\s+[✅─⚠]\s+(.+?)(?:[（(]|$)/)
+            return m ? m[1].trim() : null
+          },
+        },
+      )
+
+      p.log.success(`${sp}[1/2] ✔ ${SLACK_COMMANDS.length} commands · slack-mrkdwn rule${slackHooksLabel} 已安裝`)
     } else {
       p.log.info(`${sp}[1/2] claude-dev 已安裝全部設定，略過 Slack 獨立安裝步驟`)
     }
 
-    // ── 生成 ab-slack-message.plugin ─────────────────────────────
+    // ── [2/2] build-slack-message.plugin with progress ──────────
     console.log()
-    const s2 = p.spinner()
-    s2.start(`${sp}[2/2] 打包 ab-slack-message.plugin...`)
+    p.log.info(`${sp}[2/2] 打包 ab-slack-message.plugin...`)
+
+    const slackBuildPhases = { skills: false, rules: false, done: false }
+
     try {
-      runSafe('bash scripts/build-slack-plugin.sh', { stdio: 'pipe' })
-      s2.stop(`${sp}[2/2] ✔ ab-slack-message.plugin 打包完成 → dist/ab-slack-message.plugin`)
+      await runWithProgress(
+        'bash scripts/build-slack-plugin.sh',
+        {
+          total: 3,
+          initStatus: '初始化...',
+          parseProgress(line) {
+            if (!slackBuildPhases.skills && line.includes('Skills')) { slackBuildPhases.skills = true; return '📦 Skills' }
+            if (!slackBuildPhases.rules  && line.includes('Rules'))  { slackBuildPhases.rules  = true; return '📋 Rules'  }
+            if (!slackBuildPhases.done   && line.includes('╔'))      { slackBuildPhases.done   = true; return '✔ 完成'    }
+            return null
+          },
+        },
+      )
+      p.log.success(`${sp}[2/2] ✔ ab-slack-message.plugin 打包完成 → dist/ab-slack-message.plugin`)
     } catch (e) {
-      s2.stop(`${sp}[2/2] plugin 打包失敗，略過`)
+      p.log.warn(`${sp}[2/2] plugin 打包失敗，略過`)
       p.log.warn(e.message)
     }
   }
@@ -242,12 +348,38 @@ async function main() {
         })
 
     if (selectedModules.length > 0) {
-      const s = p.spinner()
-      s.start(`${sp}安裝 ${selectedModules.length}/${ZSH_MODULES.length} 個 zsh 模組 → ~/.zsh/modules/`)
+      // total = modules + 1 (.zshrc) + (tools selected ? 1 : 0) (.ripgreprc)
+      const hasTools = selectedModules.includes('tools')
+      const zshTotal = selectedModules.length + 1 + (hasTools ? 1 : 0)
 
-      run(`zsh zsh/install.sh --modules "${selectedModules.join(',')}"`, { stdio: 'pipe' })
+      console.log()
+      p.log.info(`${sp}安裝 ${selectedModules.length}/${ZSH_MODULES.length} 個 zsh 模組 → ~/.zsh/modules/`)
 
-      s.stop(`${sp}✔ ${selectedModules.length} 個 zsh 模組已安裝（${selectedModules.join('、')}）`)
+      await runWithProgress(
+        `zsh zsh/install.sh --modules "${selectedModules.join(',')}"`,
+        {
+          total: zshTotal,
+          initStatus: '初始化...',
+          parseProgress(line) {
+            // brew tool installation (potentially long, show status only)
+            if (line.includes('安裝 Homebrew CLI 工具') || /brew install\s/.test(line)) {
+              return { statusOnly: true, label: '安裝 brew 工具...' }
+            }
+            // module .zsh files: `  ✔ aliases.zsh` or `  ▶ aliases.zsh（無變更...）`
+            // use (?!\S) to exclude .zshrc
+            if (/^\s+[✔▶⚠]\s+\S+\.zsh(?!\S)/.test(line)) {
+              return line.match(/(\S+\.zsh)/)?.[1] ?? 'module'
+            }
+            // .zshrc deployment
+            if (/✔\s+~\/.zshrc/.test(line)) return '~/.zshrc'
+            // .ripgreprc (only when tools module selected)
+            if (/✔\s+~\/.ripgreprc/.test(line)) return '~/.ripgreprc'
+            return null
+          },
+        },
+      )
+
+      p.log.success(`${sp}✔ ${selectedModules.length} 個 zsh 模組已安裝（${selectedModules.join('、')}）`)
     }
   }
 

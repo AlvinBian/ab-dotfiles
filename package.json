@@ -22,6 +22,7 @@
     "fix": "bash zsh/fix-env.sh"
   },
   "devDependencies": {
-    "@clack/prompts": "^0.9.1"
+    "@clack/prompts": "^0.9.1",
+    "cli-progress": "^3.12.0"
   }
 }

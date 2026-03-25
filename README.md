@@ -56,63 +56,77 @@ pnpm run setup        # 互動式安裝精靈
 | 指令 | 說明 |
 |------|------|
 | `pnpm run setup` | 互動式安裝精靈 — 選擇 Claude / Zsh / 全部 |
-| `pnpm run update` | 從 GitHub 拉取最新版本，針對性更新變更部分 |
-| `pnpm run update:dry` | 預覽有哪些變更，不實際執行 |
-| `pnpm run hooks` | 安裝自動更新機制（git hook + launchd 排程） |
-| `pnpm run hooks:off` | 移除自動更新機制 |
-| `pnpm run deploy` | 安裝 Claude 設定 + 打包 .plugin（日常更新用） |
-| `pnpm run build` | 只打包 dist/ab-dotfiles.plugin |
-| `pnpm run workspace` | 掃描 git repos，生成 Kiro / VS Code 工作區 |
-| `pnpm run fix` | 修復開發環境（node/pnpm 版本衝突等） |
+| `pnpm run build` | 智慧打包插件（自動整合專案上下文） |
+| `pnpm run deploy` | install Claude 設定 + 智慧打包插件 |
+| `pnpm run update` | 從 GitHub 拉取最新，針對性部署變更 |
+| `pnpm run hooks` | 安裝 git post-merge hook（pull 後自動更新） |
+| `pnpm run workspace` | 掃描 git repos，生成工作區 |
+| `pnpm run fix` | 修復開發環境（node/pnpm 衝突等） |
 
-`setup` 支援 flag 快捷模式（跳過互動）：
-
+setup 支援 flag：
 ```bash
-pnpm run setup -- --all     # 全部安裝
-pnpm run setup -- --claude  # 只安裝 Claude 設定
-pnpm run setup -- --zsh     # 只安裝 Zsh 環境
+pnpm run setup -- --all / --claude / --zsh
 ```
 
 ---
 
-## 自動同步 GitHub
+## 智慧打包（build）
 
-### 安裝方式
+`pnpm run build` 執行時自動偵測專案上下文，整合既有配置再打包：
 
-```bash
-pnpm run hooks
+```
+執行 pnpm run build
+  ↓
+① git pull 拿最新 ab-dotfiles 模板
+② 偵測當前目錄：
+   CLAUDE.md 存在？         → 提取規則嵌入 plugin.json
+   .claude/commands/ 存在？  → 專案自訂指令（優先於同名模板）
+   .claude/agents/ 存在？    → 專案自訂 agents
+   package.json 存在？       → 偵測技術棧，過濾相關 commands
+③ 合併：專案配置 > ab-dotfiles 模板
+④ 打包 dist/ab-dotfiles.plugin
 ```
 
-安裝後有兩個自動觸發時機：
+### 範例：從任意專案目錄打包
 
-| 觸發時機 | 行為 |
-|----------|------|
-| `git pull` 後 | 自動偵測變更，針對性部署（透過 post-merge hook） |
-| 每天 09:00 | 自動從 GitHub fetch，有更新則部署（透過 launchd） |
+```bash
+# 在 KKday b2c-web 專案中執行
+cd ~/projects/b2c-web
+pnpm run -C ~/Documents/MyProjects/ab-dotfiles build
 
-### 針對性更新邏輯
+# 或設定 alias：dotbuild → 隨時快速打包
+```
 
-只更新實際有變更的部分，不觸碰未改動的設定：
+### 技術棧自動偵測
 
+| 偵測到 | 包含的 commands |
+|--------|----------------|
+| vue | code-review / kkday-conventions / test-gen |
+| typescript | code-review / kkday-conventions / test-gen |
+| php | code-review / kkday-conventions |
+| 無特定技術棧 | 全部 commands |
+
+所有專案都包含：`auto-setup` / `pr-workflow` / `draft-slack` / `slack-formatting`
+
+---
+
+## GitHub 同步（按需）
+
+更新不使用定時排程，只在需要時觸發：
+
+| 方式 | 命令 |
+|------|------|
+| 手動更新 | `pnpm run update` |
+| git pull 後自動 | `pnpm run hooks` 安裝一次即可 |
+| 預覽變更 | `pnpm run update -- --dry-run` |
+
+針對性更新邏輯（只更新有改動的部分）：
 ```
 claude/commands/xxx.md 變更  →  只更新 ~/.claude/commands/xxx.md
 claude/agents/xxx.md 變更    →  只更新 ~/.claude/agents/xxx.md
-claude/hooks.json 變更       →  只 merge hooks（不覆蓋既有設定）
+claude/hooks.json 變更       →  只 merge hooks
 zsh/modules/xxx.zsh 變更     →  只更新 ~/.zsh/modules/xxx.zsh
 zsh/zshrc 變更               →  備份後更新 ~/.zshrc
-```
-
-### 手動執行
-
-```bash
-pnpm run update           # 立即從 GitHub 拉取並部署
-pnpm run update:dry       # 預覽將要更新的內容，不實際執行
-
-# 查看更新歷史
-tail -f .update.log
-
-# 移除自動更新
-pnpm run hooks:off
 ```
 
 ---

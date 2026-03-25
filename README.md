@@ -2,13 +2,23 @@
 
 Alvin Bian 的個人開發環境設定腳本。新機器初始化、Claude Code CLI 全域設定、Zsh 環境配置一鍵完成。
 
+## 本機專案目錄
+
+| 路徑 | 用途 |
+|------|------|
+| `~/Kkday/Projects/kkday-b2c-web` | KKday B2C Web（Nuxt 3 + Vue + TypeScript） |
+| `~/Kkday/Projects/kkday-member-ci` | KKday Member CI（CodeIgniter + Vue 2.7 + TypeScript） |
+| `~/Documents/MyProjects/ab-flash` | 個人專案 ab-flash（Python） |
+| `~/Documents/MyProjects/Study/` | 學習 / 練習專案 |
+
 ## 腳本清單
 
 | 腳本 | 說明 |
 |------|------|
 | `setup-zsh.sh` | Zsh / Oh-My-Zsh 環境設定、plugins、aliases |
 | `fix-dev-env.sh` | 開發環境問題修復（Node、pnpm、PHP 等） |
-| `install-to-claude-code.sh` | Claude Code CLI 全域指令 & hooks 安裝（ab-claude-code + ab-slack-message） |
+| `install-to-claude-code.sh` | Claude Code CLI 全域指令 & hooks 安裝（CLI / VSCode / JetBrains） |
+| `build-cowork-plugin.sh` | 打包 ab-dotfiles.plugin，供 Cowork Desktop App 安裝 |
 
 ## 新機器初始化順序
 
@@ -22,13 +32,26 @@ bash ~/scripts/setup-zsh.sh
 # 3. 修復開發環境
 bash ~/scripts/fix-dev-env.sh
 
-# 4. 安裝 Claude Code CLI 全域設定
+# 4-a. Claude Code CLI / VSCode / JetBrains
 bash ~/scripts/install-to-claude-code.sh
+
+# 4-b. Cowork Desktop App
+bash ~/scripts/build-cowork-plugin.sh
+# → 將 ~/scripts/ab-dotfiles.plugin 拖入 Cowork 安裝
 ```
 
-## Claude Code CLI 安裝後可用的指令
+## Claude Code 全客戶端共用
 
-安裝完成後，在任何專案的 `claude` CLI 中輸入：
+```
+~/scripts/claude-commands/*.md   ← 唯一 source of truth
+~/scripts/claude-agents/*.md
+~/scripts/claude-hooks.json
+         │
+         ├── install-to-claude-code.sh → ~/.claude/  → ✅ CLI + VSCode + JetBrains
+         └── build-cowork-plugin.sh    → ab-dotfiles.plugin → ✅ Cowork
+```
+
+## 可用指令（安裝後）
 
 | 指令 | 功能 |
 |------|------|
@@ -41,10 +64,13 @@ bash ~/scripts/install-to-claude-code.sh
 | `/review-slack` | 審查 Slack 訊息格式 |
 | `/slack-formatting` | Slack mrkdwn 語法完整參考 |
 
-Subagents（對話中直接說）：
-- `用 explorer agent 掃描...` → Haiku 模型快速掃描，省 token
-- `用 reviewer agent 審查...` → Sonnet 深度程式碼審查
+Subagents：`explorer`（Haiku，省 token 掃描）、`reviewer`（Sonnet，深度審查）
 
-## 新增腳本
+## 更新 skill 流程
 
-將 `.sh` 腳本放入此目錄，`chmod +x` 後 commit 即可。
+```bash
+# 修改 claude-commands/ 或 claude-agents/ 後：
+bash ~/scripts/install-to-claude-code.sh   # CLI/VSCode 立即生效
+bash ~/scripts/build-cowork-plugin.sh      # 重新打包 → 拖入 Cowork
+git add -A && git commit -m "..." && git push
+```

@@ -33,17 +33,28 @@ tools: ["Read", "Grep", "Glob", "Bash"]
 - 優先用 Glob / Grep，避免讀取大檔案
 - 如果檔案超過 200 行，只讀取關鍵片段
 
-**專案路徑參考**：
+**動態專案探索**：
 
-KKday 工作 repos（`~/Kkday/Projects/`）：
-- b2c-web:         `~/Kkday/Projects/kkday-b2c-web`
-- member-ci:       `~/Kkday/Projects/kkday-member-ci`
+當需要跨 repo 查找或列出所有本地專案時，執行以下指令動態發現所有 git repos：
 
-個人 / 學習專案（`~/Documents/MyProjects/`）：
-- ab-flash:        `~/Documents/MyProjects/ab-flash`
-- Study 專案:      `~/Documents/MyProjects/Study/`
-  - kkday-member-ci-2:        `~/Documents/MyProjects/Study/kkday-member-ci-2`
-  - kkday-mobile-member-ci-2: `~/Documents/MyProjects/Study/kkday-mobile-member-ci-2`
+```bash
+find ~ -maxdepth 6 -name .git -type d 2>/dev/null \
+  | grep -v 'node_modules\|\.cache\|Library\|\.Trash\|\.venv\|vendor\|worktrees\|\.kiro\|\.openclaw' \
+  | while read gitdir; do
+      repo=$(dirname "$gitdir")
+      remote=$(git -C "$repo" remote get-url origin 2>/dev/null \
+        | sed 's/.*github.com[:/]//;s/\.git$//')
+      name=$(basename "$repo")
+      echo "$name | $repo | $remote"
+    done | sort
+```
+
+輸出格式：`專案名 | 本地路徑 | GitHub remote (owner/repo)`
+
+分類規則：
+- `kkday-it/` 開頭 → KKday 工作 repo
+- `AlvinBian/` 開頭 → 個人專案
+- remote 為空 → 純本地、尚未推上 GitHub
 
 **輸出格式**：
 ```

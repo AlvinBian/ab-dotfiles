@@ -3,8 +3,10 @@
 .env
 .env.*
 *.log
+.build.log
+.update.log
 
-# Build outputs
+# Build outputs（.plugin 檔 + 展開的預覽資料夾，僅供本地查閱，不追蹤）
 dist/
 
 # Node

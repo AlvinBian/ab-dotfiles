@@ -1,7 +1,7 @@
 {
   "name": "ab-dotfiles",
   "version": "1.0.0",
-  "description": "Alvin Bian 個人開發工具包：Claude Code 全域設定、KKday 開發規範、Kiro 工作區生成",
+  "description": "Alvin Bian 個人開發工具包：Claude Code 全域設定、KKday 開發規範、工作區生成",
   "private": true,
   "packageManager": "pnpm@9.15.5",
   "engines": {
@@ -9,13 +9,17 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "setup":   "node bin/setup.mjs",
-    "build":   "bash scripts/build-plugin.sh",
-    "deploy":  "bash scripts/install-claude.sh && bash scripts/build-plugin.sh",
-    "update":  "bash scripts/auto-update.sh",
-    "hooks":   "bash scripts/setup-hooks.sh",
-    "workspace":"bash scripts/generate-workspace.sh",
-    "fix":     "bash zsh/fix-env.sh"
+    "setup": "node bin/setup.mjs",
+    "build": "bash scripts/build-plugin.sh",
+    "build:dev": "bash scripts/build-claude-dev-plugin.sh",
+    "build:slack": "bash scripts/build-slack-plugin.sh",
+    "build:all": "bash scripts/build-claude-dev-plugin.sh && bash scripts/build-slack-plugin.sh",
+    "deploy": "bash scripts/install-claude.sh && bash scripts/build-claude-dev-plugin.sh",
+    "update": "bash scripts/auto-update.sh",
+    "hooks": "bash scripts/setup-hooks.sh",
+    "workspace": "bash scripts/generate-workspace.sh",
+    "context": "bash scripts/fetch-kkday-context.sh",
+    "fix": "bash zsh/fix-env.sh"
   },
   "devDependencies": {
     "@clack/prompts": "^0.9.1"

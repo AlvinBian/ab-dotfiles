@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # scripts/generate-workspace.sh
-# 自動掃描 MyProjects/ 同級 git 專案，生成 Kiro / VS Code 工作區檔案
+# 自動掃描 MyProjects/ 同級 git 專案，生成 Kiro / Cursor / VS Code 工作區檔案
 #
 # 用法：
 #   pnpm run workspace

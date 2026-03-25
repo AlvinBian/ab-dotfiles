@@ -1,0 +1,24 @@
+{
+  "kkday_repos": [
+    {
+      "repo": "kkday-it/kkday-b2c-web",
+      "branch": "master"
+    },
+    {
+      "repo": "kkday-it/kkday-member-ci",
+      "branch": "master"
+    },
+    {
+      "repo": "kkday-it/kkday-mobile-member-ci",
+      "branch": "master"
+    },
+    {
+      "repo": "kkday-it/web-design-system",
+      "branch": "master"
+    },
+    {
+      "repo": "kkday-it/web-js-lib",
+      "branch": "master"
+    }
+  ]
+}

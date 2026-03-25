@@ -10,7 +10,7 @@
 #
 # 自動觸發：
 #   - git pull 後（由 .git/hooks/post-merge 呼叫）
-#   - 每日定時（由 launchd 排程呼叫）
+#
 # =============================================================================
 set -e
 
@@ -27,11 +27,15 @@ success() { echo -e "  ${GREEN}✔ $1${NC}"; }
 warn()    { echo -e "  ${YELLOW}⚠ $1${NC}"; }
 skip()    { echo -e "  ${DIM}─ $1${NC}"; }
 
+REPO_NAME="ab-dotfiles"
+REPO_BRANCH="master"
+
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║   ab-dotfiles 自動更新                       ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════╝${NC}"
-echo -e "  ${DIM}倉庫：$REPO_DIR${NC}"
+echo -e "  ${DIM}來源：$REPO_NAME@$REPO_BRANCH${NC}"
+echo -e "  ${DIM}路徑：$REPO_DIR${NC}"
 $DRY_RUN && echo -e "  ${YELLOW}[DRY RUN 模式 — 只顯示變更，不實際執行]${NC}"
 
 cd "$REPO_DIR"
@@ -44,13 +48,13 @@ if ! git remote get-url origin &>/dev/null; then
   exit 0
 fi
 
-git fetch origin main --quiet 2>/dev/null || {
-  warn "無法連線到 GitHub，略過本次更新"
+git fetch origin "$REPO_BRANCH" --quiet 2>/dev/null || {
+  warn "無法連線到 GitHub（$REPO_NAME），略過本次更新"
   exit 0
 }
 
 LOCAL=$(git rev-parse HEAD)
-REMOTE=$(git rev-parse origin/main)
+REMOTE=$(git rev-parse "origin/$REPO_BRANCH")
 
 if [[ "$LOCAL" == "$REMOTE" ]]; then
   success "已是最新版本（$(git log -1 --format='%h %s')）"
@@ -58,36 +62,37 @@ if [[ "$LOCAL" == "$REMOTE" ]]; then
 fi
 
 # 列出有哪些 commit 要拉
-COMMIT_COUNT=$(git rev-list HEAD..origin/main --count)
+COMMIT_COUNT=$(git rev-list HEAD.."origin/$REPO_BRANCH" --count)
 info "發現 $COMMIT_COUNT 個新 commit："
-git log HEAD..origin/main --oneline --no-walk=unsorted | sed 's/^/    /'
+git log HEAD.."origin/$REPO_BRANCH" --oneline | sed 's/^/    /'
 echo ""
 
 # ── Step 2：偵測哪些檔案有變更 ───────────────────────────────────
 step "② 分析變更範圍"
 
-CHANGED_FILES=$(git diff --name-only HEAD origin/main)
+CHANGED_FILES=$(git diff --name-only HEAD "origin/$REPO_BRANCH")
 
 # 分類變更
 COMMANDS_CHANGED=$(echo "$CHANGED_FILES" | grep "^claude/commands/" | sed 's|claude/commands/||;s|\.md$||' | tr '\n' ',' | sed 's/,$//')
 AGENTS_CHANGED=$(echo "$CHANGED_FILES"   | grep "^claude/agents/"   | sed 's|claude/agents/||;s|\.md$||'   | tr '\n' ',' | sed 's/,$//')
+RULES_CHANGED=$(echo "$CHANGED_FILES"    | grep "^claude/rules/"    | sed 's|claude/rules/||;s|\.md$||'    | tr '\n' ',' | sed 's/,$//')
 HOOKS_CHANGED=$(echo "$CHANGED_FILES"    | grep -c "claude/hooks.json" || true)
 ZSH_MODULES=$(echo "$CHANGED_FILES"      | grep "^zsh/modules/"     | sed 's|zsh/modules/||;s|\.zsh$||'     | tr '\n' ',' | sed 's/,$//')
 ZSHRC_CHANGED=$(echo "$CHANGED_FILES"    | grep -c "^zsh/zshrc$" || true)
-SCRIPTS_CHANGED=$(echo "$CHANGED_FILES"  | grep -c "^scripts/" || true)
 
 # 顯示分析結果
 [[ -n "$COMMANDS_CHANGED" ]] && info "Claude commands：$COMMANDS_CHANGED" || skip "Claude commands（無變更）"
 [[ -n "$AGENTS_CHANGED"   ]] && info "Claude agents：$AGENTS_CHANGED"     || skip "Claude agents（無變更）"
+[[ -n "$RULES_CHANGED"    ]] && info "Claude rules：$RULES_CHANGED"       || skip "Claude rules（無變更）"
 [[ "$HOOKS_CHANGED" -gt 0 ]] && info "hooks.json：有變更"                 || skip "hooks.json（無變更）"
-[[ -n "$ZSH_MODULES"      ]] && info "Zsh modules：$ZSH_MODULES"          || skip "Zsh modules（無變更）"
+[[ -n "$ZSH_MODULES"      ]] && info "zsh 環境模組：$ZSH_MODULES"          || skip "zsh 環境模組（無變更）"
 [[ "$ZSHRC_CHANGED" -gt 0 ]] && info "~/.zshrc：有變更"                   || skip "~/.zshrc（無變更）"
 
 # 若完全沒有可處理的變更
-if [[ -z "$COMMANDS_CHANGED" && -z "$AGENTS_CHANGED" && "$HOOKS_CHANGED" -eq 0 \
-   && -z "$ZSH_MODULES" && "$ZSHRC_CHANGED" -eq 0 ]]; then
+if [[ -z "$COMMANDS_CHANGED" && -z "$AGENTS_CHANGED" && -z "$RULES_CHANGED" \
+   && "$HOOKS_CHANGED" -eq 0 && -z "$ZSH_MODULES" && "$ZSHRC_CHANGED" -eq 0 ]]; then
   info "其他變更（README / scripts / package.json 等），不需重新部署"
-  $DRY_RUN || git pull origin main --quiet
+  $DRY_RUN || git pull origin "$REPO_BRANCH" --quiet
   success "已拉取最新版本"
   exit 0
 fi
@@ -101,7 +106,7 @@ fi
 
 # ── Step 3：git pull ──────────────────────────────────────────────
 step "③ 拉取最新版本"
-git pull origin main --quiet
+git pull origin "$REPO_BRANCH" --quiet
 success "git pull 完成"
 
 # ── Step 4：針對性部署 ────────────────────────────────────────────
@@ -130,10 +135,17 @@ if [[ "$HOOKS_CHANGED" -gt 0 ]]; then
   DEPLOYED=$((DEPLOYED + 1))
 fi
 
-# Zsh modules
+# zsh 環境模組
 if [[ -n "$ZSH_MODULES" ]]; then
-  info "更新 zsh modules：$ZSH_MODULES"
+  info "更新 zsh 環境模組：$ZSH_MODULES"
   zsh "$REPO_DIR/zsh/install.sh" --modules "$ZSH_MODULES"
+  DEPLOYED=$((DEPLOYED + 1))
+fi
+
+# Claude rules
+if [[ -n "$RULES_CHANGED" ]]; then
+  info "更新 rules：$RULES_CHANGED"
+  bash "$REPO_DIR/scripts/install-claude.sh" --rules "$RULES_CHANGED"
   DEPLOYED=$((DEPLOYED + 1))
 fi
 

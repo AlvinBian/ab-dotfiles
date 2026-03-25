@@ -1,7 +1,7 @@
-# ── Node 版本管理（自動偵測 nvm / n）────────────────────────────
-#  優先順序：nvm（lazy loading） > n > 系統 node
+# ── Node 版本管理（動態偵測 nvm / n）────────────────────────────
+#  優先順序：nvm（lazy loading） > n（brew 或手動安裝）
 
-# ── nvm Lazy Loading ──────────────────────────────────────────────
+# ── nvm ───────────────────────────────────────────────────────────
 if [[ -d "$HOME/.nvm" ]]; then
   export NVM_DIR="$HOME/.nvm"
 
@@ -31,10 +31,13 @@ if [[ -d "$HOME/.nvm" ]]; then
   add-zsh-hook chpwd _auto_nvm_use
   _auto_nvm_use
 
-# ── n node version manager ────────────────────────────────────────
+# ── n ─────────────────────────────────────────────────────────────
 elif command -v n &>/dev/null || [[ -d "$HOME/n" ]]; then
-  export N_PREFIX="${N_PREFIX:-$HOME/n}"
-  [[ ":$PATH:" != *":$N_PREFIX/bin:"* ]] && export PATH="$N_PREFIX/bin:$PATH"
+  # 手動安裝（~/n）vs brew 安裝（PATH 已由 brew 設好，無需額外 N_PREFIX）
+  if [[ -d "$HOME/n" ]]; then
+    export N_PREFIX="$HOME/n"
+    [[ ":$PATH:" != *":$N_PREFIX/bin:"* ]] && export PATH="$N_PREFIX/bin:$PATH"
+  fi
 
   _auto_n_use() {
     local version_file=""

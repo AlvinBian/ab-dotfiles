@@ -35,7 +35,7 @@ echo ""
 cat > "$HOOK_FILE" << 'HOOK_EOF'
 #!/usr/bin/env bash
 # ab-dotfiles git post-merge hook
-# 每次 git pull 成功後，自動針對性更新變更的 Claude / Zsh 設定
+# 每次 git pull 成功後，自動針對性更新變更的 Claude / zsh 環境模組
 REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 echo "🔄 [ab-dotfiles] 偵測更新中..."
 bash "$REPO_DIR/scripts/auto-update.sh" 2>&1 | tee -a "$REPO_DIR/.update.log"

@@ -34,6 +34,34 @@ success() { echo -e "  ${GREEN}✔ $1${NC}"; }
 warn()    { echo -e "  ${YELLOW}⚠ $1${NC}"; }
 skip()    { echo -e "  ${DIM}─ $1${NC}"; }
 
+# ── Spinner（網路操作用）─────────────────────────────────────────
+_spin_start() {
+  _SPIN_MSG="$1"
+  ( i=0
+    while true; do
+      case $(( i % 8 )) in
+        0) c='⠋';; 1) c='⠙';; 2) c='⠹';; 3) c='⠸';;
+        4) c='⠼';; 5) c='⠴';; 6) c='⠦';; 7) c='⠧';;
+      esac
+      printf "\r  \033[0;36m%s %s\033[0m   " "$c" "$_SPIN_MSG"
+      sleep 0.1
+      i=$(( i+1 ))
+    done
+  ) &
+  _SPIN_PID=$!
+}
+
+_spin_stop() {
+  local status="${1:-ok}"
+  kill "$_SPIN_PID" 2>/dev/null
+  wait "$_SPIN_PID" 2>/dev/null || true
+  printf "\r\033[2K"
+  [[ "$status" == "ok" ]] \
+    && echo -e "  ${GREEN}✔ $_SPIN_MSG${NC}" \
+    || echo -e "  ${YELLOW}⚠ $_SPIN_MSG${NC}"
+  unset _SPIN_PID _SPIN_MSG
+}
+
 PLUGIN_VERSION="$(python3 -c "import json; d=json.load(open('$REPO_DIR/package.json')); print(d.get('version','1.0.0'))" 2>/dev/null || echo '1.0.0')"
 
 echo ""
@@ -47,16 +75,23 @@ REPO_BRANCH="master"
 # ── Step 1：git pull 取得最新模板 ────────────────────────────────
 step "① 同步最新模板（$REPO_NAME@$REPO_BRANCH）"
 cd "$REPO_DIR"
-git fetch origin "$REPO_BRANCH" --quiet 2>/dev/null && {
+_spin_start "連線 GitHub，檢查更新..."
+if git fetch origin "$REPO_BRANCH" --quiet 2>/dev/null; then
+  _spin_stop "ok"
   LOCAL=$(git rev-parse HEAD)
   REMOTE=$(git rev-parse "origin/$REPO_BRANCH")
   if [[ "$LOCAL" != "$REMOTE" ]]; then
+    _spin_start "拉取最新版本"
     git pull origin "$REPO_BRANCH" --quiet
+    _spin_stop "ok"
     success "已拉取最新版本（$(git log -1 --format='%h %s')）"
   else
     skip "已是最新版本（$(git log -1 --format='%h')）"
   fi
-} || warn "無法連線 GitHub（$REPO_NAME），使用本地版本"
+else
+  _spin_stop "warn"
+  warn "無法連線 GitHub（$REPO_NAME），使用本地版本"
+fi
 cd "$INVOKE_DIR"
 
 # ── Step 2：偵測專案上下文 ────────────────────────────────────────

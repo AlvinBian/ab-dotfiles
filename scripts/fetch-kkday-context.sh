@@ -17,7 +17,7 @@
 #   pnpm run context
 # =============================================================================
 set -e
-trap 'echo -e "\033[1;33m  ⚠ 步驟失敗，中止執行\033[0m"; exit 1' ERR
+trap '[[ -n "${_SPIN_PID:-}" ]] && { kill "$_SPIN_PID" 2>/dev/null; wait "$_SPIN_PID" 2>/dev/null || true; printf "\r\033[2K"; }; echo -e "\033[1;33m  ⚠ 步驟失敗，中止執行\033[0m"; exit 1' ERR
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="$REPO_DIR/ab.config.json"
@@ -30,6 +30,43 @@ info()    { echo -e "  ${CYAN}▶ $1${NC}"; }
 success() { echo -e "  ${GREEN}✔ $1${NC}"; }
 warn()    { echo -e "  ${YELLOW}⚠ $1${NC}"; }
 skip()    { echo -e "  ${DIM}─ $1${NC}"; }
+
+# ── 進度顯示工具 ─────────────────────────────────────────────────
+_spin_start() {
+  _SPIN_MSG="$1"
+  ( i=0
+    while true; do
+      case $(( i % 8 )) in
+        0) c='⠋';; 1) c='⠙';; 2) c='⠹';; 3) c='⠸';;
+        4) c='⠼';; 5) c='⠴';; 6) c='⠦';; 7) c='⠧';;
+      esac
+      printf "\r  \033[0;36m%s %s\033[0m   " "$c" "$_SPIN_MSG"
+      sleep 0.1
+      i=$(( i+1 ))
+    done
+  ) &
+  _SPIN_PID=$!
+}
+
+_spin_stop() {
+  local status="${1:-ok}"
+  kill "$_SPIN_PID" 2>/dev/null
+  wait "$_SPIN_PID" 2>/dev/null || true
+  printf "\r\033[2K"
+  [[ "$status" == "ok" ]] \
+    && echo -e "  ${GREEN}✔ $_SPIN_MSG${NC}" \
+    || echo -e "  ${YELLOW}⚠ $_SPIN_MSG${NC}"
+  unset _SPIN_PID _SPIN_MSG
+}
+
+_progress_bar() {
+  local current="$1" total="$2" label="$3"
+  local width=24 bar="" i
+  local filled=$(( total > 0 ? current * width / total : width ))
+  for (( i=0; i<filled; i++ )); do bar+="█"; done
+  for (( i=filled; i<width; i++ )); do bar+="░"; done
+  echo -e "  ${CYAN}[${bar}]${NC} ${BOLD}${current}/${total}${NC}  ${DIM}${label}${NC}"
+}
 
 PLUGIN_VERSION="$(python3 -c "
 import json
@@ -86,6 +123,7 @@ if [[ -z "$REPOS_JSON" ]]; then
   warn "ab.config.json 中沒有 kkday_repos"; exit 1
 fi
 
+TOTAL_REPOS=$(echo "$REPOS_JSON" | wc -l | tr -d ' ')
 mkdir -p "$DIST_DIR"
 
 # ── package.json 全量分析 ─────────────────────────────────────────
@@ -182,11 +220,14 @@ PYEOF
 
 # ── 逐 repo 打包 ──────────────────────────────────────────────────
 BUILT=0
+REPO_IDX=0
 
 while IFS='|' read -r repo branch; do
   [[ -z "$repo" ]] && continue
+  REPO_IDX=$(( REPO_IDX + 1 ))
   name=$(basename "$repo")
   echo ""
+  _progress_bar "$REPO_IDX" "$TOTAL_REPOS" "$name"
   echo -e "${BLUE}── $name（$repo @ $branch）${NC}"
 
   BUILD_TMP="/tmp/ab-kkday-plugin-$$-$name"
@@ -198,9 +239,11 @@ while IFS='|' read -r repo branch; do
 
   # ── 抓 package.json → 全量分析 ──────────────────────────────────
   PKG_TMPFILE=$(mktemp)
+  _spin_start "抓取 $name/package.json"
   gh api "repos/$repo/contents/package.json?ref=$branch" \
     --jq '.content' 2>/dev/null \
     | base64 -d 2>/dev/null > "$PKG_TMPFILE" || true
+  _spin_stop "ok"
 
   ANALYSIS=$(_analyze_package "$PKG_TMPFILE")
   rm -f "$PKG_TMPFILE"
@@ -220,9 +263,11 @@ while IFS='|' read -r repo branch; do
 
   # ── 抓 CLAUDE.md（選用）────────────────────────────────────────
   CLAUDE_TMPFILE=$(mktemp)
+  _spin_start "抓取 $name/CLAUDE.md"
   gh api "repos/$repo/contents/CLAUDE.md?ref=$branch" \
     --jq '.content' 2>/dev/null \
     | base64 -d 2>/dev/null > "$CLAUDE_TMPFILE" || true
+  _spin_stop "ok"
 
   HAS_CLAUDE=false
   if [[ -s "$CLAUDE_TMPFILE" ]]; then

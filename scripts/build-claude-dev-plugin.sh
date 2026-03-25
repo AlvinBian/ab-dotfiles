@@ -32,6 +32,43 @@ success() { echo -e "  ${GREEN}✔ $1${NC}"; }
 warn()    { echo -e "  ${YELLOW}⚠ $1${NC}"; }
 skip()    { echo -e "  ${DIM}─ $1${NC}"; }
 
+# ── 進度顯示工具 ─────────────────────────────────────────────────
+_spin_start() {
+  _SPIN_MSG="$1"
+  ( i=0
+    while true; do
+      case $(( i % 8 )) in
+        0) c='⠋';; 1) c='⠙';; 2) c='⠹';; 3) c='⠸';;
+        4) c='⠼';; 5) c='⠴';; 6) c='⠦';; 7) c='⠧';;
+      esac
+      printf "\r  \033[0;36m%s %s\033[0m   " "$c" "$_SPIN_MSG"
+      sleep 0.1
+      i=$(( i+1 ))
+    done
+  ) &
+  _SPIN_PID=$!
+}
+
+_spin_stop() {
+  local status="${1:-ok}"
+  kill "$_SPIN_PID" 2>/dev/null
+  wait "$_SPIN_PID" 2>/dev/null || true
+  printf "\r\033[2K"
+  [[ "$status" == "ok" ]] \
+    && echo -e "  ${GREEN}✔ $_SPIN_MSG${NC}" \
+    || echo -e "  ${YELLOW}⚠ $_SPIN_MSG${NC}"
+  unset _SPIN_PID _SPIN_MSG
+}
+
+_progress_bar() {
+  local current="$1" total="$2" label="$3"
+  local width=24 bar="" i
+  local filled=$(( total > 0 ? current * width / total : width ))
+  for (( i=0; i<filled; i++ )); do bar+="█"; done
+  for (( i=filled; i<width; i++ )); do bar+="░"; done
+  echo -e "  ${CYAN}[${bar}]${NC} ${BOLD}${current}/${total}${NC}  ${DIM}${label}${NC}"
+}
+
 PLUGIN_VERSION="$(python3 -c "import json; print(json.load(open('$REPO_DIR/package.json')).get('version','1.0.0'))" 2>/dev/null || echo '1.0.0')"
 
 echo ""
@@ -140,17 +177,23 @@ for r in json.load(open('$CONFIG')).get('kkday_repos', []):
       echo ""
     } > "$CLAUDE_MD_FILE"
 
+    TOTAL_KKDAY=$(echo "$REPOS_JSON" | wc -l | tr -d ' ')
+    KKDAY_IDX=0
     REPO_BUILT=0
     while IFS='|' read -r repo branch; do
       [[ -z "$repo" ]] && continue
+      KKDAY_IDX=$(( KKDAY_IDX + 1 ))
       name=$(basename "$repo")
-      info "抓取 $name..."
+      echo ""
+      _progress_bar "$KKDAY_IDX" "$TOTAL_KKDAY" "$name"
 
       # 抓 package.json
       PKG_TMPFILE=$(mktemp)
+      _spin_start "抓取 $name/package.json"
       gh api "repos/$repo/contents/package.json?ref=$branch" \
         --jq '.content' 2>/dev/null \
         | base64 -d 2>/dev/null > "$PKG_TMPFILE" || true
+      _spin_stop "ok"
 
       PKG_SUMMARY=""
       TECH_STACK=""
@@ -178,9 +221,11 @@ except: print('||')
 
       # 抓 CLAUDE.md
       CLAUDE_TMPFILE=$(mktemp)
+      _spin_start "抓取 $name/CLAUDE.md"
       gh api "repos/$repo/contents/CLAUDE.md?ref=$branch" \
         --jq '.content' 2>/dev/null \
         | base64 -d 2>/dev/null > "$CLAUDE_TMPFILE" || true
+      _spin_stop "ok"
 
       # 寫入合併 CLAUDE.md
       {

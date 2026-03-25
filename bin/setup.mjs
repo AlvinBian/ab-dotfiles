@@ -133,14 +133,15 @@ async function main() {
 
   // ── Claude 安裝流程 ──────────────────────────────────────────
   if (targets.includes('claude-dev')) {
-    p.log.step('claude code 開發規則')
-    console.log()
+    const si = targets.indexOf('claude-dev') + 1
+    const sn = targets.length
+    const sp = sn > 1 ? `[${si}/${sn}] ` : ''
 
     // 選擇 commands
     const selectedCommands = FLAG_ALL
       ? CLAUDE_COMMANDS.map(c => c.value)
       : await multiselectWithAll({
-          message: 'Slash Commands（/xxx）',
+          message: `${sp}claude code › Slash Commands（/xxx）`,
           options: CLAUDE_COMMANDS,
         })
 
@@ -148,7 +149,7 @@ async function main() {
     const selectedAgents = FLAG_ALL
       ? CLAUDE_AGENTS.map(a => a.value)
       : await multiselectWithAll({
-          message: 'Agents（@xxx）',
+          message: `${sp}claude code › Agents（@xxx）`,
           options: CLAUDE_AGENTS,
         })
 
@@ -156,13 +157,14 @@ async function main() {
     const installHooks = FLAG_ALL
       ? true
       : handleCancel(await p.confirm({
-          message: '安裝 Hooks（PostToolUse / PreToolUse / SessionStart / Stop）？',
+          message: `${sp}claude code › 安裝 Hooks（PostToolUse / PreToolUse / SessionStart / Stop）？`,
           initialValue: true,
         }))
 
     // 執行安裝
     const s = p.spinner()
-    s.start('安裝 Claude 設定中...')
+    const hooksLabel = installHooks ? ' · hooks' : ''
+    s.start(`${sp}[1/2] 安裝 ${selectedCommands.length} commands · ${selectedAgents.length} agents${hooksLabel} · rules → ~/.claude/`)
 
     const cmdsArg   = selectedCommands.join(',')
     const agentsArg = selectedAgents.join(',')
@@ -170,83 +172,82 @@ async function main() {
 
     run(`bash scripts/install-claude.sh --commands "${cmdsArg}" --agents "${agentsArg}" --rules "all" ${hooksFlag}`, { stdio: 'pipe' })
 
-    s.stop(`Claude 設定安裝完成（${selectedCommands.length} commands · ${selectedAgents.length} agents${installHooks ? ' · hooks' : ''} · rules）`)
+    s.stop(`${sp}[1/2] ✔ ${selectedCommands.length} commands · ${selectedAgents.length} agents${hooksLabel} · rules 已安裝`)
 
     // ── 生成 ab-claude-dev.plugin ─────────────────────────────────
     console.log()
-    p.log.step('生成 ab-claude-dev.plugin')
     const s2 = p.spinner()
-    s2.start('打包 skills / agents / hooks / rules...')
+    s2.start(`${sp}[2/2] 打包 ab-claude-dev.plugin（含 KKday 上下文，需約 30 秒）...`)
     try {
       runSafe('bash scripts/build-claude-dev-plugin.sh', { stdio: 'pipe' })
-      s2.stop('ab-claude-dev.plugin 打包完成 → dist/ab-claude-dev.plugin')
+      s2.stop(`${sp}[2/2] ✔ ab-claude-dev.plugin 打包完成 → dist/ab-claude-dev.plugin`)
     } catch (e) {
-      s2.stop('plugin 打包失敗，略過')
+      s2.stop(`${sp}[2/2] plugin 打包失敗，略過`)
       p.log.warn(e.message)
     }
   }
 
   // ── Slack 安裝流程 ────────────────────────────────────────────
   if (targets.includes('slack')) {
-    p.log.step('Slack 格式工具')
-    console.log()
+    const si = targets.indexOf('slack') + 1
+    const sn = targets.length
+    const sp = sn > 1 ? `[${si}/${sn}] ` : ''
 
-    // claude-dev 已安裝全部 commands + rules，slack 只需 build plugin
     const claudeDevAlreadyRan = targets.includes('claude-dev')
 
     if (!claudeDevAlreadyRan) {
-      // Slack commands 固定三個，不需要 multiselect
       const installHooksSlack = handleCancel(await p.confirm({
-        message: '安裝通用 Hooks（PostToolUse / PreToolUse / SessionStart / Stop）？',
+        message: `${sp}Slack › 安裝通用 Hooks（PostToolUse / PreToolUse / SessionStart / Stop）？`,
         initialValue: false,
       }))
 
       const s = p.spinner()
-      s.start('安裝 Slack 設定中...')
+      const slackHooksLabel = installHooksSlack ? ' · hooks' : ''
+      s.start(`${sp}[1/2] 安裝 ${SLACK_COMMANDS.length} Slack commands · slack-mrkdwn rule${slackHooksLabel} → ~/.claude/`)
 
       const slackCmds = SLACK_COMMANDS.map(c => c.value).join(',')
       const hooksFlag = installHooksSlack ? '--hooks' : ''
 
       run(`bash scripts/install-claude.sh --commands "${slackCmds}" --rules "slack-mrkdwn" ${hooksFlag}`, { stdio: 'pipe' })
 
-      s.stop(`Slack 設定安裝完成（${SLACK_COMMANDS.length} commands · slack-mrkdwn rule${installHooksSlack ? ' · hooks' : ''}）`)
+      s.stop(`${sp}[1/2] ✔ ${SLACK_COMMANDS.length} commands · slack-mrkdwn rule${slackHooksLabel} 已安裝`)
     } else {
-      p.log.info('claude-dev 已安裝全部設定，略過 Slack 獨立安裝步驟')
+      p.log.info(`${sp}[1/2] claude-dev 已安裝全部設定，略過 Slack 獨立安裝步驟`)
     }
 
     // ── 生成 ab-slack-message.plugin ─────────────────────────────
     console.log()
-    p.log.step('生成 ab-slack-message.plugin')
     const s2 = p.spinner()
-    s2.start('打包 slack skills / rules...')
+    s2.start(`${sp}[2/2] 打包 ab-slack-message.plugin...`)
     try {
       runSafe('bash scripts/build-slack-plugin.sh', { stdio: 'pipe' })
-      s2.stop('ab-slack-message.plugin 打包完成 → dist/ab-slack-message.plugin')
+      s2.stop(`${sp}[2/2] ✔ ab-slack-message.plugin 打包完成 → dist/ab-slack-message.plugin`)
     } catch (e) {
-      s2.stop('plugin 打包失敗，略過')
+      s2.stop(`${sp}[2/2] plugin 打包失敗，略過`)
       p.log.warn(e.message)
     }
   }
 
   // ── Zsh 安裝流程 ─────────────────────────────────────────────
   if (targets.includes('zsh')) {
-    p.log.step('zsh 環境模組')
-    console.log()
+    const si = targets.indexOf('zsh') + 1
+    const sn = targets.length
+    const sp = sn > 1 ? `[${si}/${sn}] ` : ''
 
     const selectedModules = FLAG_ALL
       ? ZSH_MODULES.map(m => m.value)
       : await multiselectWithAll({
-          message: '選擇要安裝的 zsh 環境模組',
+          message: `${sp}zsh › 選擇要安裝的環境模組`,
           options: ZSH_MODULES,
         })
 
     if (selectedModules.length > 0) {
       const s = p.spinner()
-      s.start(`安裝 ${selectedModules.length} 個 zsh 環境模組...`)
+      s.start(`${sp}安裝 ${selectedModules.length}/${ZSH_MODULES.length} 個 zsh 模組 → ~/.zsh/modules/`)
 
       run(`zsh zsh/install.sh --modules "${selectedModules.join(',')}"`, { stdio: 'pipe' })
 
-      s.stop(`zsh 環境模組安裝完成（${selectedModules.join('、')}）`)
+      s.stop(`${sp}✔ ${selectedModules.length} 個 zsh 模組已安裝（${selectedModules.join('、')}）`)
     }
   }
 

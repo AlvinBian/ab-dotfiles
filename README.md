@@ -24,28 +24,28 @@ Alvin Bian 的個人開發環境設定腳本。新機器初始化、Claude Code 
 
 ```bash
 # 1. clone 這個 repo
-git clone git@github.com:AlvinBian/ab-dotfiles.git ~/scripts
+git clone git@github.com:AlvinBian/ab-dotfiles.git ~/Documents/MyProjects/ab-dotfiles
 
 # 2. 設定 Zsh 環境
-bash ~/scripts/setup-zsh.sh
+bash ~/Documents/MyProjects/ab-dotfiles/setup-zsh.sh
 
 # 3. 修復開發環境
-bash ~/scripts/fix-dev-env.sh
+bash ~/Documents/MyProjects/ab-dotfiles/fix-dev-env.sh
 
 # 4-a. Claude Code CLI / VSCode / JetBrains
-bash ~/scripts/install-to-claude-code.sh
+bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh
 
 # 4-b. Cowork Desktop App
-bash ~/scripts/build-cowork-plugin.sh
-# → 將 ~/scripts/ab-dotfiles.plugin 拖入 Cowork 安裝
+bash ~/Documents/MyProjects/ab-dotfiles/build-cowork-plugin.sh
+# → 將 ~/Documents/MyProjects/ab-dotfiles/ab-dotfiles.plugin 拖入 Cowork 安裝
 ```
 
 ## Claude Code 全客戶端共用
 
 ```
-~/scripts/claude-commands/*.md   ← 唯一 source of truth
-~/scripts/claude-agents/*.md
-~/scripts/claude-hooks.json
+~/Documents/MyProjects/ab-dotfiles/claude-commands/*.md   ← 唯一 source of truth
+~/Documents/MyProjects/ab-dotfiles/claude-agents/*.md
+~/Documents/MyProjects/ab-dotfiles/claude-hooks.json
          │
          ├── install-to-claude-code.sh → ~/.claude/  → ✅ CLI + VSCode + JetBrains
          └── build-cowork-plugin.sh    → ab-dotfiles.plugin → ✅ Cowork
@@ -70,7 +70,7 @@ Subagents：`explorer`（Haiku，省 token 掃描）、`reviewer`（Sonnet，深
 
 ```bash
 # 修改 claude-commands/ 或 claude-agents/ 後：
-bash ~/scripts/install-to-claude-code.sh   # CLI/VSCode 立即生效
-bash ~/scripts/build-cowork-plugin.sh      # 重新打包 → 拖入 Cowork
+bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh   # CLI/VSCode 立即生效
+bash ~/Documents/MyProjects/ab-dotfiles/build-cowork-plugin.sh      # 重新打包 → 拖入 Cowork
 git add -A && git commit -m "..." && git push
 ```

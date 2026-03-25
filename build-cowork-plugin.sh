@@ -3,7 +3,7 @@
 # build-cowork-plugin.sh
 # 從 ~/scripts/claude-commands/ 打包成 ab-dotfiles.plugin，供 Cowork 安裝
 #
-# 用法：bash ~/scripts/build-cowork-plugin.sh
+# 用法：bash ~/Documents/MyProjects/ab-dotfiles/build-cowork-plugin.sh
 # 輸出：~/scripts/ab-dotfiles.plugin（拖入 Cowork Desktop App 安裝）
 #
 # ~/scripts/ 是唯一 source of truth：
@@ -75,6 +75,6 @@ echo "📦 安裝到 Cowork："
 echo "   將 ab-dotfiles.plugin 拖入 Claude Desktop App 視窗即可安裝"
 echo ""
 echo "🔄 更新流程（修改 claude-commands/ 後）："
-echo "   1. bash ~/scripts/install-to-claude-code.sh  ← CLI/VSCode 立即生效"
-echo "   2. bash ~/scripts/build-cowork-plugin.sh     ← 重新打包"
+echo "   1. bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh  ← CLI/VSCode 立即生效"
+echo "   2. bash ~/Documents/MyProjects/ab-dotfiles/build-cowork-plugin.sh     ← 重新打包"
 echo "   3. 拖入 Cowork 重新安裝 .plugin              ← Cowork 生效"

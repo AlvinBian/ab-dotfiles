@@ -3,7 +3,7 @@
 # install-to-claude-code.sh
 # 將 ~/scripts/claude-commands、claude-agents、claude-hooks.json
 # 安裝到 Claude Code CLI 全域設定（~/.claude/）
-# 用法：bash ~/scripts/install-to-claude-code.sh
+# 用法：bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh
 # =============================================================================
 set -e
 
@@ -76,4 +76,4 @@ echo "🤖 Agents        ($(ls $AGENTS_DIR/*.md  2>/dev/null | wc -l | tr -d ' '
 echo "🪝 Hooks         → $SETTINGS_FILE"
 echo ""
 echo -e "${YELLOW}⚠️  Hooks 在下次 claude 啟動後生效${NC}"
-echo "💡 日後更新：bash ~/scripts/install-to-claude-code.sh"
+echo "💡 日後更新：bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh"

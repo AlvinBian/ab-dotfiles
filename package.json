@@ -1,0 +1,20 @@
+{
+  "name": "ab-dotfiles",
+  "version": "1.0.0",
+  "description": "Alvin Bian 個人開發工具包：Claude Code 全域設定、KKday 開發規範、Kiro 工作區生成",
+  "private": true,
+  "packageManager": "pnpm@9.15.5",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "install:claude": "bash install-to-claude-code.sh",
+    "build:plugin": "bash build-cowork-plugin.sh",
+    "workspace": "bash generate-workspace.sh",
+    "setup": "bash setup-zsh.sh",
+    "fix-env": "bash fix-dev-env.sh",
+    "deploy": "pnpm run install:claude && pnpm run build:plugin",
+    "open:workspace": "bash generate-workspace.sh && open \"$(dirname $(pwd))/$(basename $(dirname $(pwd))).code-workspace\""
+  }
+}

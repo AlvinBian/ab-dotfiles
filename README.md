@@ -1,76 +1,91 @@
 # ab-dotfiles
 
-Alvin Bian 的個人開發環境設定腳本。新機器初始化、Claude Code CLI 全域設定、Zsh 環境配置一鍵完成。
+Alvin Bian 個人開發工具包。管理 Claude Code 全域設定、KKday 開發規範、自動生成 Kiro / VS Code 工作區。
 
-## 本機專案目錄
+## 目錄結構
 
-| 路徑 | 用途 |
-|------|------|
-| `~/Kkday/Projects/kkday-b2c-web` | KKday B2C Web（Nuxt 3 + Vue + TypeScript） |
-| `~/Kkday/Projects/kkday-member-ci` | KKday Member CI（CodeIgniter + Vue 2.7 + TypeScript） |
-| `~/Documents/MyProjects/ab-flash` | 個人專案 ab-flash（Python） |
-| `~/Documents/MyProjects/Study/` | 學習 / 練習專案 |
+```
+ab-dotfiles/
+├── package.json              # pnpm 腳本入口
+├── claude-commands/          # Slash commands（/code-review、/pr-workflow 等）
+├── claude-agents/            # 自定義 agents（explorer、reviewer）
+├── claude-hooks.json         # Hooks 設定（Prettier、lint、env 保護）
+├── install-to-claude-code.sh # 安裝到 Claude Code CLI / VSCode
+├── build-cowork-plugin.sh    # 打包成 Cowork .plugin 檔
+├── generate-workspace.sh     # 自動生成 Kiro / VS Code 工作區
+├── setup-zsh.sh              # Zsh 環境初始化
+└── fix-dev-env.sh            # 開發環境修復工具
+```
 
-## 腳本清單
-
-| 腳本 | 說明 |
-|------|------|
-| `setup-zsh.sh` | Zsh / Oh-My-Zsh 環境設定、plugins、aliases |
-| `fix-dev-env.sh` | 開發環境問題修復（Node、pnpm、PHP 等） |
-| `install-to-claude-code.sh` | Claude Code CLI 全域指令 & hooks 安裝（CLI / VSCode / JetBrains） |
-| `build-cowork-plugin.sh` | 打包 ab-dotfiles.plugin，供 Cowork Desktop App 安裝 |
-
-## 新機器初始化順序
+## 快速開始
 
 ```bash
-# 1. clone 這個 repo
-git clone git@github.com:AlvinBian/ab-dotfiles.git ~/Documents/MyProjects/ab-dotfiles
+# 安裝依賴（可選，只需 pnpm scripts）
+pnpm install
 
-# 2. 設定 Zsh 環境
-bash ~/Documents/MyProjects/ab-dotfiles/setup-zsh.sh
+# 安裝到 Claude Code CLI / VSCode / JetBrains
+pnpm run install:claude
 
-# 3. 修復開發環境
-bash ~/Documents/MyProjects/ab-dotfiles/fix-dev-env.sh
+# 打包成 Cowork Desktop App 的 .plugin 檔
+pnpm run build:plugin
 
-# 4-a. Claude Code CLI / VSCode / JetBrains
-bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh
+# 一鍵同時部署 CLI + Cowork
+pnpm run deploy
 
-# 4-b. Cowork Desktop App
-bash ~/Documents/MyProjects/ab-dotfiles/build-cowork-plugin.sh
-# → 將 ~/Documents/MyProjects/ab-dotfiles/ab-dotfiles.plugin 拖入 Cowork 安裝
+# 生成 Kiro / VS Code 工作區（掃描同級所有 git 專案）
+pnpm run workspace
 ```
 
-## Claude Code 全客戶端共用
+## 工作區生成
 
-```
-~/Documents/MyProjects/ab-dotfiles/claude-commands/*.md   ← 唯一 source of truth
-~/Documents/MyProjects/ab-dotfiles/claude-agents/*.md
-~/Documents/MyProjects/ab-dotfiles/claude-hooks.json
-         │
-         ├── install-to-claude-code.sh → ~/.claude/  → ✅ CLI + VSCode + JetBrains
-         └── build-cowork-plugin.sh    → ab-dotfiles.plugin → ✅ Cowork
-```
-
-## 可用指令（安裝後）
-
-| 指令 | 功能 |
-|------|------|
-| `/code-review` | KKday Vue/TS/PHP 程式碼審查 |
-| `/pr-workflow` | 分支 → commit → 發 PR 完整流程 |
-| `/test-gen` | 自動生成 Vitest / Jest / PHPUnit 測試 |
-| `/kkday-conventions` | KKday 開發規範速查 |
-| `/auto-setup` | 新專案環境自動偵測與設定 |
-| `/draft-slack` | 生成符合 mrkdwn 格式的 Slack 訊息 |
-| `/review-slack` | 審查 Slack 訊息格式 |
-| `/slack-formatting` | Slack mrkdwn 語法完整參考 |
-
-Subagents：`explorer`（Haiku，省 token 掃描）、`reviewer`（Sonnet，深度審查）
-
-## 更新 skill 流程
+`generate-workspace.sh` 會掃描 `~/Documents/MyProjects/` 下所有 git 專案（含 Study/ 子目錄），
+自動輸出 `MyProjects.code-workspace`，可直接在 Kiro 或 VS Code 開啟。
 
 ```bash
-# 修改 claude-commands/ 或 claude-agents/ 後：
-bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh   # CLI/VSCode 立即生效
-bash ~/Documents/MyProjects/ab-dotfiles/build-cowork-plugin.sh      # 重新打包 → 拖入 Cowork
-git add -A && git commit -m "..." && git push
+pnpm run workspace
+# → 輸出：~/Documents/MyProjects/MyProjects.code-workspace
+
+# 用 Kiro 開啟
+open ~/Documents/MyProjects/MyProjects.code-workspace
 ```
+
+## Claude Code 覆蓋範圍
+
+| 工具            | 方式                            |
+| -------------- | ------------------------------- |
+| Claude Code CLI | `pnpm run install:claude`       |
+| VS Code 插件    | `pnpm run install:claude`       |
+| JetBrains 插件  | `pnpm run install:claude`       |
+| Cowork Desktop | `pnpm run build:plugin` + 拖入  |
+
+## 更新流程
+
+修改 `claude-commands/` 或 `claude-agents/` 後：
+
+```bash
+# 1. CLI / VSCode 立即生效
+pnpm run install:claude
+
+# 2. 重新打包 Cowork plugin
+pnpm run build:plugin
+
+# 3. 將 ab-dotfiles.plugin 拖入 Cowork Desktop App 重新安裝
+```
+
+## Slash Commands
+
+| 指令               | 說明                         |
+| ----------------- | ---------------------------- |
+| `/auto-setup`     | 自動檢測專案環境並推薦配置    |
+| `/code-review`    | KKday 規範深度審查            |
+| `/kkday-conventions` | Vue/TS/PHP 開發規範查詢    |
+| `/pr-workflow`    | PR 分支→commit→發 PR 全流程  |
+| `/test-gen`       | 自動生成 Vitest/Jest 測試     |
+| `/slack-formatting` | Slack mrkdwn 格式化         |
+| `/draft-slack`    | 生成結構化 Slack 訊息         |
+| `/review-slack`   | 檢查 Slack 訊息格式           |
+
+## Agents
+
+- **explorer** — 快速掃描 codebase，動態探索所有本地 git 專案（Haiku 省 token）
+- **reviewer** — 深度程式碼審查，KKday Vue/TS/PHP 規範合規

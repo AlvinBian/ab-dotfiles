@@ -1,0 +1,53 @@
+{
+  "description": "ab-claude-code hooks：自動格式化、PHP 語法檢查、保護受保護檔案、context 壓縮提示、任務完成確認",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; if [[ \"$FILE\" == *.ts || \"$FILE\" == *.vue || \"$FILE\" == *.js || \"$FILE\" == *.tsx ]]; then npx prettier --write \"$FILE\" 2>/dev/null; elif [[ \"$FILE\" == *.php ]]; then php -l \"$FILE\" 2>&1 | grep -v 'No syntax errors' || true; fi; exit 0",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; for p in '.env' '.env.local' '.env.production' 'package-lock.json' 'pnpm-lock.yaml' 'yarn.lock' 'composer.lock' 'Podfile.lock'; do [[ \"$FILE\" == *\"$p\"* ]] && echo \"Blocked: $FILE is protected\" >&2 && exit 2; done; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "BRANCH=$(git branch --show-current 2>/dev/null); TICKET=$(echo \"$BRANCH\" | grep -oE '[A-Z]+-[0-9]+' | head -1); echo \"⚠️ Context 已壓縮。保留：當前任務目標、已修改檔案、驗證狀態、未完成 TODO。${TICKET:+Ticket: $TICKET}\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "檢查是否所有要求的任務都已完成。如果有遺漏，回傳 {\"ok\": false, \"reason\": \"尚未完成：<具體項目>\"}。如果都完成了，回傳 {\"ok\": true}。注意：如果 stop_hook_active 為 true，直接回傳 {\"ok\": true}。",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

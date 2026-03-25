@@ -51,11 +51,15 @@ pnpm run setup        # 互動式安裝精靈
 
 ---
 
-## pnpm 指令（5 條）
+## pnpm 指令
 
 | 指令 | 說明 |
 |------|------|
 | `pnpm run setup` | 互動式安裝精靈 — 選擇 Claude / Zsh / 全部 |
+| `pnpm run update` | 從 GitHub 拉取最新版本，針對性更新變更部分 |
+| `pnpm run update:dry` | 預覽有哪些變更，不實際執行 |
+| `pnpm run hooks` | 安裝自動更新機制（git hook + launchd 排程） |
+| `pnpm run hooks:off` | 移除自動更新機制 |
 | `pnpm run deploy` | 安裝 Claude 設定 + 打包 .plugin（日常更新用） |
 | `pnpm run build` | 只打包 dist/ab-dotfiles.plugin |
 | `pnpm run workspace` | 掃描 git repos，生成 Kiro / VS Code 工作區 |
@@ -67,6 +71,48 @@ pnpm run setup        # 互動式安裝精靈
 pnpm run setup -- --all     # 全部安裝
 pnpm run setup -- --claude  # 只安裝 Claude 設定
 pnpm run setup -- --zsh     # 只安裝 Zsh 環境
+```
+
+---
+
+## 自動同步 GitHub
+
+### 安裝方式
+
+```bash
+pnpm run hooks
+```
+
+安裝後有兩個自動觸發時機：
+
+| 觸發時機 | 行為 |
+|----------|------|
+| `git pull` 後 | 自動偵測變更，針對性部署（透過 post-merge hook） |
+| 每天 09:00 | 自動從 GitHub fetch，有更新則部署（透過 launchd） |
+
+### 針對性更新邏輯
+
+只更新實際有變更的部分，不觸碰未改動的設定：
+
+```
+claude/commands/xxx.md 變更  →  只更新 ~/.claude/commands/xxx.md
+claude/agents/xxx.md 變更    →  只更新 ~/.claude/agents/xxx.md
+claude/hooks.json 變更       →  只 merge hooks（不覆蓋既有設定）
+zsh/modules/xxx.zsh 變更     →  只更新 ~/.zsh/modules/xxx.zsh
+zsh/zshrc 變更               →  備份後更新 ~/.zshrc
+```
+
+### 手動執行
+
+```bash
+pnpm run update           # 立即從 GitHub 拉取並部署
+pnpm run update:dry       # 預覽將要更新的內容，不實際執行
+
+# 查看更新歷史
+tail -f .update.log
+
+# 移除自動更新
+pnpm run hooks:off
 ```
 
 ---

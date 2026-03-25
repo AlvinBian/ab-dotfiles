@@ -10,6 +10,10 @@
   },
   "scripts": {
     "setup":     "node bin/setup.mjs",
+    "update":    "bash scripts/auto-update.sh",
+    "update:dry":"bash scripts/auto-update.sh --dry-run",
+    "hooks":     "bash scripts/setup-hooks.sh",
+    "hooks:off": "bash scripts/setup-hooks.sh --uninstall",
     "deploy":    "bash scripts/install-claude.sh && bash scripts/build-plugin.sh",
     "build":     "bash scripts/build-plugin.sh",
     "workspace": "bash scripts/generate-workspace.sh",

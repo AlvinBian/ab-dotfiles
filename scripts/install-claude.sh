@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
 # scripts/install-claude.sh
-# 安裝 claude/ 設定到 Claude Code CLI 全域設定（~/.claude/）
+# 安裝 claude/ 設定到 ~/.claude/
 #
 # 用法：
-#   pnpm run install:claude
-#   bash scripts/install-claude.sh
+#   bash scripts/install-claude.sh                          ← 全部安裝
+#   bash scripts/install-claude.sh --commands "a,b" --agents "explorer" --hooks
+#   （由 bin/setup.mjs 傳入具體選擇）
 # =============================================================================
 set -e
 
-# 從 scripts/ 往上一層取得 repo root
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 COMMANDS_DIR="$CLAUDE_DIR/commands"
@@ -18,31 +18,63 @@ SETTINGS_FILE="$CLAUDE_DIR/settings.json"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 
-echo -e "${BLUE}=== Claude Code CLI 全域設定安裝 ===${NC}"
+# ── 解析參數 ──────────────────────────────────────────────────────
+SELECTED_COMMANDS=""
+SELECTED_AGENTS=""
+INSTALL_HOOKS=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --commands) SELECTED_COMMANDS="$2"; shift 2 ;;
+    --agents)   SELECTED_AGENTS="$2";   shift 2 ;;
+    --hooks)    INSTALL_HOOKS=true;     shift ;;
+    *)          shift ;;
+  esac
+done
+
+# 若未指定，預設全部
+if [[ -z "$SELECTED_COMMANDS" && -z "$SELECTED_AGENTS" && "$INSTALL_HOOKS" == false ]]; then
+  SELECTED_COMMANDS="all"
+  SELECTED_AGENTS="all"
+  INSTALL_HOOKS=true
+fi
 
 mkdir -p "$COMMANDS_DIR" "$AGENTS_DIR"
 
-# 安裝 slash commands
-echo -e "${BLUE}📦 安裝 slash commands...${NC}"
-for f in "$REPO_DIR/claude/commands/"*.md; do
-  cp "$f" "$COMMANDS_DIR/"
-  echo -e "${GREEN}  ✅ $(basename $f)${NC}"
-done
+# ── 安裝 commands ─────────────────────────────────────────────────
+if [[ -n "$SELECTED_COMMANDS" ]]; then
+  echo -e "${BLUE}📦 安裝 slash commands...${NC}"
+  IFS=',' read -ra CMD_LIST <<< "$SELECTED_COMMANDS"
+  for f in "$REPO_DIR/claude/commands/"*.md; do
+    name=$(basename "$f" .md)
+    if [[ "$SELECTED_COMMANDS" == "all" ]] || printf '%s\n' "${CMD_LIST[@]}" | grep -qx "$name"; then
+      cp "$f" "$COMMANDS_DIR/"
+      echo -e "${GREEN}  ✅ /$name${NC}"
+    fi
+  done
+fi
 
-# 安裝 agents
-echo -e "${BLUE}🤖 安裝 agents...${NC}"
-for f in "$REPO_DIR/claude/agents/"*.md; do
-  cp "$f" "$AGENTS_DIR/"
-  echo -e "${GREEN}  ✅ $(basename $f)${NC}"
-done
+# ── 安裝 agents ───────────────────────────────────────────────────
+if [[ -n "$SELECTED_AGENTS" ]]; then
+  echo -e "${BLUE}🤖 安裝 agents...${NC}"
+  IFS=',' read -ra AGENT_LIST <<< "$SELECTED_AGENTS"
+  for f in "$REPO_DIR/claude/agents/"*.md; do
+    name=$(basename "$f" .md)
+    if [[ "$SELECTED_AGENTS" == "all" ]] || printf '%s\n' "${AGENT_LIST[@]}" | grep -qx "$name"; then
+      cp "$f" "$AGENTS_DIR/"
+      echo -e "${GREEN}  ✅ @$name${NC}"
+    fi
+  done
+fi
 
-# 合併 hooks 到 settings.json
-echo -e "${BLUE}🪝 安裝 hooks...${NC}"
-HOOKS_FILE="$REPO_DIR/claude/hooks.json"
-if [ ! -f "$HOOKS_FILE" ]; then
-  echo -e "${YELLOW}  ⚠️  claude/hooks.json 不存在，略過${NC}"
-else
-  python3 - "$SETTINGS_FILE" "$HOOKS_FILE" << 'PYEOF'
+# ── 安裝 hooks ────────────────────────────────────────────────────
+if [[ "$INSTALL_HOOKS" == true ]]; then
+  echo -e "${BLUE}🪝 安裝 hooks...${NC}"
+  HOOKS_FILE="$REPO_DIR/claude/hooks.json"
+  if [ ! -f "$HOOKS_FILE" ]; then
+    echo -e "${YELLOW}  ⚠️  claude/hooks.json 不存在，略過${NC}"
+  else
+    python3 - "$SETTINGS_FILE" "$HOOKS_FILE" << 'PYEOF'
 import json, sys, os
 settings_path, hooks_path = sys.argv[1], sys.argv[2]
 new_hooks = json.load(open(hooks_path))["hooks"]
@@ -65,15 +97,5 @@ with open(settings_path, "w") as f:
   json.dump(existing, f, indent=2, ensure_ascii=False)
 print("  ✅ hooks 合併完成")
 PYEOF
+  fi
 fi
-
-echo ""
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}✅ 安裝完成！${NC}"
-echo -e "${GREEN}========================================${NC}"
-echo ""
-echo "📁 Slash commands ($(ls $COMMANDS_DIR/*.md 2>/dev/null | wc -l | tr -d ' ') 個) → $COMMANDS_DIR/"
-echo "🤖 Agents        ($(ls $AGENTS_DIR/*.md  2>/dev/null | wc -l | tr -d ' ') 個) → $AGENTS_DIR/"
-echo "🪝 Hooks         → $SETTINGS_FILE"
-echo ""
-echo -e "${YELLOW}⚠️  Hooks 在下次 claude 啟動後生效${NC}"

@@ -6,3 +6,7 @@
 
 # Build outputs
 dist/
+
+# Node
+node_modules/
+pnpm-lock.yaml

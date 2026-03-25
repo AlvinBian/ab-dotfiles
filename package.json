@@ -9,17 +9,11 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "setup": "node bin/setup.mjs",
-    "setup:all": "node bin/setup.mjs --all",
-    "setup:claude": "node bin/setup.mjs --claude",
-    "setup:zsh": "node bin/setup.mjs --zsh",
-    "install:claude": "bash scripts/install-claude.sh",
-    "install:zsh": "bash zsh/install.sh --all",
-    "fix:env": "bash zsh/fix-env.sh",
-    "build:plugin": "bash scripts/build-plugin.sh",
+    "setup":     "node bin/setup.mjs",
+    "deploy":    "bash scripts/install-claude.sh && bash scripts/build-plugin.sh",
+    "build":     "bash scripts/build-plugin.sh",
     "workspace": "bash scripts/generate-workspace.sh",
-    "workspace:open": "bash scripts/generate-workspace.sh && open \"$(dirname $(pwd))/$(basename $(dirname $(pwd))).code-workspace\"",
-    "deploy": "bash scripts/install-claude.sh && bash scripts/build-plugin.sh"
+    "fix":       "bash zsh/fix-env.sh"
   },
   "devDependencies": {
     "@clack/prompts": "^0.9.1"

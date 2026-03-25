@@ -41,6 +41,24 @@ fi
 
 mkdir -p "$COMMANDS_DIR" "$AGENTS_DIR"
 
+# ── 安全複製（差異偵測 + 備份）──────────────────────────────────
+# 若目標已存在且內容不同 → 備份原檔後覆寫
+# 若目標不存在或內容相同 → 直接複製（無動作）
+_safe_copy() {
+  local src="$1" dest="$2" label="$3"
+  if [[ -f "$dest" ]]; then
+    if diff -q "$src" "$dest" &>/dev/null; then
+      echo -e "${YELLOW}  ─ $label（無變更，略過）${NC}"
+      return
+    else
+      cp "$dest" "${dest}.bak"
+      echo -e "${YELLOW}  ↩ $label（已備份原檔 → .bak）${NC}"
+    fi
+  fi
+  cp "$src" "$dest"
+  echo -e "${GREEN}  ✅ $label${NC}"
+}
+
 # ── 安裝 commands ─────────────────────────────────────────────────
 if [[ -n "$SELECTED_COMMANDS" ]]; then
   echo -e "${BLUE}📦 安裝 slash commands...${NC}"
@@ -48,8 +66,7 @@ if [[ -n "$SELECTED_COMMANDS" ]]; then
   for f in "$REPO_DIR/claude/commands/"*.md; do
     name=$(basename "$f" .md)
     if [[ "$SELECTED_COMMANDS" == "all" ]] || printf '%s\n' "${CMD_LIST[@]}" | grep -qx "$name"; then
-      cp "$f" "$COMMANDS_DIR/"
-      echo -e "${GREEN}  ✅ /$name${NC}"
+      _safe_copy "$f" "$COMMANDS_DIR/$name.md" "/$name"
     fi
   done
 fi
@@ -61,8 +78,7 @@ if [[ -n "$SELECTED_AGENTS" ]]; then
   for f in "$REPO_DIR/claude/agents/"*.md; do
     name=$(basename "$f" .md)
     if [[ "$SELECTED_AGENTS" == "all" ]] || printf '%s\n' "${AGENT_LIST[@]}" | grep -qx "$name"; then
-      cp "$f" "$AGENTS_DIR/"
-      echo -e "${GREEN}  ✅ @$name${NC}"
+      _safe_copy "$f" "$AGENTS_DIR/$name.md" "@$name"
     fi
   done
 fi

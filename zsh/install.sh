@@ -137,11 +137,16 @@ mkdir -p ~/.zsh/modules
 
 for name in $SELECTED_MODULES; do
   src="$MODULES_DIR/$name.zsh"
-  if [[ -f "$src" ]]; then
-    cp "$src" ~/.zsh/modules/"$name.zsh"
-    success "$name.zsh"
-  else
+  dest=~/.zsh/modules/"$name.zsh"
+  if [[ ! -f "$src" ]]; then
     warn "$name.zsh 不存在於 $MODULES_DIR，略過"
+    continue
+  fi
+  if [[ -f "$dest" ]] && diff -q "$src" "$dest" &>/dev/null; then
+    info "$name.zsh（無變更，略過）"
+  else
+    cp "$src" "$dest"
+    success "$name.zsh"
   fi
 done
 

@@ -45,33 +45,29 @@ ab-dotfiles/
 ## 快速開始
 
 ```bash
-# 安裝依賴
-pnpm install
-
-# 互動式安裝精靈（選擇 Claude / Zsh / 全部）
-pnpm run setup
-
-# 非互動式：全部安裝
-pnpm run setup:all
+pnpm install          # 安裝依賴（首次）
+pnpm run setup        # 互動式安裝精靈
 ```
 
 ---
 
-## pnpm 指令
+## pnpm 指令（5 條）
 
 | 指令 | 說明 |
 |------|------|
-| `pnpm run setup` | 互動式安裝精靈（@clack/prompts TUI） |
-| `pnpm run setup:all` | 全部安裝（非互動） |
-| `pnpm run setup:claude` | 只安裝 Claude 設定 |
-| `pnpm run setup:zsh` | 只安裝 Zsh 環境 |
-| `pnpm run install:claude` | 直接執行 install-claude.sh（全部） |
-| `pnpm run install:zsh` | 直接執行 zsh/install.sh --all |
-| `pnpm run build:plugin` | 打包 dist/ab-dotfiles.plugin |
-| `pnpm run deploy` | install:claude + build:plugin 一鍵完成 |
-| `pnpm run workspace` | 生成 Kiro / VS Code 工作區 |
-| `pnpm run workspace:open` | 生成並立即開啟工作區 |
-| `pnpm run fix:env` | 修復開發環境（node/pnpm 衝突等） |
+| `pnpm run setup` | 互動式安裝精靈 — 選擇 Claude / Zsh / 全部 |
+| `pnpm run deploy` | 安裝 Claude 設定 + 打包 .plugin（日常更新用） |
+| `pnpm run build` | 只打包 dist/ab-dotfiles.plugin |
+| `pnpm run workspace` | 掃描 git repos，生成 Kiro / VS Code 工作區 |
+| `pnpm run fix` | 修復開發環境（node/pnpm 版本衝突等） |
+
+`setup` 支援 flag 快捷模式（跳過互動）：
+
+```bash
+pnpm run setup -- --all     # 全部安裝
+pnpm run setup -- --claude  # 只安裝 Claude 設定
+pnpm run setup -- --zsh     # 只安裝 Zsh 環境
+```
 
 ---
 

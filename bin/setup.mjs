@@ -36,18 +36,17 @@ const CLAUDE_AGENTS = [
   { value: 'reviewer', label: '@reviewer', hint: '深度程式碼審查（Sonnet）' },
 ]
 
-// ── Zsh 模組定義 ────────────────────────────────────────────────
+// ── Zsh 模組定義（Zinit + p10k 架構，10 → 8 模組）──────────────
+// plugins / completion / keybindings 已整合進 zinit.zsh
 const ZSH_MODULES = [
-  { value: 'nvm',          label: 'nvm',          hint: 'Node 版本管理（lazy load，支援 nvm / n）' },
-  { value: 'pnpm',         label: 'pnpm',         hint: 'PNPM PATH 設定' },
-  { value: 'completion',   label: 'completion',   hint: 'ZSH 補全系統（智慧配色 + 模糊比對）' },
-  { value: 'history',      label: 'history',      hint: '歷史記錄（50000 筆，去重、跨 session 共享）' },
-  { value: 'keybindings',  label: 'keybindings',  hint: '按鍵綁定（Option 移動單詞 / Ctrl 刪行）' },
-  { value: 'plugins',      label: 'plugins',      hint: 'autosuggestions / syntax-highlight / starship' },
-  { value: 'fzf',          label: 'fzf',          hint: 'FZF 模糊搜尋整合（Ctrl-T / Alt-C）' },
-  { value: 'tools',        label: 'tools',        hint: '現代 CLI（bat / eza / zoxide / fd / tldr）' },
-  { value: 'git',          label: 'git',          hint: 'Git aliases + delta diff viewer' },
-  { value: 'aliases',      label: 'aliases',      hint: '編輯器自動偵測（Kiro/Cursor/VSCode）+ 通用 aliases' },
+  { value: 'zinit',   label: 'zinit',   hint: '插件管理 + Powerlevel10k + autosuggestions + fzf-tab + bindkey' },
+  { value: 'nvm',     label: 'nvm',     hint: 'Node 版本管理（lazy load，支援 nvm / n）' },
+  { value: 'pnpm',    label: 'pnpm',    hint: 'PNPM PATH 設定' },
+  { value: 'history', label: 'history', hint: '歷史記錄（50000 筆，去重、跨 session 共享）' },
+  { value: 'fzf',     label: 'fzf',     hint: 'FZF 環境設定（fd + bat 整合；key-bindings 由 fzf-tab 接管）' },
+  { value: 'tools',   label: 'tools',   hint: '現代 CLI（bat / eza / zoxide / fd / tldr / ripgrep）' },
+  { value: 'git',     label: 'git',     hint: 'Git aliases + delta diff viewer + lazygit' },
+  { value: 'aliases', label: 'aliases', hint: '編輯器自動偵測（Kiro/Cursor/VSCode）+ gh / uv + 通用 aliases' },
 ]
 
 // ── 工具函式 ────────────────────────────────────────────────────

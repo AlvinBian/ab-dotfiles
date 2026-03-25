@@ -3,3 +3,6 @@
 .env
 .env.*
 *.log
+
+# Build outputs
+dist/

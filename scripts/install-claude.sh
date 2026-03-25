@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # =============================================================================
-# install-to-claude-code.sh
-# 將 ~/scripts/claude-commands、claude-agents、claude-hooks.json
-# 安裝到 Claude Code CLI 全域設定（~/.claude/）
-# 用法：bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh
+# scripts/install-claude.sh
+# 安裝 claude/ 設定到 Claude Code CLI 全域設定（~/.claude/）
+#
+# 用法：
+#   pnpm run install:claude
+#   bash scripts/install-claude.sh
 # =============================================================================
 set -e
 
-SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+# 從 scripts/ 往上一層取得 repo root
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 COMMANDS_DIR="$CLAUDE_DIR/commands"
 AGENTS_DIR="$CLAUDE_DIR/agents"
@@ -17,29 +20,27 @@ GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 
 echo -e "${BLUE}=== Claude Code CLI 全域設定安裝 ===${NC}"
 
-# 建立目錄
 mkdir -p "$COMMANDS_DIR" "$AGENTS_DIR"
 
-# 複製 slash commands
+# 安裝 slash commands
 echo -e "${BLUE}📦 安裝 slash commands...${NC}"
-for f in "$SCRIPTS_DIR/claude-commands/"*.md; do
+for f in "$REPO_DIR/claude/commands/"*.md; do
   cp "$f" "$COMMANDS_DIR/"
   echo -e "${GREEN}  ✅ $(basename $f)${NC}"
 done
 
-# 複製 agents
+# 安裝 agents
 echo -e "${BLUE}🤖 安裝 agents...${NC}"
-for f in "$SCRIPTS_DIR/claude-agents/"*.md; do
+for f in "$REPO_DIR/claude/agents/"*.md; do
   cp "$f" "$AGENTS_DIR/"
   echo -e "${GREEN}  ✅ $(basename $f)${NC}"
 done
 
 # 合併 hooks 到 settings.json
 echo -e "${BLUE}🪝 安裝 hooks...${NC}"
-HOOKS_FILE="$SCRIPTS_DIR/claude-hooks.json"
-
+HOOKS_FILE="$REPO_DIR/claude/hooks.json"
 if [ ! -f "$HOOKS_FILE" ]; then
-  echo -e "${YELLOW}  ⚠️  claude-hooks.json 不存在，略過${NC}"
+  echo -e "${YELLOW}  ⚠️  claude/hooks.json 不存在，略過${NC}"
 else
   python3 - "$SETTINGS_FILE" "$HOOKS_FILE" << 'PYEOF'
 import json, sys, os
@@ -76,4 +77,3 @@ echo "🤖 Agents        ($(ls $AGENTS_DIR/*.md  2>/dev/null | wc -l | tr -d ' '
 echo "🪝 Hooks         → $SETTINGS_FILE"
 echo ""
 echo -e "${YELLOW}⚠️  Hooks 在下次 claude 啟動後生效${NC}"
-echo "💡 日後更新：bash ~/Documents/MyProjects/ab-dotfiles/install-to-claude-code.sh"

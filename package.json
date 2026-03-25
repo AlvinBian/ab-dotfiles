@@ -9,12 +9,13 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "install:claude": "bash install-to-claude-code.sh",
-    "build:plugin": "bash build-cowork-plugin.sh",
-    "workspace": "bash generate-workspace.sh",
-    "setup": "bash setup-zsh.sh",
-    "fix-env": "bash fix-dev-env.sh",
-    "deploy": "pnpm run install:claude && pnpm run build:plugin",
-    "open:workspace": "bash generate-workspace.sh && open \"$(dirname $(pwd))/$(basename $(dirname $(pwd))).code-workspace\""
+    "install:claude":    "bash scripts/install-claude.sh",
+    "install:zsh":       "bash scripts/setup-zsh.sh",
+    "install:env":       "bash scripts/fix-env.sh",
+    "install:all":       "pnpm run install:claude && pnpm run install:zsh",
+    "build:plugin":      "bash scripts/build-plugin.sh",
+    "workspace":         "bash scripts/generate-workspace.sh",
+    "workspace:open":    "bash scripts/generate-workspace.sh && open \"$(dirname $(pwd))/$(basename $(dirname $(pwd))).code-workspace\"",
+    "deploy":            "pnpm run install:claude && pnpm run build:plugin"
   }
 }

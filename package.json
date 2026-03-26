@@ -1,7 +1,7 @@
 {
   "name": "ab-dotfiles",
   "version": "1.0.0",
-  "description": "Alvin Bian 個人開發工具包：Claude Code 全域設定、KKday 開發規範、工作區生成",
+  "description": "開發環境統一管理工具 — Claude Code 配置、技術棧技能庫、zsh 模組、工作區生成",
   "private": true,
   "packageManager": "pnpm@9.15.5",
   "engines": {
@@ -10,19 +10,18 @@
   },
   "scripts": {
     "setup": "node bin/setup.mjs",
-    "build": "bash scripts/build-plugin.sh",
-    "build:dev": "bash scripts/build-claude-dev-plugin.sh",
-    "build:slack": "bash scripts/build-slack-plugin.sh",
-    "build:all": "bash scripts/build-claude-dev-plugin.sh && bash scripts/build-slack-plugin.sh",
-    "deploy": "bash scripts/install-claude.sh && bash scripts/build-claude-dev-plugin.sh",
-    "update": "bash scripts/auto-update.sh",
-    "hooks": "bash scripts/setup-hooks.sh",
-    "workspace": "bash scripts/generate-workspace.sh",
-    "context": "bash scripts/fetch-kkday-context.sh",
-    "fix": "bash zsh/fix-env.sh"
+    "scan": "node bin/scan.mjs",
+    "restore": "node bin/restore.mjs",
+    "doctor": "node -e \"import('./lib/doctor.mjs').then(m => m.ensureEnvironment())\"",
+    "workspace": "bash scripts/generate-workspace.sh"
   },
   "devDependencies": {
-    "@clack/prompts": "^0.9.1",
-    "cli-progress": "^3.12.0"
+    "@clack/prompts": "^0.9.1"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "ora": "^9.3.0",
+    "picocolors": "^1.1.1",
+    "semver": "^7.7.4"
   }
 }

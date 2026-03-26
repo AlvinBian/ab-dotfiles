@@ -1,9 +1,19 @@
-# Code Style 規範
+# Code Style
 
-- 縮排：2 spaces（所有語言）
-- 引號：JS/TS 用單引號，Vue template 用雙引號
-- 行尾不留空白
-- 檔案末尾留一個空行
-- import 排序：外部套件 → 內部模組 → 相對路徑
-- 函式超過 30 行考慮拆分
-- 變數命名：camelCase（JS/TS）、snake_case（PHP）、PascalCase（Component）
+## 格式
+
+- 縮排：依專案設定（通常 2 spaces for JS/TS，4 spaces for PHP/Python/Go）
+- 行尾不留空白，檔案末尾留一個空行
+- 單行不超過 120 字元
+
+## 函式
+
+- 超過 30 行考慮拆分
+- 單一職責，一個函式做一件事
+- 避免超過 3 層巢狀
+
+## 命名
+
+- 使用有意義的名稱，避免縮寫（`getUserData` 非 `getUD`）
+- Boolean 變數用 `is` / `has` / `should` 前綴
+- 具體命名慣例（camelCase / snake_case 等）依語言技能片段定義

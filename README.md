@@ -1,6 +1,6 @@
 # ab-dotfiles
 
-Alvin Bian 個人開發工具包。統一管理 Claude Code 全域設定、KKday 開發規範、zsh 環境模組、工作區自動生成。
+開發環境統一管理工具。自動偵測技術棧、整合 Claude Code 配置、zsh 環境模組、工作區生成。
 
 ---
 
@@ -10,12 +10,25 @@ Alvin Bian 個人開發工具包。統一管理 Claude Code 全域設定、KKday
 ab-dotfiles/
 ├── package.json               # pnpm 腳本入口
 ├── bin/
-│   └── setup.mjs              # 統一互動式安裝 CLI（@clack/prompts）
+│   ├── setup.mjs              # 統一互動式安裝 CLI（@clack/prompts）
+│   ├── scan.mjs               # 全自動技術棧掃描 & stacks/ 生成
+│   └── restore.mjs            # 還原備份
+│
+├── lib/
+│   ├── skill-detect.mjs       # 技術棧偵測引擎（detect.json 匹配）
+│   └── doctor.mjs             # 環境健康檢查
+│
+├── stacks/                    # 技術棧技能庫（scan 自動生成）
+│   └── {tech}/                # 每個技術一個目錄
+│       ├── detect.json        # 偵測規則（deps / files / languages）
+│       ├── code-review.md     # 審查 checklist
+│       ├── test-gen.md        # 測試模式與範例
+│       └── code-style.md      # 命名慣例與格式規範
 │
 ├── claude/                    # Claude Code 設定（唯一 source of truth）
-│   ├── commands/              # Slash commands（8 個）
+│   ├── commands/              # Slash commands（7 個）
 │   ├── agents/                # 自定義 agents（explorer、reviewer）
-│   ├── rules/                 # 規範檔案（git-workflow / code-style / kkday-conventions / slack-mrkdwn）
+│   ├── rules/                 # 規範檔案（git-workflow / code-style / slack-mrkdwn）
 │   └── hooks.json             # Hooks（PostToolUse / PreToolUse / SessionStart / Stop）
 │
 ├── zsh/                       # zsh 環境模組（brew 原生）
@@ -38,15 +51,14 @@ ab-dotfiles/
 │   ├── install-claude.sh           # 安裝到 ~/.claude/（支援 --commands/--agents/--hooks）
 │   ├── build-claude-dev-plugin.sh  # 打包 ab-claude-dev.plugin
 │   ├── build-slack-plugin.sh       # 打包 ab-slack-message.plugin
+│   ├── build-plugin.sh             # 智慧打包
 │   ├── generate-workspace.sh       # 自動掃描 git repos 生成工作區
-│   ├── auto-update.sh              # 從 GitHub 拉取最新並針對性部署
-│   ├── fetch-kkday-context.sh      # 抓取 KKday repos 上下文，打包專屬 plugin
-│   └── setup-hooks.sh              # 安裝 git post-merge hook
+│   └── auto-update.sh              # 從 GitHub 拉取最新並針對性部署
 │
 └── dist/                           # 構建輸出（gitignored）
-    ├── ab-dotfiles.plugin          # 智慧打包（pnpm run build）
-    ├── ab-claude-dev.plugin        # 個人開發工具包（pnpm run build:dev）
-    └── ab-slack-message.plugin     # Slack 格式工具（pnpm run build:slack）
+    ├── ab-dotfiles.plugin          # 智慧打包
+    ├── ab-claude-dev.plugin        # Claude Code 配置包
+    └── ab-slack-message.plugin     # Slack 格式工具
 ```
 
 ---
@@ -55,8 +67,10 @@ ab-dotfiles/
 
 ```bash
 pnpm install          # 安裝依賴（首次）
-pnpm run setup        # 互動式安裝精靈
+pnpm run setup        # 互動式安裝精靈（自動建立 config.json）
 ```
+
+> `config.json` 已加入 `.gitignore`，不會被追蹤。`pnpm run setup` 會引導你完成所有設定。
 
 ---
 
@@ -65,65 +79,38 @@ pnpm run setup        # 互動式安裝精靈
 | 指令                 | 說明                                                          |
 | -------------------- | ------------------------------------------------------------- |
 | `pnpm run setup`     | 互動式安裝精靈 — 選擇 claude-dev / Slack 工具 / zsh 環境模組  |
-| `pnpm run build`     | 智慧打包（依當前專案上下文合併）→ `ab-dotfiles.plugin`        |
-| `pnpm run build:dev`   | 打包個人開發工具包（含 KKday 上下文）→ `ab-claude-dev.plugin`   |
-| `pnpm run build:slack` | 打包 Slack 格式工具 → `ab-slack-message.plugin`                 |
-| `pnpm run build:all`   | 同時打包 `ab-claude-dev.plugin` + `ab-slack-message.plugin`     |
-| `pnpm run deploy`      | install Claude 設定 到 `~/.claude/` + 打包 `ab-claude-dev.plugin` |
-| `pnpm run update`    | 從 GitHub 拉取最新，針對性部署變更                            |
-| `pnpm run hooks`     | 安裝 git post-merge hook（pull 後自動更新）                   |
-| `pnpm run workspace` | 掃描 git repos，生成工作區                                    |
-| `pnpm run context`   | 抓取 KKday repos 上下文，打包專屬 plugin                      |
-| `pnpm run fix`       | 修復開發環境（node/pnpm 衝突等）                              |
+| `pnpm run scan`      | 全自動技術棧掃描，生成 stacks/ 目錄（`--init` 重建 / `--no-ai` 離線） |
+| `pnpm run restore`   | 還原備份（從 dist/backup/ 恢復先前設定）                      |
+| `pnpm run doctor`    | 環境健康檢查（node / pnpm / gh CLI / 依賴版本）               |
+| `pnpm run workspace` | 掃描 git repos，生成 .code-workspace 工作區檔案               |
 
 setup 支援 flag：
 ```bash
-pnpm run setup -- --all     # 全部安裝
-pnpm run setup -- --claude  # 只安裝 Claude 開發規則
-pnpm run setup -- --slack   # 只安裝 Slack 格式工具
-pnpm run setup -- --zsh     # 只安裝 zsh 環境模組
+pnpm run setup -- --all      # 全部自動安裝
+pnpm run setup -- --manual   # 手動模式（只生成到 dist/preview/，不自動部署）
+pnpm run setup -- --claude   # 只安裝 Claude 開發規則
+pnpm run setup -- --slack    # 只安裝 Slack 格式工具
+pnpm run setup -- --zsh      # 只安裝 zsh 環境模組
 ```
 
----
+### 安裝模式
 
-## 打包 Plugin（build）
+| 模式 | 說明 |
+|------|------|
+| 自動（預設） | 直接部署到 `~/.claude/` / `~/.zsh/`，同時備份到 `dist/preview/` |
+| 手動 | 只生成到 `dist/preview/`，用戶自行複製部署 |
 
-| 指令                   | 輸出                      | 說明                                               |
-| ---------------------- | ------------------------- | -------------------------------------------------- |
-| `pnpm run build`       | `ab-dotfiles.plugin`      | 智慧打包：偵測當前專案 CLAUDE.md / tech stack 合併 |
-| `pnpm run build:dev`   | `ab-claude-dev.plugin`    | 固定打包全部工具 + 自動整合 KKday repos 上下文     |
-| `pnpm run build:slack` | `ab-slack-message.plugin` | Slack 格式工具（3 skills + slack-mrkdwn rule）     |
-| `pnpm run build:all`   | 兩個 plugin               | 同時打包 dev + slack                               |
-
-`pnpm run build:dev` 打包內容：
-
-| 類型      | 來源                                                                   |
-| --------- | ---------------------------------------------------------------------- |
-| skills    | `claude/commands/` 全部（8 個）                                        |
-| agents    | `claude/agents/` 全部（2 個）                                          |
-| hooks     | `claude/hooks.json`                                                    |
-| rules     | `claude/rules/` 全部（4 個）+ `~/.claude/rules/` 補全（不重複）       |
-| CLAUDE.md | `ab.config.json` kkday_repos（需要 gh CLI 登入，離線自動跳過）         |
-
----
-
-## GitHub 同步（按需）
-
-更新不使用定時排程，只在需要時觸發：
-
-| 方式            | 命令                           |
-| --------------- | ------------------------------ |
-| 手動更新        | `pnpm run update`              |
-| git pull 後自動 | `pnpm run hooks` 安裝一次即可  |
-| 預覽變更        | `pnpm run update -- --dry-run` |
-
-針對性更新邏輯（只更新有改動的部分）：
+手動模式下生成的檔案結構：
 ```
-claude/commands/xxx.md 變更  →  只更新 ~/.claude/commands/xxx.md
-claude/agents/xxx.md 變更    →  只更新 ~/.claude/agents/xxx.md
-claude/hooks.json 變更       →  只 merge hooks
-zsh/modules/xxx.zsh 變更     →  只更新 ~/.zsh/modules/xxx.zsh
-zsh/zshrc 變更               →  備份後更新 ~/.zshrc
+dist/preview/
+├── claude/
+│   ├── commands/    → cp -r dist/preview/claude/* ~/.claude/
+│   ├── agents/
+│   ├── rules/
+│   └── hooks.json
+└── zsh/
+    ├── modules/     → cp dist/preview/zsh/modules/*.zsh ~/.zsh/modules/
+    └── zshrc        → cp dist/preview/zsh/zshrc ~/.zshrc
 ```
 
 ---
@@ -189,13 +176,12 @@ zsh zsh/install.sh --modules "nvm,git,plugins,tools,aliases"
 | Cowork（開發規則）           | `pnpm run setup -- --claude` → 拖入 `dist/ab-claude-dev.plugin`   |
 | Cowork（Slack 工具）         | `pnpm run setup -- --slack` → 拖入 `dist/ab-slack-message.plugin` |
 
-### Slash Commands（8 個）
+### Slash Commands（7 個）
 
 | 指令                 | 說明                                                  |
 | -------------------- | ----------------------------------------------------- |
 | `/auto-setup`        | 自動檢測專案環境並推薦配置（CLAUDE.md / rules / MCP） |
-| `/code-review`       | KKday 規範深度審查（Vue/TS/PHP，嚴重度分級）          |
-| `/kkday-conventions` | Vue/TS/PHP 開發規範查詢                               |
+| `/code-review`       | 規範深度審查（嚴重度分級）                             |
 | `/pr-workflow`       | 分支 → commit → PR 描述 → 發 PR 全流程                |
 | `/test-gen`          | 自動生成 Vitest / Jest 單元測試                       |
 | `/slack-formatting`  | Slack mrkdwn 格式化規範                               |
@@ -207,7 +193,7 @@ zsh zsh/install.sh --modules "nvm,git,plugins,tools,aliases"
 | Agent       | 說明                                                            |
 | ----------- | --------------------------------------------------------------- |
 | `@explorer` | 快速掃描 codebase，動態探索所有本地 git 專案（Haiku，省 token） |
-| `@reviewer` | 深度程式碼審查，KKday Vue/TS/PHP 規範合規（Sonnet）             |
+| `@reviewer` | 深度程式碼審查，規範合規（Sonnet）                   |
 
 兩個 agent 均使用 `find ~ -maxdepth 6 -name .git` **動態發現**本地所有 git repos，無硬編碼路徑。
 

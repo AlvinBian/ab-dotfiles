@@ -1,0 +1,118 @@
+{
+  "targets": {
+    "claude-dev": {
+      "label": "Claude Code 開發規則",
+      "hint": "commands / agents / hooks / rules → ~/.claude/ + plugin",
+      "flag": "--claude",
+      "steps": [
+        {
+          "type": "install-claude",
+          "label": "安裝 commands · agents · rules → ~/.claude/",
+          "script": "bash scripts/install-claude.sh",
+          "selectable": {
+            "commands": {
+              "dir": "claude/commands",
+              "ext": ".md",
+              "selectLabel": "Slash Commands（/xxx）"
+            },
+            "agents": {
+              "dir": "claude/agents",
+              "ext": ".md",
+              "selectLabel": "Agents（@xxx）"
+            }
+          },
+          "fixed": {
+            "rules": "all",
+            "hooks": true
+          },
+          "hooksConfirm": true
+        },
+        {
+          "type": "build-plugin",
+          "label": "打包 ab-claude-dev.plugin（含 repos 上下文，需約 30 秒）",
+          "script": "bash scripts/build-claude-dev-plugin.sh",
+          "phases": [
+            "Skills",
+            "Agents",
+            "Hooks",
+            "Rules",
+            "Repos",
+            "打包完成"
+          ],
+          "successMsg": "ab-claude-dev.plugin 打包完成 → dist/ab-claude-dev.plugin"
+        }
+      ]
+    },
+    "slack": {
+      "label": "Slack 格式工具",
+      "hint": "slack commands / rules → ~/.claude/ + plugin",
+      "flag": "--slack",
+      "steps": [
+        {
+          "type": "install-claude",
+          "label": "安裝 Slack commands · rule → ~/.claude/",
+          "script": "bash scripts/install-claude.sh",
+          "selectable": {
+            "commands": {
+              "dir": "claude/commands",
+              "ext": ".md",
+              "filter": [
+                "draft-slack",
+                "review-slack",
+                "slack-formatting"
+              ]
+            }
+          },
+          "fixed": {
+            "rules": "slack-mrkdwn"
+          },
+          "hooksConfirm": true,
+          "skipIf": "claude-dev"
+        },
+        {
+          "type": "build-plugin",
+          "label": "打包 ab-slack-message.plugin",
+          "script": "bash scripts/build-slack-plugin.sh",
+          "phases": [
+            "Skills",
+            "Rules",
+            "打包完成"
+          ],
+          "successMsg": "ab-slack-message.plugin 打包完成 → dist/ab-slack-message.plugin"
+        }
+      ]
+    },
+    "zsh": {
+      "label": "zsh 環境模組",
+      "hint": "modules → ~/.zsh/modules/ + ~/.zshrc",
+      "flag": "--zsh",
+      "steps": [
+        {
+          "type": "install-modules",
+          "label": "安裝 zsh 模組 → ~/.zsh/modules/",
+          "script": "zsh zsh/install.sh",
+          "selectable": {
+            "modules": {
+              "dir": "zsh/modules",
+              "ext": ".zsh",
+              "selectLabel": "選擇要安裝的環境模組"
+            }
+          },
+          "extraTotal": {
+            "base": 1,
+            "ifModule": {
+              "tools": 1
+            }
+          }
+        }
+      ],
+      "outroMsg": "✅ 安裝完成！執行 source ~/.zshrc 讓 zsh 設定生效"
+    }
+  },
+  "repos": [
+    "kkday-it/kkday-member-ci",
+    "kkday-it/kkday-mobile-member-ci",
+    "kkday-it/kkday-web-docker",
+    "kkday-it/kkday-b2c-web"
+  ]
+}

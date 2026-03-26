@@ -14,7 +14,7 @@
 #   bash scripts/install-claude.sh --force                   ← 強制覆蓋（忽略本地修改）
 #
 # Manifest：~/.claude/.ab-manifest（JSON，記錄安裝時各檔 hash）
-# ab.config.json：僅讀取 kkday_repos
+# config.json：僅讀取 repos
 # =============================================================================
 set -e
 
@@ -72,30 +72,31 @@ _file_hash() {
 
 _manifest_get() {
   python3 -c "
-import json, os
+import json, os, sys
 try:
-  d = json.load(open('$MANIFEST_FILE'))
-  print(d.get('files', {}).get('$1', ''))
+  d = json.load(open(sys.argv[1]))
+  print(d.get('files', {}).get(sys.argv[2], ''))
 except:
   print('')
-" 2>/dev/null
+" "$MANIFEST_FILE" "$1" </dev/null 2>/dev/null
 }
 
 _manifest_set() {
   local key="$1" hash="$2"
-  python3 << PYEOF
+  python3 -c "
 import json, os, sys
-manifest = '$MANIFEST_FILE'
+manifest = sys.argv[1]
+key = sys.argv[2]
+hashval = sys.argv[3]
 data = {}
 if os.path.exists(manifest):
-  try: data = json.load(open(manifest))
-  except: pass
-if 'files' not in data:
-  data['files'] = {}
-data['files']['$key'] = '$hash'
+    try: data = json.load(open(manifest))
+    except: pass
+if 'files' not in data: data['files'] = {}
+data['files'][key] = hashval
 with open(manifest, 'w') as f:
-  json.dump(data, f, indent=2, ensure_ascii=False)
-PYEOF
+    json.dump(data, f, indent=2, ensure_ascii=False)
+" "$MANIFEST_FILE" "$key" "$hash" </dev/null >/dev/null 2>&1
 }
 
 # ── 智慧安裝（manifest 追蹤 + 優先順序）─────────────────────────
@@ -107,7 +108,7 @@ _install_file() {
   # 1. 有專案自訂版本 → 用專案版本（不更新 manifest，這不是 ab-dotfiles 的檔案）
   if [[ -n "$project_src" && -f "$project_src" ]]; then
     if [[ -f "$dest" ]] && diff -q "$project_src" "$dest" &>/dev/null; then
-      echo -e "${DIM}  ─ $label（專案版本，無變更）${NC}"
+      echo -e "${DIM}  ─ $label 專案版本 無變更${NC}"
     else
       cp "$project_src" "$dest"
       echo -e "${GREEN}  ✅ $label ${CYAN}[專案優先]${NC}"
@@ -132,7 +133,7 @@ _install_file() {
 
   # 3. 目標與來源相同 → 無需更新
   if [[ "$src_hash" == "$dest_hash" ]]; then
-    echo -e "${DIM}  ─ $label（無變更）${NC}"
+    echo -e "${DIM}  ─ $label 無變更${NC}"
     _manifest_set "$key" "$src_hash"
     return
   fi
@@ -143,7 +144,7 @@ _install_file() {
   if [[ -n "$saved_hash" ]]; then
     if [[ "$dest_hash" != "$saved_hash" && "$FORCE" != true ]]; then
       # 本地有修改，略過（保護使用者的自訂）
-      echo -e "${YELLOW}  ⚠ $label（本地已修改，略過）${NC}"
+      echo -e "${YELLOW}  ⚠ $label 本地已修改 略過${NC}"
       return
     fi
   fi

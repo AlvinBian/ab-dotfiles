@@ -8,7 +8,7 @@
 #   agents:   claude/agents/ 全部
 #   hooks:    claude/hooks.json
 #   rules:    claude/rules/ 全部 + ~/.claude/rules/（補全）
-#   CLAUDE.md: 整合 ab.config.json 的 kkday_repos 上下文（需要 gh CLI）
+#   CLAUDE.md: 整合 config.json 的 repos 上下文（需要 gh CLI）
 #   plugin.json
 #
 # 用法：
@@ -19,9 +19,10 @@ set -e
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="/tmp/ab-claude-dev-plugin-$$"
-DIST_DIR="$REPO_DIR/dist"
+DIST_DIR="$REPO_DIR/dist/release"
 OUTPUT="$DIST_DIR/ab-claude-dev.plugin"
-CONFIG="$REPO_DIR/ab.config.json"
+mkdir -p "$DIST_DIR"
+CONFIG="$REPO_DIR/config.json"
 
 GREEN='\033[0;32m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'
 YELLOW='\033[1;33m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
@@ -149,43 +150,48 @@ for f in "$HOME/.claude/rules/"*.md; do
 done
 echo -e "   ${CYAN}→ $RULE_COUNT rules${NC}"
 
-# ── KKday 上下文（選用，需要 gh CLI + ab.config.json）────────────
-step "🏢 KKday 上下文"
-KKDAY_CONTEXT=false
+# ── Repos 上下文（選用，需要 gh CLI + config.json）────────────
+step "🔗 Repos 上下文"
+REPOS_CONTEXT=false
 
 if ! command -v gh &>/dev/null; then
-  skip "gh CLI 未安裝，略過 KKday 上下文"
+  skip "gh CLI 未安裝，略過 repos 上下文"
 elif ! gh auth status &>/dev/null 2>&1; then
-  skip "gh 未登入，略過 KKday 上下文"
+  skip "gh 未登入，略過 repos 上下文"
 elif [[ ! -f "$CONFIG" ]]; then
-  skip "ab.config.json 不存在，略過 KKday 上下文"
+  skip "config.json 不存在，略過 repos 上下文"
 else
   REPOS_JSON=$(python3 -c "
 import json
-for r in json.load(open('$CONFIG')).get('kkday_repos', []):
-    print(r['repo'] + '|' + r.get('branch', 'master'))
+repos = json.load(open('$CONFIG')).get('repos', [])
+for r in repos:
+    repo = r if isinstance(r, str) else r.get('repo', '')
+    if repo: print(repo)
 " 2>/dev/null || echo "")
 
   if [[ -z "$REPOS_JSON" ]]; then
-    skip "ab.config.json 無 kkday_repos，略過"
+    skip "config.json 無 repos，略過"
   else
     CLAUDE_MD_FILE="$BUILD_DIR/CLAUDE.md"
     {
-      echo "# KKday 專案上下文"
+      echo "# 專案上下文"
       echo ""
       echo "> 由 pnpm run build 自動抓取（$(date '+%Y-%m-%d')）"
       echo ""
     } > "$CLAUDE_MD_FILE"
 
-    TOTAL_KKDAY=$(echo "$REPOS_JSON" | wc -l | tr -d ' ')
-    KKDAY_IDX=0
+    TOTAL_REPOS=$(echo "$REPOS_JSON" | wc -l | tr -d ' ')
+    REPO_IDX=0
     REPO_BUILT=0
-    while IFS='|' read -r repo branch; do
+    while read -r repo; do
       [[ -z "$repo" ]] && continue
-      KKDAY_IDX=$(( KKDAY_IDX + 1 ))
+      REPO_IDX=$(( REPO_IDX + 1 ))
       name=$(basename "$repo")
       echo ""
-      _progress_bar "$KKDAY_IDX" "$TOTAL_KKDAY" "$name"
+      _progress_bar "$REPO_IDX" "$TOTAL_REPOS" "$name"
+
+      # 自動偵測預設分支
+      branch=$(gh api "repos/$repo" --jq '.default_branch' 2>/dev/null || echo "main")
 
       # 抓 package.json
       PKG_TMPFILE=$(mktemp)
@@ -261,8 +267,8 @@ except: print('||')
     done <<< "$REPOS_JSON"
 
     if [[ $REPO_BUILT -gt 0 ]]; then
-      echo -e "   ${CYAN}→ $REPO_BUILT 個 KKday repos 已整合至 CLAUDE.md${NC}"
-      KKDAY_CONTEXT=true
+      echo -e "   ${CYAN}→ $REPO_BUILT 個 repos 已整合至 CLAUDE.md${NC}"
+      REPOS_CONTEXT=true
     else
       # 全部失敗：移除僅含標題的空殼 CLAUDE.md，不打包不完整內容
       rm -f "$CLAUDE_MD_FILE"
@@ -272,15 +278,15 @@ except: print('||')
 fi
 
 # ── plugin.json ───────────────────────────────────────────────────
-KKDAY_NOTE=""
-[[ "$KKDAY_CONTEXT" == "true" ]] && KKDAY_NOTE=" + KKday 上下文（$(date '+%Y-%m-%d')）"
+REPOS_NOTE=""
+[[ "$REPOS_CONTEXT" == "true" ]] && REPOS_NOTE=" + repos 上下文（$(date '+%Y-%m-%d')）"
 cat > "$BUILD_DIR/.claude-plugin/plugin.json" << JSON_EOF
 {
   "name": "ab-claude-dev",
   "version": "$PLUGIN_VERSION",
-  "description": "Claude Code 個人開發工具包 — skills / agents / hooks / rules${KKDAY_NOTE}",
-  "author": { "name": "Alvin Bian", "email": "alvin.bian@kkday.com" },
-  "keywords": ["claude-code", "kkday", "code-review", "pr-workflow", "test-gen", "slack", "vue", "typescript", "php"]
+  "description": "Claude Code 配置包 — skills / agents / hooks / rules${REPOS_NOTE}",
+  "author": "ab-dotfiles",
+  "keywords": ["claude-code", "code-review", "pr-workflow", "test-gen", "slack", "vue", "typescript", "php"]
 }
 JSON_EOF
 
@@ -299,7 +305,7 @@ echo -e "${GREEN}║   ✅ ab-claude-dev.plugin 打包完成           ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════╝${NC}"
 echo -e "  ${BOLD}版    本：${NC} $PLUGIN_VERSION"
 echo -e "  ${BOLD}內    容：${NC} $SKILL_COUNT skills · $AGENT_COUNT agents · hooks · $RULE_COUNT rules"
-[[ "$KKDAY_CONTEXT" == "true" ]] && echo -e "  ${BOLD}KKday：  ${NC} $REPO_BUILT repos 上下文已整合"
+[[ "$REPOS_CONTEXT" == "true" ]] && echo -e "  ${BOLD}Repos：  ${NC} $REPO_BUILT repos 上下文已整合"
 echo -e "  ${BOLD}輸出路徑：${NC} $OUTPUT（$FILE_SIZE）"
 echo ""
-echo -e "${YELLOW}📌 將 dist/ab-claude-dev.plugin 拖入 Cowork Desktop App 安裝${NC}"
+echo -e "${YELLOW}📌 將 dist/release/ab-claude-dev.plugin 拖入 Cowork Desktop App 安裝${NC}"

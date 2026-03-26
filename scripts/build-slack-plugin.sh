@@ -16,8 +16,9 @@ set -e
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="/tmp/ab-slack-plugin-$$"
-DIST_DIR="$REPO_DIR/dist"
+DIST_DIR="$REPO_DIR/dist/release"
 OUTPUT="$DIST_DIR/ab-slack-message.plugin"
+mkdir -p "$DIST_DIR"
 
 GREEN='\033[0;32m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'
 YELLOW='\033[1;33m'; BOLD='\033[1m'; NC='\033[0m'
@@ -41,7 +42,7 @@ cat > "$BUILD_DIR/.claude-plugin/plugin.json" << JSON_EOF
   "name": "ab-slack-message",
   "version": "$PLUGIN_VERSION",
   "description": "Slack mrkdwn 訊息工具 — 起草、審查、格式化",
-  "author": { "name": "Alvin Bian", "email": "alvin.bian@kkday.com" },
+  "author": "ab-dotfiles",
   "keywords": ["slack", "mrkdwn", "messaging", "draft", "review"]
 }
 JSON_EOF
@@ -88,4 +89,4 @@ echo -e "  ${BOLD}版    本：${NC} $PLUGIN_VERSION"
 echo -e "  ${BOLD}內    容：${NC} $SKILL_COUNT skills · slack-mrkdwn rule"
 echo -e "  ${BOLD}輸出路徑：${NC} $OUTPUT（$FILE_SIZE）"
 echo ""
-echo -e "${YELLOW}📌 將 dist/ab-slack-message.plugin 拖入 Claude Desktop App 安裝${NC}"
+echo -e "${YELLOW}📌 將 dist/release/ab-slack-message.plugin 拖入 Claude Desktop App 安裝${NC}"

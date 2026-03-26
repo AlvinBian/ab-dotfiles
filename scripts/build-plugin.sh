@@ -22,8 +22,9 @@ set -e
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 INVOKE_DIR="$(pwd)"          # 執行指令時所在的目錄（可能是任意專案）
 BUILD_DIR="/tmp/ab-dotfiles-plugin-$$"
-DIST_DIR="$REPO_DIR/dist"
+DIST_DIR="$REPO_DIR/dist/release"
 OUTPUT="$DIST_DIR/ab-dotfiles.plugin"
+mkdir -p "$DIST_DIR"
 
 GREEN='\033[0;32m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'
 YELLOW='\033[1;33m'; DIM='\033[2m'; BOLD='\033[1m'; NC='\033[0m'
@@ -180,10 +181,10 @@ _should_include_cmd() {
   # 技術棧相關
   for tech in "${TECH_STACK[@]}"; do
     case "$tech:$name" in
-      vue:code-review|vue:kkday-conventions|vue:test-gen) return 0 ;;
+      vue:code-review|vue:test-gen) return 0 ;;
       react:code-review|react:test-gen) return 0 ;;
-      typescript:code-review|typescript:kkday-conventions|typescript:test-gen) return 0 ;;
-      php:code-review|php:kkday-conventions) return 0 ;;
+      typescript:code-review|typescript:test-gen) return 0 ;;
+      php:code-review) return 0 ;;
       testing:test-gen) return 0 ;;
     esac
   done
@@ -213,8 +214,8 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR/.claude-plugin" "$BUILD_DIR/skills" "$BUILD_DIR/agents" "$BUILD_DIR/hooks"
 
 # plugin.json
-PLUGIN_DESC="Alvin Bian 個人開發工具包"
-[[ -n "$PROJECT_NAME" && ! $IS_SELF ]] && PLUGIN_DESC="$PROJECT_NAME 專案 Claude 配置（基於 ab-dotfiles）"
+PLUGIN_DESC="ab-dotfiles Claude Code 配置包"
+[[ -n "$PROJECT_NAME" && ! $IS_SELF ]] && PLUGIN_DESC="$PROJECT_NAME Claude 配置（基於 ab-dotfiles）"
 
 # 若有 CLAUDE.md，提取前 5 行作為 description 補充
 CLAUDE_SUMMARY=""
@@ -228,8 +229,8 @@ cat > "$BUILD_DIR/.claude-plugin/plugin.json" << JSON_EOF
   "name": "ab-dotfiles",
   "version": "$PLUGIN_VERSION",
   "description": "$PLUGIN_DESC",
-  "author": { "name": "Alvin Bian", "email": "alvin.bian@kkday.com" },
-  "keywords": ["kkday", "code-review", "pr-workflow", "test-gen", "slack", "vue", "typescript", "php"],
+  "author": "ab-dotfiles",
+  "keywords": ["ab-dotfiles", "code-review", "pr-workflow", "test-gen", "slack", "vue", "typescript", "php"],
   "techStack": $(python3 -c "import json; s='${TECH_STACK[*]}'; print(json.dumps(s.split() if s.strip() else []))" 2>/dev/null || echo "[]")
 }
 JSON_EOF
@@ -332,7 +333,7 @@ echo -e "  ${BOLD}專案配置：${NC} CLAUDE.md 已整合"
 echo -e "  ${BOLD}檔案大小：${NC} $FILE_SIZE"
 echo -e "  ${BOLD}輸出路徑：${NC} $OUTPUT"
 echo ""
-echo -e "${YELLOW}📌 將 dist/ab-dotfiles.plugin 拖入 Cowork Desktop App 安裝${NC}"
+echo -e "${YELLOW}📌 將 dist/release/ab-dotfiles.plugin 拖入 Cowork Desktop App 安裝${NC}"
 
 # 記錄 build log
 LOG_FILE="$REPO_DIR/.build.log"

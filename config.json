@@ -66,7 +66,6 @@
           "fixed": {
             "rules": "slack-mrkdwn"
           },
-          "hooksConfirm": true,
           "skipIf": "claude-dev"
         },
         {
@@ -109,10 +108,18 @@
       "outroMsg": "✅ 安裝完成！執行 source ~/.zshrc 讓 zsh 設定生效"
     }
   },
-  "repos": [
-    "kkday-it/kkday-member-ci",
-    "kkday-it/kkday-mobile-member-ci",
-    "kkday-it/kkday-web-docker",
-    "kkday-it/kkday-b2c-web"
+  "sources": [
+    {
+      "name": "everything-claude-code",
+      "repo": "affaan-m/everything-claude-code",
+      "paths": {
+        "commands": "commands",
+        "agents": "agents",
+        "rules": "rules/{lang}",
+        "rulesCommon": "rules/common",
+        "hooks": "hooks/hooks.json"
+      },
+      "priority": 10
+    }
   ]
 }

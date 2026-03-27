@@ -1,6 +1,101 @@
 # ab-dotfiles
 
-開發環境統一管理工具。自動偵測技術棧、整合 Claude Code 配置、zsh 環境模組、工作區生成。
+開發環境統一管理工具 — AI 驅動的技術棧偵測、Claude Code 技能庫生成、zsh 環境模組。
+
+## 零基礎安裝
+
+什麼都沒裝？從這裡開始。
+
+### macOS（一鍵腳本）
+
+```bash
+# 1. 安裝 Homebrew（如果沒有）
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2. 安裝 nvm + Node.js
+brew install nvm
+mkdir -p ~/.nvm
+echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.zshrc
+echo '[ -s "$(brew --prefix nvm)/nvm.sh" ] && . "$(brew --prefix nvm)/nvm.sh"' >> ~/.zshrc
+source ~/.zshrc
+nvm install 22
+nvm use 22
+
+# 3. 安裝 pnpm
+corepack enable
+corepack prepare pnpm@latest --activate
+
+# 4. 安裝 GitHub CLI
+brew install gh
+gh auth login
+
+# 5. 安裝 Claude Code CLI
+npm install -g @anthropic-ai/claude-code
+
+# 6. clone 並啟動
+git clone https://github.com/AlvinBian/ab-dotfiles.git
+cd ab-dotfiles
+pnpm install
+pnpm run setup
+```
+
+### 已有 Node.js 環境
+
+```bash
+git clone https://github.com/AlvinBian/ab-dotfiles.git
+cd ab-dotfiles
+pnpm install
+pnpm run setup
+```
+
+### 環境要求
+
+| 工具 | 最低版本 | 安裝方式 |
+|------|---------|---------|
+| macOS | — | — |
+| Homebrew | — | `/bin/bash -c "$(curl -fsSL ...)"` |
+| nvm | — | `brew install nvm` |
+| Node.js | 18+ | `nvm install 22` |
+| pnpm | 9+ | `corepack enable && corepack prepare pnpm@latest --activate` |
+| gh CLI | — | `brew install gh` → `gh auth login` |
+| Claude Code | — | `npm install -g @anthropic-ai/claude-code` |
+
+`pnpm run doctor` 可檢查以上工具是否就緒。
+
+---
+
+## 功能概覽
+
+```
+pnpm run setup
+  │
+  ├─ 連結 GitHub → 選擇倉庫
+  ├─ Per-repo AI 技術棧分析（並行）
+  ├─ Taxonomy 查表分類（awesome-nodejs/php，1300+ 套件）
+  ├─ 跨 repo 整合去重
+  ├─ 開發者畫像（AI 推斷角色）
+  ├─ 技術棧選擇（預選 + 確認）
+  ├─ ECC 外部資源（AI 推薦 + 選擇）
+  ├─ 生成 stacks/ 技能庫
+  ├─ 安裝 Claude Code 配置（commands / agents / rules / hooks）
+  ├─ 安裝 zsh 環境模組
+  └─ 生成 HTML 報告
+```
+
+---
+
+## 指令
+
+| 指令 | 說明 |
+|------|------|
+| `pnpm run setup` | 互動式安裝精靈 |
+| `pnpm run setup -- --all` | 全部自動安裝 |
+| `pnpm run setup -- --manual` | 手動模式（只生成到 dist/preview/） |
+| `pnpm run scan` | 技術棧掃描，生成 stacks/ |
+| `pnpm run restore` | 從備份還原 |
+| `pnpm run doctor` | 環境健康檢查 |
+| `pnpm run workspace` | 生成 .code-workspace |
+| `pnpm run taxonomy:build` | 重建 awesome-* 分類索引 |
 
 ---
 
@@ -8,236 +103,216 @@
 
 ```
 ab-dotfiles/
-├── package.json               # pnpm 腳本入口
 ├── bin/
-│   ├── setup.mjs              # 統一互動式安裝 CLI（@clack/prompts）
-│   ├── scan.mjs               # 全自動技術棧掃描 & stacks/ 生成
-│   └── restore.mjs            # 還原備份
+│   ├── setup.mjs                # 安裝精靈
+│   ├── scan.mjs                 # 技術棧掃描
+│   └── restore.mjs              # 還原備份
 │
 ├── lib/
-│   ├── skill-detect.mjs       # 技術棧偵測引擎（detect.json 匹配）
-│   └── doctor.mjs             # 環境健康檢查
+│   ├── pipeline/                # 分析 Pipeline
+│   │   ├── pipeline-runner.mjs  # Orchestrator
+│   │   ├── repo-analyzer.mjs    # Per-repo AI 分類
+│   │   ├── merge-dedup.mjs      # 跨 repo 整合去重
+│   │   ├── tech-select-ui.mjs   # 技術棧選擇 UI
+│   │   ├── ecc-select-ui.mjs    # ECC 選擇 UI
+│   │   ├── profile-generator.mjs # 開發者畫像
+│   │   ├── audit-trail.mjs      # 決策審計鏈
+│   │   └── pipeline-cache.mjs   # 統一快取
+│   ├── taxonomy/                # 分類引擎
+│   │   ├── classify.mjs         # 查表分類（零 AI）
+│   │   ├── build.mjs            # 從 awesome-* 建構索引
+│   │   └── categories.json      # 標準分類定義
+│   ├── claude-cli.mjs           # Claude CLI 封裝（streaming）
+│   ├── github.mjs               # GitHub API（GraphQL）
+│   └── ...
 │
-├── stacks/                    # 技術棧技能庫（scan 自動生成）
-│   └── {tech}/                # 每個技術一個目錄
-│       ├── detect.json        # 偵測規則（deps / files / languages）
-│       ├── code-review.md     # 審查 checklist
-│       ├── test-gen.md        # 測試模式與範例
-│       └── code-style.md      # 命名慣例與格式規範
+├── claude/                      # Claude Code 配置
+│   ├── commands/                # 7 個 slash commands
+│   ├── agents/                  # 10 個 agents
+│   ├── rules/                   # 3 個規則
+│   └── hooks.json               # 4 個 hooks
 │
-├── claude/                    # Claude Code 設定（唯一 source of truth）
-│   ├── commands/              # Slash commands（7 個）
-│   ├── agents/                # 自定義 agents（explorer、reviewer）
-│   ├── rules/                 # 規範檔案（git-workflow / code-style / slack-mrkdwn）
-│   └── hooks.json             # Hooks（PostToolUse / PreToolUse / SessionStart / Stop）
+├── stacks/                      # 技能庫（setup 生成）
+│   └── {tech}/
+│       ├── detect.json          # 偵測規則
+│       ├── code-review.md       # 審查 checklist
+│       ├── test-gen.md          # 測試模式
+│       └── code-style.md        # 命名慣例
 │
-├── zsh/                       # zsh 環境模組（brew 原生）
-│   ├── zshrc                  # ~/.zshrc 模板（~25 行，glob 載入子模組）
-│   ├── install.sh             # zsh 環境模組安裝腳本（互動式 / --all / --modules）
-│   ├── fix-env.sh             # 開發環境修復工具
-│   └── modules/               # 10 個獨立模組（字母順序動態載入）
-│       ├── aliases.zsh        # 編輯器偵測 + open -e + gh / uv + 通用 aliases
-│       ├── completion.zsh     # zsh 補全（compinit + menu select）
-│       ├── fzf.zsh            # FZF key-bindings + fd + bat 預覽
-│       ├── git.zsh            # Git aliases + delta + lazygit
-│       ├── history.zsh        # 歷史記錄（50k + 去重 + 跨 session）
-│       ├── keybindings.zsh    # 按鍵綁定（Alt/Ctrl+←/→、↑↓前綴搜尋）
-│       ├── nvm.zsh            # Node 版本管理（lazy load + .nvmrc 自動切換）
-│       ├── plugins.zsh        # autosuggestions + syntax-highlighting + starship
-│       ├── pnpm.zsh           # PNPM PATH
-│       └── tools.zsh          # 現代 CLI（bat / eza / zoxide / fd / ripgrep / tldr）
+├── zsh/                         # zsh 環境模組
+│   ├── zshrc                    # ~/.zshrc 模板
+│   ├── modules/                 # 10 個獨立模組
+│   └── install.sh               # 安裝腳本
 │
-├── scripts/                        # 構建 & 安裝腳本
-│   ├── install-claude.sh           # 安裝到 ~/.claude/（支援 --commands/--agents/--hooks）
-│   ├── build-claude-dev-plugin.sh  # 打包 ab-claude-dev.plugin
-│   ├── build-slack-plugin.sh       # 打包 ab-slack-message.plugin
-│   ├── build-plugin.sh             # 智慧打包
-│   ├── generate-workspace.sh       # 自動掃描 git repos 生成工作區
-│   └── auto-update.sh              # 從 GitHub 拉取最新並針對性部署
+├── .cache/                      # 快取（gitignored）
+│   ├── repo-ai/                 # Per-repo AI 分類快取
+│   ├── taxonomy/                # awesome-* 查表索引
+│   ├── sources/                 # ECC 來源快取
+│   └── audit/                   # 決策審計鏈
 │
-└── dist/                           # 構建輸出（gitignored）
-    ├── ab-dotfiles.plugin          # 智慧打包
-    ├── ab-claude-dev.plugin        # Claude Code 配置包
-    └── ab-slack-message.plugin     # Slack 格式工具
+└── docs/
+    └── scaffold-plan.md         # 腳手架方案規劃
 ```
 
 ---
 
-## 快速開始
+## Claude Code 配置
 
-```bash
-pnpm install          # 安裝依賴（首次）
-pnpm run setup        # 互動式安裝精靈（自動建立 config.json）
-```
+### Slash Commands（7 個）
 
-> `config.json` 已加入 `.gitignore`，不會被追蹤。`pnpm run setup` 會引導你完成所有設定。
-
----
-
-## pnpm 指令
-
-| 指令                 | 說明                                                          |
-| -------------------- | ------------------------------------------------------------- |
-| `pnpm run setup`     | 互動式安裝精靈 — 選擇 claude-dev / Slack 工具 / zsh 環境模組  |
-| `pnpm run scan`      | 全自動技術棧掃描，生成 stacks/ 目錄（`--init` 重建 / `--no-ai` 離線） |
-| `pnpm run restore`   | 還原備份（從 dist/backup/ 恢復先前設定）                      |
-| `pnpm run doctor`    | 環境健康檢查（node / pnpm / gh CLI / 依賴版本）               |
-| `pnpm run workspace` | 掃描 git repos，生成 .code-workspace 工作區檔案               |
-
-setup 支援 flag：
-```bash
-pnpm run setup -- --all      # 全部自動安裝
-pnpm run setup -- --manual   # 手動模式（只生成到 dist/preview/，不自動部署）
-pnpm run setup -- --claude   # 只安裝 Claude 開發規則
-pnpm run setup -- --slack    # 只安裝 Slack 格式工具
-pnpm run setup -- --zsh      # 只安裝 zsh 環境模組
-```
-
-### 安裝模式
-
-| 模式 | 說明 |
+| 指令 | 說明 |
 |------|------|
-| 自動（預設） | 直接部署到 `~/.claude/` / `~/.zsh/`，同時備份到 `dist/preview/` |
-| 手動 | 只生成到 `dist/preview/`，用戶自行複製部署 |
+| `/auto-setup` | 自動檢測專案環境並推薦配置 |
+| `/code-review` | 深度程式碼審查（嚴重度分級） |
+| `/pr-workflow` | 分支 → commit → PR 全流程 |
+| `/test-gen` | 自動生成單元測試 |
+| `/draft-slack` | 生成結構化 Slack 訊息（9 種場景） |
+| `/slack-formatting` | Slack mrkdwn 格式指南 |
+| `/review-slack` | 檢查 Slack 訊息格式 |
 
-手動模式下生成的檔案結構：
+### Agents（10 個）
+
+| Agent | 模型 | 讀/寫 | 用途 |
+|-------|------|-------|------|
+| `@explorer` | haiku | 唯讀 | 快速搜索 codebase |
+| `@planner` | sonnet | 唯讀 | 設計方案、拆解任務 |
+| `@coder` | sonnet | 讀寫 | 實作功能 |
+| `@tester` | sonnet | 讀寫 | 生成測試、跑測試 |
+| `@reviewer` | sonnet | 唯讀 | 深度 code review |
+| `@refactor` | sonnet | 讀寫 | 重構優化 |
+| `@debugger` | sonnet | 讀寫 | 定位修復 bug |
+| `@documenter` | sonnet | 讀寫 | 生成文件 |
+| `@deployer` | sonnet | 讀寫 | PR + Release |
+| `@monitor` | haiku | 唯讀 | 日誌分析、效能檢查 |
+
+### Hooks（4 個，可個別選擇）
+
+| Hook | 說明 |
+|------|------|
+| 自動格式化 | 寫檔後 prettier / php -l |
+| 檔案保護 | 阻止修改 .env、lock 等 |
+| Context 壓縮提示 | 壓縮時保留重要資訊 |
+| 任務完成檢查 | 停止前確認任務完成 |
+
+---
+
+## 技術棧分析 Pipeline
+
 ```
-dist/preview/
-├── claude/
-│   ├── commands/    → cp -r dist/preview/claude/* ~/.claude/
-│   ├── agents/
-│   ├── rules/
-│   └── hooks.json
-└── zsh/
-    ├── modules/     → cp dist/preview/zsh/modules/*.zsh ~/.zsh/modules/
-    └── zshrc        → cp dist/preview/zsh/zshrc ~/.zshrc
+repos fetch + ECC fetch（並行）
+  → per-repo AI 分類（並行，各自快取）
+  → awesome-* 查表驗證（1373 套件，80%+ 覆蓋率）
+  → 跨 repo 整合去重（多數決仲裁）
+  → 開發者畫像（AI 推斷角色）
+  → 技術棧預選（主力 repo + 共用 + AI 核心分類）
+  → ECC AI 推薦（背景並行）
+  → 決策審計鏈（JSONL）
 ```
+
+### 快取策略
+
+| 快取 | 位置 | 失效條件 |
+|------|------|---------|
+| Per-repo AI | `.cache/repo-ai/` | 該 repo deps 改變 |
+| Taxonomy 索引 | `.cache/taxonomy/` | `pnpm run taxonomy:build` |
+| ECC 來源 | `.cache/sources/` | 1h TTL or SHA 改變 |
+| 審計鏈 | `.cache/audit/` | 保留最近 10 次 |
 
 ---
 
 ## zsh 環境模組
 
-### 架構設計
+### 模組清單
 
-```
-~/.zshrc（由 zsh/zshrc 部署，~25 行）
-  └── 動態載入 ~/.zsh/modules/*.zsh（字母順序）
-        ├── aliases.zsh      ← 編輯器偵測 + open -e + 通用 aliases
-        ├── completion.zsh   ← zsh 補全（compinit + menu select）
-        ├── fzf.zsh          ← FZF key-bindings + fd + bat 預覽
-        ├── git.zsh          ← Git aliases + delta + lazygit
-        ├── history.zsh      ← 歷史記錄 50k + dedup + share
-        ├── keybindings.zsh  ← Alt/Ctrl+←/→、↑↓前綴搜尋
-        ├── nvm.zsh          ← Node 版本管理（lazy load）
-        ├── plugins.zsh      ← autosuggestions + syntax-highlighting
-        ├── pnpm.zsh         ← PNPM PATH
-        └── tools.zsh        ← bat / eza / zoxide / fd / ripgrep / tldr
-```
+| 模組 | 說明 |
+|------|------|
+| aliases | 編輯器偵測 + 通用 aliases |
+| completion | zsh 補全（menu select） |
+| fzf | 模糊搜尋（Ctrl+R / Ctrl+T） |
+| git | Git aliases + delta + lazygit |
+| history | 歷史記錄（50k + 去重） |
+| keybindings | Alt/Ctrl 方向鍵 |
+| nvm | Node 版本管理（lazy load） |
+| plugins | autosuggestions + syntax-highlighting |
+| pnpm | PNPM PATH |
+| tools | bat / eza / zoxide / fd / ripgrep / tldr |
 
-### 依賴工具（brew 安裝）
-
-| 工具                    | 用途                                |
-| ----------------------- | ----------------------------------- |
-| fzf                     | 模糊搜尋（Ctrl+R / Ctrl+T / Alt+C） |
-| zoxide                  | 智慧目錄跳轉（`cd` → `z`）          |
-| bat                     | 語法高亮 pager（`cat` → `bat`）     |
-| eza                     | 現代 ls（`ls` / `ll` / `lt`）       |
-| fd                      | 快速搜尋（`find` → `fd`）           |
-| git-delta               | diff 語法高亮                       |
-| lazygit                 | TUI git 介面（`lg`）                |
-| tldr                    | 簡化版 man page（`help`）           |
-| ripgrep                 | 快速全文搜尋                        |
-| zsh-autosuggestions     | 歷史自動提示                        |
-| zsh-syntax-highlighting | 指令語法高亮                        |
-
-### 安裝
+### 依賴工具
 
 ```bash
-# 互動式選擇模組
-zsh zsh/install.sh
-
-# 全部安裝
-zsh zsh/install.sh --all
-
-# 指定模組（由 setup.mjs 呼叫）
-zsh zsh/install.sh --modules "nvm,git,plugins,tools,aliases"
+# setup 會自動安裝，也可手動：
+brew install fzf zoxide bat eza fd git-delta lazygit tldr ripgrep \
+  zsh-autosuggestions zsh-syntax-highlighting
 ```
 
 ---
 
-## Claude Code 設定
+## 配置
 
-### 覆蓋範圍
+### .env
 
-| 工具                         | 安裝方式                                                          |
-| ---------------------------- | ----------------------------------------------------------------- |
-| Claude Code CLI              | `pnpm run setup -- --claude`                                      |
-| Kiro / Cursor / VS Code 插件 | `pnpm run setup -- --claude`                                      |
-| Cowork（開發規則）           | `pnpm run setup -- --claude` → 拖入 `dist/ab-claude-dev.plugin`   |
-| Cowork（Slack 工具）         | `pnpm run setup -- --slack` → 拖入 `dist/ab-slack-message.plugin` |
-
-### Slash Commands（7 個）
-
-| 指令                 | 說明                                                  |
-| -------------------- | ----------------------------------------------------- |
-| `/auto-setup`        | 自動檢測專案環境並推薦配置（CLAUDE.md / rules / MCP） |
-| `/code-review`       | 規範深度審查（嚴重度分級）                             |
-| `/pr-workflow`       | 分支 → commit → PR 描述 → 發 PR 全流程                |
-| `/test-gen`          | 自動生成 Vitest / Jest 單元測試                       |
-| `/slack-formatting`  | Slack mrkdwn 格式化規範                               |
-| `/draft-slack`       | 生成結構化 Slack 訊息草稿                             |
-| `/review-slack`      | 檢查 Slack 訊息格式合規                               |
-
-### Agents（2 個）
-
-| Agent       | 說明                                                            |
-| ----------- | --------------------------------------------------------------- |
-| `@explorer` | 快速掃描 codebase，動態探索所有本地 git 專案（Haiku，省 token） |
-| `@reviewer` | 深度程式碼審查，規範合規（Sonnet）                   |
-
-兩個 agent 均使用 `find ~ -maxdepth 6 -name .git` **動態發現**本地所有 git repos，無硬編碼路徑。
-
-### Hooks
-
-| Hook 事件                 | 功能                                         |
-| ------------------------- | -------------------------------------------- |
-| PostToolUse（Edit/Write） | 自動執行 Prettier（TS/Vue/JS），PHP 語法檢查 |
-| PreToolUse（Edit/Write）  | 保護受保護檔案（.env、lock 檔等）            |
-| SessionStart              | Context 壓縮後提示保留關鍵上下文             |
-| Stop                      | 確認所有任務完成再結束 session               |
-
----
-
-## 工作區自動生成
-
-`scripts/generate-workspace.sh` 掃描 `~/Documents/MyProjects/` 所有同級 git 專案（含 Study/ 子目錄），自動輸出 `.code-workspace` 檔供 Kiro / Cursor / VS Code 開啟。
+首次執行時自動從 `.env.template` 建立。主要配置：
 
 ```bash
-pnpm run workspace
-# → ~/Documents/MyProjects/MyProjects.code-workspace
+# AI 模型（per-repo 分類）
+AI_REPO_MODEL=sonnet
+AI_REPO_EFFORT=low
+AI_REPO_TIMEOUT=60000
+AI_REPO_CACHE=true
+
+# GitHub
+GITHUB_ORG=
+GH_API_TIMEOUT=15000
+
+# ECC 外部來源
+ECC_SOURCES=everything-claude-code|affaan-m/everything-claude-code|10
+
+# AI 並發數
+AI_CONCURRENCY=3
 ```
+
+### config.json
+
+首次 `pnpm run setup` 時自動建立。定義安裝目標和步驟。
 
 ---
 
-## Cowork Plugin 更新流程
+## 故障排除
 
 ```bash
-# 修改 claude/commands/ 或 claude/agents/ 後重新安裝並打包
+# 環境檢查
+pnpm run doctor
 
-# Claude 開發規則 plugin
-pnpm run setup -- --claude
-# → dist/ab-claude-dev.plugin 拖入 Cowork Desktop App
+# 還原到上次備份
+pnpm run restore
 
-# Slack 格式工具 plugin
-pnpm run setup -- --slack
-# → dist/ab-slack-message.plugin 拖入 Cowork Desktop App
+# 重建分類索引
+pnpm run taxonomy:build
+
+# 清除所有快取
+rm -rf .cache/
 ```
 
----
+### 常見問題
 
-## 需求
+**Q: `gh auth login` 失敗？**
+```bash
+gh auth login --web
+```
 
-- macOS（Homebrew）
-- Node.js ≥ 18
-- pnpm ≥ 9
-- zsh（macOS 預設）
+**Q: Claude CLI 未安裝？**
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+**Q: pnpm 找不到？**
+```bash
+corepack enable
+corepack prepare pnpm@latest --activate
+```
+
+**Q: nvm 找不到？**
+```bash
+brew install nvm
+# 然後重開終端或 source ~/.zshrc
+```

@@ -13,13 +13,13 @@
     "scan": "node bin/scan.mjs",
     "restore": "node bin/restore.mjs",
     "doctor": "node -e \"import('./lib/doctor.mjs').then(m => m.ensureEnvironment())\"",
-    "workspace": "bash scripts/generate-workspace.sh"
+    "workspace": "bash scripts/generate-workspace.sh",
+    "taxonomy:build": "node lib/taxonomy/build.mjs"
   },
   "devDependencies": {
     "@clack/prompts": "^0.9.1"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
     "ora": "^9.3.0",
     "picocolors": "^1.1.1",
     "semver": "^7.7.4"

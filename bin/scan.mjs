@@ -83,8 +83,8 @@ function getRepos() {
     }
   }
 
-  // 來源 2：dist/cache/repos.json（setup 產生的快取）
-  const cacheRepos = path.join(REPO_DIR, 'dist', 'cache', 'repos.json')
+  // 來源 2：.cache/repos.json（setup 產生的快取）
+  const cacheRepos = path.join(REPO_DIR, '.cache', 'repos.json')
   if (fs.existsSync(cacheRepos)) {
     return JSON.parse(fs.readFileSync(cacheRepos, 'utf8'))
       .map(e => parseRepoEntry(e).repo)
@@ -148,7 +148,6 @@ async function main() {
       for (const [id, meta] of data.techMetas) {
         if (!globalTechs.has(id)) globalTechs.set(id, meta)
       }
-      // techMetas 已合併，後續不再需要
       delete data.techMetas
       results.push(data)
       console.log(`  ✔ ${data.name.padEnd(30)} ${data.techs.join(', ') || '(none)'}`)

@@ -2,6 +2,7 @@
 *.local
 .env
 .env.*
+!.env.template
 *.log
 .build.log
 .update.log
@@ -11,6 +12,9 @@ config.json
 
 # Build outputs（.plugin 檔 + 展開的預覽資料夾，僅供本地查閱，不追蹤）
 dist/
+
+# 快取（AI 分類、ECC 來源、session 等，不追蹤）
+.cache/
 
 # Node
 node_modules/

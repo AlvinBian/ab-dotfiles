@@ -58,13 +58,13 @@ async function main() {
   }
 
   // 互動式選擇
-  const selected = p.isCancel(await p.select({
+  const selected = await p.select({
     message: '選擇要還原的備份版本  ↑↓ 選擇 · Enter 確認',
     options: backups.map(b => ({
       value: b.name,
       label: `${b.name}  ${pc.dim(b.contents.join(', '))}`,
     })),
-  }))
+  })
   if (p.isCancel(selected)) { p.cancel('已取消'); process.exit(0) }
 
   const backup = backups.find(b => b.name === selected)

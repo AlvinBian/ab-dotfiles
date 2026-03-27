@@ -2,17 +2,16 @@
 /**
  * ab-dotfiles 統一安裝 CLI（config-driven）
  *
- * 優化後流程：
- *   1. 環境檢查
- *   2. 選 targets + mode（先知道要裝什麼，再決定分析什麼）
- *   3. 選 repos（只在 claude-dev target 需要）
- *   4. 並行：分析 repos + 取得 ECC（快取）
- *   5. 一次 AI：技術棧分類 + ECC 推薦
- *   6. 用戶選技術棧 + 選 ECC
- *   7. 備份
- *   8. 並行：生成 stacks/ + 寫入 ECC
- *   9. 執行 targets（安裝/打包）
- *  10. 摘要 + 報告 + 瀏覽器
+ * 流程：
+ *   1. 環境檢查 + 選 targets + mode
+ *   2. 選 repos → 並行分析：
+ *      - repos fetch + ECC fetch
+ *      - per-repo AI 分類（並行，各自快取）
+ *      - merge + dedup → 開發者畫像
+ *      - ECC AI 推薦（背景）
+ *   3. 技術棧確認（確認預選 / 自訂 / 補充）+ ECC 選擇
+ *   4. 備份 + 生成 stacks/ + 寫入 ECC
+ *   5. 執行 targets → 報告
  */
 
 import * as p from '@clack/prompts'
@@ -22,18 +21,20 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-import { CATEGORY_ORDER } from '../lib/npm-classify.mjs'
 import { handleCancel, multiselectWithAll } from '../lib/ui.mjs'
 import { interactiveRepoSelect } from '../lib/repo-select.mjs'
 import { runTarget } from '../lib/install-handlers.mjs'
 import { backupIfExists, cleanOldBackups, BACKUP_DIR, BACKUP_TIMESTAMP } from '../lib/backup.mjs'
-import { analyzeRepo } from '../lib/skill-detect.mjs'
 import { ensureEnvironment } from '../lib/doctor.mjs'
-import { BACKUP_MAX_COUNT, GH_REPO_ANALYZE_TIMEOUT } from '../lib/constants.mjs'
-import { fetchAllSources, buildSyncResult, writeSyncedFiles } from '../lib/source-sync.mjs'
+import { BACKUP_MAX_COUNT, AI_REPO_MODEL, AI_REPO_EFFORT, AI_REPO_TIMEOUT, AI_REPO_CACHE, AI_REPO_MAX_CATEGORIES, AI_REPO_MAX_TECHS, AI_CONCURRENCY } from '../lib/constants.mjs'
+import { buildSyncResult, writeSyncedFiles } from '../lib/source-sync.mjs'
 import { generateReport, saveReport, openInBrowser } from '../lib/report.mjs'
-import { callClaudeJSON } from '../lib/claude-cli.mjs'
 import { loadSession, saveSession } from '../lib/session.mjs'
+import { runAnalysisPipeline } from '../lib/pipeline/pipeline-runner.mjs'
+import { showRepoSummary, selectTechStacks } from '../lib/pipeline/tech-select-ui.mjs'
+import { selectEcc } from '../lib/pipeline/ecc-select-ui.mjs'
+import { generateProfile, showProfile } from '../lib/pipeline/profile-generator.mjs'
+import { env } from '../lib/env.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const REPO = path.resolve(__dirname, '..')
@@ -42,6 +43,20 @@ const PREVIEW_DIR = path.join(REPO, 'dist', 'preview')
 function loadConfig() {
   const cfgPath = path.join(REPO, 'config.json')
   return fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')) : { targets: {} }
+}
+
+/**
+ * 從 .env ECC_SOURCES 解析 sources，fallback 到 config.json
+ * 格式：name|repo|priority（多個用逗號分隔）
+ */
+function loadSources(configSources) {
+  const eccEnv = env('ECC_SOURCES', '')
+  if (!eccEnv) return configSources || []
+  return eccEnv.split(',').map(entry => {
+    const [name, repo, priority] = entry.trim().split('|')
+    if (!name || !repo) return null
+    return { name, repo, priority: parseInt(priority, 10) || 0, paths: { commands: 'commands', agents: 'agents', rules: 'rules/{lang}', rulesCommon: 'rules/common', hooks: 'hooks/hooks.json' } }
+  }).filter(Boolean)
 }
 
 cleanOldBackups()
@@ -65,7 +80,7 @@ function runScan(skills) {
 async function main() {
   const config = loadConfig()
   const targets = config.targets || {}
-  const sources = config.sources || []
+  const sources = loadSources(config.sources)
   const args = process.argv.slice(2)
   const flagAll = args.includes('--all')
   const flagManual = args.includes('--manual')
@@ -125,11 +140,12 @@ async function main() {
 
   let detectedSkills = []
   let categorizedTechs = new Map()
-  let eccRecommended = null
+  let eccSelectedNames = null
   let fetchedSources = { sources: [], localNames: new Set() }
   let selectedRepos = []
   let repoNpmMap = {}
   let allLangs = []
+  let pipelineResult = null
 
   if (needsClaude) {
     // 選 repos
@@ -137,172 +153,76 @@ async function main() {
     selectedRepos = await interactiveRepoSelect()
     if (selectedRepos.length === 0) { p.log.warn('未選擇倉庫'); process.exit(0) }
 
-    const repoNames = selectedRepos.map(r => r.split('/')[1])
+    // ── Pipeline：repos fetch + per-repo AI（並行）+ merge ──
+    const sP = p.spinner()
+    let classifyDone = 0
+    const repoCount = selectedRepos.length
 
-    // 並行：分析 repos + 取得 ECC
-    const s = p.spinner()
-    s.start('分析技術棧 + 取得外部 source...')
-
-    // 只做 repo 分析（ECC 不需要預先 fetch，AI 直接知道 repo 內容）
-    const analysisResults = await Promise.allSettled(selectedRepos.map(repo =>
-      Promise.race([analyzeRepo(repo), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), GH_REPO_ANALYZE_TIMEOUT))])
-    ))
-    // 列出本地已有的檔案（用於排除）
-    fetchedSources = { sources: [], localNames: new Set() }
-    for (const sub of ['commands', 'agents', 'rules']) {
-      const dir = path.join(REPO, 'claude', sub)
-      if (fs.existsSync(dir)) {
-        for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.md'))) fetchedSources.localNames.add(f)
-      }
-    }
-
-    // 收集 deps
-    const allNpmDeps = new Set(), allPhpDeps = new Set(), allLanguages = new Set()
-    let successCount = 0
-
-    for (let i = 0; i < analysisResults.length; i++) {
-      if (analysisResults[i].status !== 'fulfilled') continue
-      successCount++
-      const { context, languages } = analysisResults[i].value
-      const tf = context.techFiles
-      const repoNpms = new Set()
-
-      if (tf['package.json']) {
-        try {
-          const pkg = JSON.parse(tf['package.json'])
-          for (const n of [...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.devDependencies || {})]) {
-            if (!n.startsWith('@types/')) { allNpmDeps.add(n); repoNpms.add(n) }
-          }
-        } catch {}
-      }
-      if (tf['composer.json']) {
-        try {
-          const c = JSON.parse(tf['composer.json'])
-          for (const n of [...Object.keys(c.require || {}), ...Object.keys(c['require-dev'] || {})]) {
-            if (!/^(php$|ext-|lib-|composer\/|psr\/)/.test(n)) allPhpDeps.add(n)
-          }
-        } catch {}
-      }
-      for (const lang of Object.keys(languages)) allLanguages.add(lang)
-      repoNpmMap[repoNames[i]] = repoNpms
-    }
-    allLangs = [...allLanguages]
-
-    s.stop(`${successCount} repos 分析完成`)
-
-    // ── 一次 AI：技術棧分類 + ECC 推薦 ──
-    // 預篩：送 AI 之前先去掉明顯的噪音（減少 prompt 大小 + 提高 AI 準確度）
-    const NOISE_RE = /^(@types\/|@babel\/|@swc\/|@storybook\/|@typescript-eslint\/|babel-|postcss-|eslint-|stylelint-|webpack-|@eslint\/|@postcss\/)/
-    const filteredNpm = [...allNpmDeps].filter(n => !NOISE_RE.test(n))
-    const allDeps = [...filteredNpm, ...[...allPhpDeps].map(n => `[php] ${n}`)]
-
-    function addTech(cat, id) {
-      if (!categorizedTechs.has(cat)) categorizedTechs.set(cat, new Map())
-      categorizedTechs.get(cat).set(id, { label: id })
-    }
-
-    // 用戶自有的項目名（AI 推薦時排除這些）
-    const localItems = [...(fetchedSources.localNames || [])].map(n => n.replace('.md', '')).join(', ')
-
-    const sourceRepos = sources.map(s => `https://github.com/${s.repo}`).join(' ')
-    const eccBlock = sources.length > 0 ? ` Also recommend from ${sourceRepos} (exclude user-owned: ${localItems || 'none'}). In "ecc" field return {commands:[{name:"x.md",desc:"<10chars",reason:"why"}],agents:[...],rules:[...]}. 8-15 commands, 3-8 agents, 5-10 rules. Only matching tech stacks.` : ''
-
-    const prompt = `Classify deps into tech stacks (max 30). Deps ([php]=Composer, rest=npm): ${allDeps.join(', ')}. Languages: ${allLangs.join(', ')}.${eccBlock} Return pure JSON (no code block): {"techStacks":{"category":["id"]}${sources.length > 0 ? ',"ecc":{"commands":[{"name":"x.md","desc":"desc","reason":"reason"}],"agents":[...],"rules":[...]}' : ''}}. Rules: only core tech (framework/UI/state/HTTP/ORM/test/build), discard dev tools. PHP id=vendor-package, npm scoped remove @/. Use Traditional Chinese for category names and desc/reason. Max 8 categories, max 30 total.`
-
-    const sAI = p.spinner()
-    sAI.start('AI 分析中...')
-
-    try {
-      const parsed = await callClaudeJSON(prompt)
-      if (parsed) {
-        if (parsed.techStacks) {
-          let count = 0
-          const MAX_TECHS = 30
-          for (const [cat, ids] of Object.entries(parsed.techStacks)) {
-            if (!Array.isArray(ids)) continue
-            for (const id of ids) {
-              if (count >= MAX_TECHS) break
-              addTech(cat, String(id))
-              count++
-            }
-            if (count >= MAX_TECHS) break
-          }
+    pipelineResult = await runAnalysisPipeline({
+      repos: selectedRepos,
+      sources,
+      baseDir: REPO,
+      aiConfig: {
+        model: AI_REPO_MODEL,
+        effort: AI_REPO_EFFORT,
+        timeout: AI_REPO_TIMEOUT,
+        maxCategories: AI_REPO_MAX_CATEGORIES,
+        maxTechs: AI_REPO_MAX_TECHS,
+        cacheEnabled: AI_REPO_CACHE,
+        concurrency: AI_CONCURRENCY,
+      },
+      onPhase: (phase, detail) => {
+        if (phase === 'fetch') sP.start(detail.message)
+        if (phase === 'fetch-done') sP.stop(`${detail.repoCount} repos 分析完成${detail.eccFileCount ? ` + ECC ${detail.eccFileCount} 個檔案` : ''}`)
+        if (phase === 'classify') { classifyDone = 0; sP.start(`Per-repo AI 分類 [0/${repoCount}]...`) }
+        if (phase === 'classify-repo-done') {
+          classifyDone++
+          const tag = detail.fromCache ? 'cache' : 'AI'
+          sP.message(`Per-repo AI 分類 [${classifyDone}/${repoCount}] ${pc.dim(detail.repo + ' ' + tag)}`)
         }
-        if (parsed.ecc) eccRecommended = parsed.ecc
-      }
-    } catch {}
-
-    const totalTechs = [...categorizedTechs.values()].reduce((sum, m) => sum + m.size, 0)
-    if (totalTechs > 0) {
-      sAI.stop(`AI 精選 ${totalTechs} 個技術棧${eccRecommended ? ' + ECC 推薦' : ''}`)
-      // per-repo 摘要
-      const allIds = new Set(); for (const m of categorizedTechs.values()) for (const id of m.keys()) allIds.add(id)
-      const lines = Object.entries(repoNpmMap).map(([name, deps]) => {
-        const matched = [...deps].map(d => d.replace(/^@/, '').replace(/\//g, '-')).filter(id => allIds.has(id))
-        const langs = allLangs.map(l => l.toLowerCase()).filter(id => allIds.has(id))
-        const all = [...new Set([...matched, ...langs])]
-        const txt = all.length > 8 ? all.slice(0, 6).join(', ') + ` … +${all.length - 6}` : all.join(', ')
-        return `  ${pc.cyan(name)}  ${txt || pc.dim('—')}`
-      }).join('\n')
-      if (lines) p.log.message(lines)
-    } else {
-      sAI.stop('AI 未回應，使用語言偵測')
-      allLangs.forEach(l => addTech('語言', l.toLowerCase()))
-    }
-
-    // ── 用戶選技術棧 ──
-    const sortedCats = [...categorizedTechs.keys()].sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a), ib = CATEGORY_ORDER.indexOf(b)
-      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+        if (phase === 'merge-done') sP.stop(`技術棧整合完成：${detail.totalTechs} 個${detail.conflicts ? `（${detail.conflicts} 衝突已仲裁）` : ''}`)
+      },
+      onRepoProgress: (repo, info) => {
+        if (info.done || info.fromCache) return
+        const parts = []
+        if (info.outputTokens) parts.push(`out:${info.outputTokens}`)
+        if (info.costUSD) parts.push(`$${info.costUSD.toFixed(4)}`)
+        if (parts.length) sP.message(`Per-repo AI 分類 [${classifyDone}/${repoCount}] ${pc.dim(repo + ' ' + parts.join(' · '))}`)
+      },
     })
 
-    if (sortedCats.length > 0) {
-      // label 直接包含內容預覽（不用 hint，避免要 hover 才看到）
-      const catOpts = sortedCats.map(cat => {
-        const items = [...categorizedTechs.get(cat).keys()]
-        return { value: cat, label: `${cat}  ${pc.dim(items.join(' '))}` }
+    categorizedTechs = pipelineResult.categorizedTechs
+    repoNpmMap = pipelineResult.repoNpmMap
+    allLangs = pipelineResult.allLangs
+    if (pipelineResult.eccFetchResult) fetchedSources = pipelineResult.eccFetchResult
+
+    // 背景產生開發者畫像（AI，與 repo 摘要顯示並行）
+    const profilePromise = generateProfile(pipelineResult)
+
+    // 顯示 per-repo 摘要（不等 AI）
+    showRepoSummary(pipelineResult)
+
+    // 等待畫像完成後顯示（加 spinner）
+    const sProfile = p.spinner()
+    sProfile.start('生成開發者畫像...')
+    const profile = await profilePromise
+    sProfile.stop('開發者畫像完成')
+    showProfile(profile, p)
+
+    // 用戶選技術棧（第一個 repo = 貢獻度最高 = 主力 repo）
+    const primaryRepo = pipelineResult.repoData[0]?.name
+    detectedSkills = await selectTechStacks(categorizedTechs, prev, primaryRepo, pipelineResult.coreCategories)
+
+    // ECC 外部資源選擇
+    if (sources.length > 0 && pipelineResult.eccFetchResult) {
+      p.log.step('載入 ECC 外部資源...')
+      eccSelectedNames = await selectEcc({
+        eccFetchResult: pipelineResult.eccFetchResult,
+        existingNames: fetchedSources.localNames || new Set(),
+        detectedSkills,
+        allLangs,
+        eccAiPromise: pipelineResult.eccAiPromise,
       })
-      const selCats = await multiselectWithAll({ message: '選擇技術棧分類', options: catOpts, initialValues: prev?.techCategories || [] })
-
-      const allSel = []
-      for (const cat of selCats) {
-        const items = [...categorizedTechs.get(cat).keys()].sort().map(id => ({ value: id, label: id }))
-        if (items.length <= 3) { allSel.push(...items.map(i => i.value)); continue }
-        allSel.push(...await multiselectWithAll({ message: cat, options: items }))
-      }
-      detectedSkills = allSel
-    }
-
-    // 自定義補充
-    const custom = handleCancel(await p.text({ message: '自定義補充技術棧（逗號分隔，Enter 跳過）', placeholder: '例如：tailwindcss, prisma', defaultValue: '' }))
-    if (custom?.trim()) {
-      for (const c of custom.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)) {
-        if (!detectedSkills.includes(c)) detectedSkills.push(c)
-      }
-    }
-    if (detectedSkills.length > 0) p.log.success(`技術棧：${detectedSkills.length} 個`)
-
-    // ── 用戶選 ECC（基於 AI 推薦，確認後才下載）──
-    let eccSelectedNames = null
-    if (eccRecommended && sources.length > 0) {
-      const selNames = { commands: new Set(), agents: new Set(), rules: new Set() }
-
-      for (const type of ['commands', 'agents', 'rules']) {
-        const items = eccRecommended[type] || []
-        if (!items.length) continue
-        const label = { commands: 'Commands', agents: 'Agents', rules: 'Rules' }[type]
-        const opts = items.map(item => ({
-          value: item.name,
-          label: `${item.name.replace('.md', '')}  ${pc.dim(item.desc || '')}  ${pc.cyan('✨ ' + (item.reason || ''))}`,
-        }))
-        const chosen = await multiselectWithAll({
-          message: `ECC ${label}（AI 推薦 ${items.length}）`,
-          options: opts,
-          initialValues: items.map(i => i.name),
-        })
-        for (const n of chosen) selNames[type].add(n)
-      }
-      eccSelectedNames = selNames
     }
   }
 
@@ -310,25 +230,27 @@ async function main() {
   // │ 階段 3：備份 → 並行寫入 → 安裝
   // └─────────────────────────────────────────────────────────────
 
-  // 備份
+  // 備份（並行）
   const HOME = process.env.HOME
+  const backupTasks = []
   if (needsClaude) {
     const cd = path.join(HOME, '.claude')
-    for (const sub of ['commands', 'agents', 'rules']) await backupIfExists(path.join(cd, sub), `claude/${sub}`)
-    await backupIfExists(path.join(cd, 'hooks.json'), 'claude/hooks.json')
-    await backupIfExists(path.join(cd, 'settings.json'), 'claude/settings.json')
+    for (const sub of ['commands', 'agents', 'rules']) backupTasks.push(backupIfExists(path.join(cd, sub), `claude/${sub}`))
+    backupTasks.push(backupIfExists(path.join(cd, 'hooks.json'), 'claude/hooks.json'))
+    backupTasks.push(backupIfExists(path.join(cd, 'settings.json'), 'claude/settings.json'))
   }
   if (needsZsh) {
-    await backupIfExists(path.join(HOME, '.zshrc'), 'zshrc')
-    await backupIfExists(path.join(HOME, '.zsh', 'modules'), 'zsh/modules')
+    backupTasks.push(backupIfExists(path.join(HOME, '.zshrc'), 'zshrc'))
+    backupTasks.push(backupIfExists(path.join(HOME, '.zsh', 'modules'), 'zsh/modules'))
   }
+  if (backupTasks.length) await Promise.all(backupTasks)
 
   // 並行：生成 stacks/ + 寫入 ECC + 更新 config.json
   const parallelTasks = []
 
   // 記錄選擇的 repos（存到快取，不汙染 config.json）
   if (selectedRepos.length > 0) {
-    const cacheDir = path.join(REPO, 'dist', 'cache')
+    const cacheDir = path.join(REPO, '.cache')
     fs.mkdirSync(cacheDir, { recursive: true })
     fs.writeFileSync(path.join(cacheDir, 'repos.json'), JSON.stringify(selectedRepos, null, 2) + '\n')
   }
@@ -339,13 +261,11 @@ async function main() {
     parallelTasks.push(runScan(detectedSkills).then(lines => { scanLines = lines }))
   }
 
-  // ECC：確認後才下載 + 寫入
+  // ECC：用已取得的資料寫入（不需重新 fetch）
   let syncResult = null
-  if (eccSelectedNames && sources.length > 0) {
+  if (eccSelectedNames && fetchedSources.sources?.length > 0) {
     parallelTasks.push((async () => {
-      // 現在才 fetch ECC（快取有效則瞬間完成）
-      const fetched = await fetchAllSources(sources, detectedSkills, REPO, () => {})
-      syncResult = buildSyncResult(fetched, eccSelectedNames)
+      syncResult = buildSyncResult(fetchedSources, eccSelectedNames)
       const claudePreview = path.join(PREVIEW_DIR, 'claude')
       await writeSyncedFiles(syncResult.downloaded, claudePreview)
       if (!manual) await writeSyncedFiles(syncResult.downloaded, path.join(HOME, '.claude'))
@@ -403,6 +323,8 @@ async function main() {
     org: selectedRepos[0]?.split('/')[0] || '',
     repos: selectedRepos,
     techStacks: Object.fromEntries([...categorizedTechs].map(([k, v]) => [k, [...v.keys()]])),
+    perRepoReasoning: pipelineResult?.perRepo ? Object.fromEntries([...pipelineResult.perRepo].map(([k, v]) => [k, { reasoning: v.reasoning, stacks: v.techStacks }])) : {},
+    auditSummary: pipelineResult?.audit?.toSummary() || [],
     ecc: syncResult ? { sources: syncResult.results.map(r => ({ name: r.source, repo: r.repo, version: r.version, cached: r.cached, added: r.added, skipped: r.skipped, hooks: r.hooks })) } : null,
     installed: {
       commands: fs.existsSync(path.join(REPO, 'claude/commands')) ? fs.readdirSync(path.join(REPO, 'claude/commands')).filter(f => f.endsWith('.md')).map(f => f.replace('.md', '')) : [],
@@ -424,7 +346,6 @@ async function main() {
   if (shouldOpen) await openInBrowser(reportPath)
 
   // ── 保存本次所有選擇（下次 setup 作為預設值）──
-  const eccSel = fetchedSources._selectedNames
   saveSession({
     targets: selectedTargets,
     mode: manual ? 'manual' : 'auto',
@@ -435,10 +356,10 @@ async function main() {
       return items.some(id => detectedSkills.includes(id))
     }),
     techStacks: detectedSkills,
-    eccSelections: eccSel ? {
-      commands: [...eccSel.commands],
-      agents: [...eccSel.agents],
-      rules: [...eccSel.rules],
+    eccSelections: eccSelectedNames ? {
+      commands: [...eccSelectedNames.commands],
+      agents: [...eccSelectedNames.agents],
+      rules: [...eccSelectedNames.rules],
     } : null,
   })
 }

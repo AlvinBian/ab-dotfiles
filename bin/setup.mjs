@@ -303,18 +303,20 @@ async function main() {
   // │ 階段 4：摘要 + 報告
   // └─────────────────────────────────────────────────────────────
 
-  p.note([
-    `${pc.bold('產出目錄')}  dist/`,
+  p.log.success(manual ? '手動模式完成' : '安裝完成')
+  const summaryLines = [
+    '產出目錄  dist/',
     '  preview/   預覽檔案', '  release/   .plugin 檔案',
     ...(fs.existsSync(BACKUP_DIR) ? [`  backup/    備份（保留 ${BACKUP_MAX_COUNT} 次）`] : []),
-    '',
     ...(manual ? [
-      `${pc.bold('手動部署')}`,
+      '',
+      '手動部署：',
       ...(needsClaude ? ['  cp -r dist/preview/claude/* ~/.claude/'] : []),
       ...(needsZsh ? ['  cp dist/preview/zsh/modules/*.zsh ~/.zsh/modules/', '  cp dist/preview/zsh/zshrc ~/.zshrc', '  source ~/.zshrc'] : []),
     ] : []),
-    ...(fs.existsSync(BACKUP_DIR) ? ['', `${pc.bold('還原')}  pnpm run restore`] : []),
-  ].join('\n'), manual ? '📁 手動模式完成' : '✅ 安裝完成')
+    ...(fs.existsSync(BACKUP_DIR) ? ['', '還原：pnpm run restore'] : []),
+  ]
+  p.log.message(summaryLines.join('\n'))
 
   // 報告
   const { ghSync } = await import('../lib/github.mjs')

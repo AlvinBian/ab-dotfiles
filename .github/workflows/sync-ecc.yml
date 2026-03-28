@@ -1,0 +1,65 @@
+name: Sync ECC + Taxonomy
+
+on:
+  schedule:
+    - cron: '0 2 * * 1' # 每週一 02:00 UTC
+  workflow_dispatch: # 手動觸發
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # ── ECC: everything-claude-code ──
+      - name: Sync ECC
+        run: |
+          git clone --depth 1 https://github.com/affaan-m/everything-claude-code.git /tmp/ecc
+
+          rm -rf ecc/everything-claude-code
+          mkdir -p ecc/everything-claude-code/{commands,agents,rules}
+
+          cp /tmp/ecc/commands/*.md ecc/everything-claude-code/commands/ 2>/dev/null || true
+          cp /tmp/ecc/agents/*.md ecc/everything-claude-code/agents/ 2>/dev/null || true
+          cp -r /tmp/ecc/rules/common/*.md ecc/everything-claude-code/rules/ 2>/dev/null || true
+          cp -r /tmp/ecc/rules/typescript/*.md ecc/everything-claude-code/rules/ 2>/dev/null || true
+          cp /tmp/ecc/hooks/hooks.json ecc/everything-claude-code/hooks.json 2>/dev/null || true
+
+          cd /tmp/ecc
+          echo "{\"sha\":\"$(git rev-parse HEAD)\",\"date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"source\":\"affaan-m/everything-claude-code\"}" \
+            > $GITHUB_WORKSPACE/ecc/everything-claude-code/.version.json
+
+          echo "ECC: $(ls $GITHUB_WORKSPACE/ecc/everything-claude-code/commands/*.md 2>/dev/null | wc -l) cmd, $(ls $GITHUB_WORKSPACE/ecc/everything-claude-code/agents/*.md 2>/dev/null | wc -l) agent, $(ls $GITHUB_WORKSPACE/ecc/everything-claude-code/rules/*.md 2>/dev/null | wc -l) rule"
+
+      # ── Taxonomy: awesome-nodejs + awesome-php ──
+      - name: Rebuild Taxonomy
+        run: |
+          mkdir -p lib/taxonomy/_generated
+          node lib/taxonomy/build.mjs
+          # build.mjs 輸出到 .cache/taxonomy/，搬到 tracked 位置
+          cp .cache/taxonomy/node-packages.json lib/taxonomy/_generated/ 2>/dev/null || true
+          cp .cache/taxonomy/php-packages.json lib/taxonomy/_generated/ 2>/dev/null || true
+          echo "{\"date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > lib/taxonomy/_generated/.version.json
+
+          echo "Taxonomy: $(node -e "const j=JSON.parse(require('fs').readFileSync('lib/taxonomy/_generated/node-packages.json','utf8')); console.log(Object.keys(j).length + ' npm')")"
+          echo "Taxonomy: $(node -e "const j=JSON.parse(require('fs').readFileSync('lib/taxonomy/_generated/php-packages.json','utf8')); console.log(Object.keys(j).length + ' php')")"
+
+      # ── Commit ──
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ecc/ lib/taxonomy/_generated/
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "chore: sync ECC + taxonomy ($(date -u +%Y-%m-%d))"
+            git push
+          fi

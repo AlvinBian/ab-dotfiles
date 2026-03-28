@@ -62,6 +62,37 @@ pnpm run setup
 
 `pnpm run doctor` 可檢查以上工具是否就緒。
 
+### 平台支援
+
+目前只支援 **macOS + zsh**。Linux / WSL 尚未測試，歡迎提 issue 或 PR。
+
+---
+
+## 安全說明
+
+setup 會修改以下檔案/目錄，**每次安裝前自動備份**：
+
+| 修改目標 | 動作 | 備份位置 |
+|---------|------|---------|
+| `~/.claude/commands/` | 寫入 slash commands | `dist/backup/{timestamp}/claude/commands` |
+| `~/.claude/agents/` | 寫入 agents | `dist/backup/{timestamp}/claude/agents` |
+| `~/.claude/rules/` | 寫入 rules | `dist/backup/{timestamp}/claude/rules` |
+| `~/.claude/hooks.json` | 寫入 hooks | `dist/backup/{timestamp}/claude/hooks.json` |
+| `~/.zshrc` | 替換為模組化版本 | `dist/backup/{timestamp}/zshrc` |
+| `~/.zsh/modules/` | 寫入 zsh 模組 | `dist/backup/{timestamp}/zsh/modules` |
+
+不想直接部署？用 `--manual` 模式：
+
+```bash
+pnpm run setup -- --manual
+# 只生成到 dist/preview/，不動任何系統檔案
+# 確認無誤後手動複製：
+#   cp -r dist/preview/claude/* ~/.claude/
+#   cp dist/preview/zsh/modules/*.zsh ~/.zsh/modules/
+```
+
+還原：`pnpm run restore`（互動式選擇備份版本）
+
 ---
 
 ## 功能概覽
@@ -274,6 +305,77 @@ AI_CONCURRENCY=3
 ### config.json
 
 首次 `pnpm run setup` 時自動建立。定義安裝目標和步驟。
+
+---
+
+## 範例輸出
+
+### setup 完成後的 dist/preview/ 結構
+
+```
+dist/preview/
+├── claude/
+│   ├── commands/
+│   │   ├── auto-setup.md
+│   │   ├── code-review.md
+│   │   ├── draft-slack.md
+│   │   ├── pr-workflow.md
+│   │   ├── review-slack.md
+│   │   ├── slack-formatting.md
+│   │   └── test-gen.md
+│   ├── agents/
+│   │   ├── coder.md
+│   │   ├── debugger.md
+│   │   ├── deployer.md
+│   │   ├── documenter.md
+│   │   ├── explorer.md
+│   │   ├── monitor.md
+│   │   ├── planner.md
+│   │   ├── refactor.md
+│   │   ├── reviewer.md
+│   │   └── tester.md
+│   ├── rules/
+│   │   ├── code-style.md
+│   │   ├── git-workflow.md
+│   │   └── slack-mrkdwn.md
+│   └── hooks.json
+└── zsh/
+    ├── modules/*.zsh (10 個)
+    └── zshrc
+```
+
+### stacks/ 技能庫範例
+
+```
+stacks/
+├── vue/
+│   ├── detect.json        # { "detect": { "deps": ["vue"] } }
+│   ├── code-review.md     # Vue 組件審查 checklist
+│   ├── test-gen.md         # Vue Test Utils 測試模式
+│   └── code-style.md       # Vue SFC 命名慣例
+├── nuxt/
+│   ├── detect.json
+│   ├── code-review.md     # Nuxt SSR 審查要點
+│   └── ...
+└── typescript/
+    ├── detect.json
+    └── ...
+```
+
+### 開發者畫像範例
+
+```
+ℹ 開發者畫像：
+
+  Vue 前端工程師
+
+  核心技能: Vue / Nuxt SSR / TypeScript / 狀態管理（Pinia / Vuex）
+  + 電商平台 · 金流整合 · 多語系
+
+  專注 Vue 生態系的電商前端工程師，橫跨 SSR 應用與行動會員平台開發。
+
+  即將根據你的技術棧，打造專屬的 Claude Code 技能庫
+```
 
 ---
 

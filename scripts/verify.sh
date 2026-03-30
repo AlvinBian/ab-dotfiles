@@ -44,18 +44,28 @@ echo ""
 echo "--- Module Import Check ---"
 node -e "
 const modules = [
-  './lib/ui/prompts.mjs',
-  './lib/ui/progress.mjs',
-  './lib/ui/files.mjs',
-  './lib/ui/preselect.mjs',
+  './lib/cli/prompts.mjs',
+  './lib/cli/progress.mjs',
+  './lib/cli/files.mjs',
+  './lib/cli/preselect.mjs',
+  './lib/cli/task-runner.mjs',
   './lib/install/index.mjs',
   './lib/install/common.mjs',
-  './lib/utils/paths.mjs',
-  './lib/utils/concurrency.mjs',
-  './lib/session.mjs',
-  './lib/repo-select.mjs',
-  './lib/pipeline/tech-select-ui.mjs',
-  './lib/pipeline/ecc-select-ui.mjs',
+  './lib/core/paths.mjs',
+  './lib/core/concurrency.mjs',
+  './lib/core/session.mjs',
+  './lib/detect/repo-select.mjs',
+  './lib/phases/phase-analyze.mjs',
+  './lib/phases/phase-plan.mjs',
+  './lib/phases/phase-execute.mjs',
+  './lib/phases/phase-complete.mjs',
+  './lib/config/auto-plan.mjs',
+  './lib/config/config-classifier.mjs',
+  './lib/detect/repo-detect.mjs',
+  './lib/deploy/deploy-global.mjs',
+  './lib/deploy/deploy-project.mjs',
+  './lib/deploy/generate-claude-md.mjs',
+  './lib/config/upgrade.mjs',
 ]
 Promise.all(modules.map(m => import(m).then(() => '✓ ' + m).catch(e => '✗ ' + m + ': ' + e.message)))
   .then(results => {
@@ -65,7 +75,13 @@ Promise.all(modules.map(m => import(m).then(() => '✓ ' + m).catch(e => '✗ ' 
   })
 "
 
-# 5. 檔案統計
+# 5. v2 Templates Check
+echo ""
+echo "--- v2 Template Check ---"
+node -e "JSON.parse(require('fs').readFileSync('claude/settings-template.json'))" && echo "✓ settings-template.json"
+node -e "JSON.parse(require('fs').readFileSync('claude/keybindings-template.json'))" && echo "✓ keybindings-template.json"
+
+# 6. 檔案統計
 echo ""
 echo "--- File Stats ---"
 AGENTS=$(ls claude/agents/*.md 2>/dev/null | wc -l | tr -d ' ')
@@ -73,15 +89,16 @@ COMMANDS=$(ls claude/commands/*.md 2>/dev/null | wc -l | tr -d ' ')
 RULES=$(ls claude/rules/*.md 2>/dev/null | wc -l | tr -d ' ')
 echo "Agents: $AGENTS | Commands: $COMMANDS | Rules: $RULES"
 
-# 6. 無殘留舊路徑
+# 7. 無殘留舊路徑
 echo ""
 echo "--- Old Import Check ---"
 OLD_IMPORTS=$(grep -rn "from.*['\"]\.\.*/ui\.mjs['\"]" lib/ bin/ 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
 OLD_IH=$(grep -rn "from.*install-handlers" lib/ bin/ 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
-if [ "$OLD_IMPORTS" -eq 0 ] && [ "$OLD_IH" -eq 0 ]; then
+OLD_PHASES=$(grep -rn "phase-intent\|phase-analysis\|phase-report" lib/ bin/ 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
+if [ "$OLD_IMPORTS" -eq 0 ] && [ "$OLD_IH" -eq 0 ] && [ "$OLD_PHASES" -eq 0 ]; then
   echo "✓ No legacy import paths found"
 else
-  echo "✗ Found $OLD_IMPORTS ui.mjs refs + $OLD_IH install-handlers refs"
+  echo "✗ Found $OLD_IMPORTS ui.mjs refs + $OLD_IH install-handlers refs + $OLD_PHASES old phase refs"
 fi
 
 echo ""

@@ -1,29 +1,29 @@
 #!/usr/bin/env node
 /**
- * ab-dotfiles 統一安裝 CLI（config-driven）
+ * ab-dotfiles v2.0 統一安裝 CLI
  *
- * 流程：
- *   Phase 1: 環境檢查 + 選 targets + mode
- *   Phase 2: 選 repos → Pipeline 分析 → 技術棧/ECC 選擇
- *   Phase 3: 備份 → 生成 → 安裝執行
- *   Phase 4: 驗證 → 報告 → session 保存
+ * 3 步流程：選 repos → 確認計畫 → 安裝
  */
 
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
+import { countBy, sumBy } from 'lodash-es'
 import fs from 'fs'
 import path from 'path'
-import { getDirname } from '../lib/utils/paths.mjs'
-import { handleCancel, BACK } from '../lib/ui/prompts.mjs'
-import { cleanOldBackups } from '../lib/backup.mjs'
-import { loadSession, checkIncompleteSession } from '../lib/session.mjs'
-import { env } from '../lib/env.mjs'
-import { warmupCli } from '../lib/claude-cli.mjs'
-
-import { runPhaseIntent } from '../lib/phases/phase-intent.mjs'
-import { runPhaseAnalysis } from '../lib/phases/phase-analysis.mjs'
-import { runPhaseExecute } from '../lib/phases/phase-execute.mjs'
-import { runPhaseReport } from '../lib/phases/phase-report.mjs'
+import { getDirname } from '../lib/core/paths.mjs'
+import { handleCancel, smartSelect, BACK } from '../lib/cli/prompts.mjs'
+import { phaseHeader } from '../lib/cli/task-runner.mjs'
+import { cleanOldBackups } from '../lib/core/backup.mjs'
+import { loadSession } from '../lib/core/session.mjs'
+import { env } from '../lib/core/env.mjs'
+import { warmupCli } from '../lib/external/claude-cli.mjs'
+import { ensureEnvironment } from '../lib/detect/doctor.mjs'
+import { interactiveRepoSelect } from '../lib/detect/repo-select.mjs'
+import { phaseAnalyze } from '../lib/phases/phase-analyze.mjs'
+import { phasePlan } from '../lib/phases/phase-plan.mjs'
+import { phaseExecute } from '../lib/phases/phase-execute.mjs'
+import { phaseComplete } from '../lib/phases/phase-complete.mjs'
+import { detectLegacyInstallation, runUpgrade } from '../lib/config/upgrade.mjs'
 
 const __dirname = getDirname(import.meta)
 const REPO = path.resolve(__dirname, '..')
@@ -32,6 +32,11 @@ const PREVIEW_DIR = path.join(REPO, 'dist', 'preview')
 function loadConfig() {
   const cfgPath = path.join(REPO, 'config.json')
   return fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')) : { targets: {} }
+}
+
+function loadProjectFolders(config, session) {
+  // 優先用 config.json 的 projectFolders，再用 session 保存的
+  return config.projectFolders || session?.projectFolders || []
 }
 
 function loadSources(configSources) {
@@ -46,7 +51,6 @@ function loadSources(configSources) {
 
 cleanOldBackups()
 
-// ══════════════════════════════════════════════════════════════════
 async function main() {
   const config = loadConfig()
   const targets = config.targets || {}
@@ -56,142 +60,376 @@ async function main() {
   const flagManual = args.includes('--manual')
   const flagQuick = args.includes('--quick')
   const flagDryRun = args.includes('--dry-run')
-  const prev = loadSession()
+  let prev = loadSession()
+  let projectFolders = loadProjectFolders(config, prev)
 
-  // --quick 前置檢查
-  if (flagQuick && !prev) {
-    p.log.error('無歷史安裝記錄，無法使用 --quick 模式。請先執行 pnpm setup。')
-    process.exit(1)
+  // 首次使用：備份原始配置（~/.zshrc、~/.claude/ 等）
+  const { ensureOriginalBackup } = await import('./backup-original.mjs')
+  const origBackup = ensureOriginalBackup()
+  if (origBackup && origBackup.length > 0) {
+    p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
   }
-  if (flagQuick) p.log.info(`Quick 模式：重放上次安裝（${prev.timestamp?.slice(0, 19) || '未知時間'}）`)
-  if (flagDryRun) p.log.info(pc.yellow('Dry Run 模式：只顯示安裝計畫，不寫入任何檔案'))
 
-  // 斷點續裝
-  const incomplete = checkIncompleteSession()
-  let resumeMode = false
-  if (incomplete.hasIncomplete && !flagAll && !flagQuick) {
-    const resume = handleCancel(await p.select({
-      message: `偵測到未完成的安裝（上次停在 ${incomplete.lastPhase}，剩餘：${incomplete.pendingTargets.join('、')}）`,
+  // Splash
+  console.log()
+  if (prev) {
+    p.intro(` ab-dotfiles v2.0 — 上次：${prev.repos?.length || '?'} repos · ${prev.techStacks?.length || '?'} stacks · ${prev.timestamp?.slice(0, 10) || ''} `)
+  } else {
+    p.intro(' ab-dotfiles v2.0 安裝精靈 ')
+  }
+
+  // 舊版安裝偵測
+  const legacyInfo = detectLegacyInstallation()
+  if (legacyInfo.hasLegacy) {
+    const upgradeResult = await runUpgrade(legacyInfo)
+    if (upgradeResult === 'cleaned') {
+      prev = null
+      projectFolders = [] // 清除後重新詢問文件夾
+    }
+  }
+
+  // --quick + --dry-run 衝突檢查
+  if (flagQuick && flagDryRun) {
+    p.log.warn('--quick 和 --dry-run 不能同時使用，已忽略 --dry-run')
+  }
+
+  // --quick：直接用上次 session 重裝，跳過所有互動
+  if (flagQuick) {
+    if (!prev) { p.log.error('無歷史記錄，無法 --quick。請先執行 pnpm setup。'); process.exit(1) }
+    p.log.info(`Quick 模式：重放上次安裝（${prev.repos?.length} repos）`)
+
+    if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
+    phaseHeader('環境檢查')
+    await ensureEnvironment()
+    warmupCli()
+
+    // 用 session 重建 plan
+    if (!prev.roles) p.log.warn('上次 session 無角色資訊，全部預設為🔄臨時')
+    const repoObjects = (prev.repos || []).map(r => ({
+      fullName: r,
+      commits: 10, // quick 模式假設都是主力
+      pct: 0,
+      _roleOverride: prev.roles?.[r] || 'temp',
+    }))
+    phaseHeader('快速分析')
+    const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
+    if (flagManual) plan.mode = 'manual'
+
+    // 應用 session 保存的角色
+    const { getClaudeMdType } = await import('../lib/config/config-classifier.mjs')
+    for (const r of plan.repos) {
+      if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
+    }
+    const rc = countBy(plan.repos, 'role')
+    plan.mainCount = rc.main || 0
+    plan.tempCount = rc.temp || 0
+    plan.toolCount = rc.tool || 0
+    plan.projects = plan.repos.filter(r => r.localPath).map(r => ({
+      repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
+    }))
+
+    phaseHeader('安裝中')
+    const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
+      repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
+      pipelineResult: plan._pipelineResult || null, fetchedSources: plan._fetchedSources || null,
+    })
+
+    phaseHeader('完成', 3, 3)
+    await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders })
+    p.outro('設定完成')
+    return
+  }
+
+  // 重入
+  if (prev && !flagAll && !flagQuick) {
+    const action = handleCancel(await p.select({
+      message: `上次安裝：${prev.repos?.length || '?'} repos · ${prev.installMode || 'full'}`,
       options: [
-        { value: 'resume', label: '繼續上次安裝', hint: '直接跳到執行，推薦' },
-        { value: 'restart', label: '重新開始' },
-        { value: 'cancel', label: '取消' },
+        { value: 'reinstall', label: '重新安裝（用上次設定）', hint: 'Enter 直接裝' },
+        { value: 'adjust', label: '調整設定' },
+        { value: 'report', label: '查看上次報告' },
       ],
     }))
-    if (resume === 'cancel') process.exit(0)
-    resumeMode = resume === 'resume'
+    if (action === BACK) { p.outro('已取消'); process.exit(0) }
+    if (action === 'report') {
+      const reportPath = path.join(REPO, 'dist', 'report.html')
+      if (fs.existsSync(reportPath)) {
+        const { openInBrowser } = await import('../lib/report.mjs')
+        await openInBrowser(reportPath)
+      } else {
+        p.log.warn('找不到上次報告')
+      }
+      p.outro()
+      process.exit(0)
+    }
+    // 「調整設定」：不自動跳過組織選擇，讓用戶重選一切
+    if (action === 'adjust') {
+      prev = { ...prev, org: null } // 清除 org 讓 interactiveRepoSelect 重新問
+    }
+    if (action === 'reinstall') {
+      // 等同 --quick
+      if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
+      phaseHeader('環境檢查')
+      await ensureEnvironment()
+      warmupCli()
+
+      if (!prev.roles) p.log.warn('上次 session 無角色資訊，全部預設為🔄臨時')
+      const repoObjects = (prev.repos || []).map(r => ({
+        fullName: r, commits: 10, pct: 0, _roleOverride: prev.roles?.[r] || 'temp',
+      }))
+      phaseHeader('快速分析')
+      const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
+
+      // 應用 session 保存的角色
+      const { getClaudeMdType } = await import('../lib/config/config-classifier.mjs')
+      for (const r of plan.repos) {
+        if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
+      }
+      const roleCounts1 = countBy(plan.repos, 'role')
+      plan.mainCount = roleCounts1.main || 0
+      plan.tempCount = roleCounts1.temp || 0
+      plan.toolCount = roleCounts1.tool || 0
+      plan.projects = plan.repos.filter(r => r.localPath).map(r => ({
+        repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
+      }))
+
+      if (flagManual) plan.mode = 'manual'
+
+      phaseHeader('安裝中')
+      const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
+        repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
+        pipelineResult: plan._pipelineResult || null, fetchedSources: plan._fetchedSources || null,
+      })
+
+      phaseHeader('完成', 3, 3)
+      await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders })
+      p.outro('設定完成')
+      return
+    }
   }
 
   if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
 
-  console.log()
-  p.intro(' ab-dotfiles 安裝精靈 ')
+  // 環境檢查
+  phaseHeader('環境檢查')
+  await ensureEnvironment()
+  warmupCli()
 
-  // ── 續裝模式：跳過 Phase 1+2，用 session 中的選擇直接執行 ──
-  if (resumeMode && prev) {
-    const selectedTargets = incomplete.pendingTargets
-    const manual = prev.mode === 'manual'
-    const needsClaude = selectedTargets.includes('claude-dev') || selectedTargets.includes('slack')
-    const needsZsh = selectedTargets.includes('zsh')
+  // ── 功能選擇 ──
+  const featureChoices = [
+    { value: 'claude', label: 'Claude Code 開發配置', hint: 'commands · agents · rules · hooks · settings · keybindings' },
+    { value: 'claudemd', label: '專案 CLAUDE.md', hint: '按 repo 角色 AI 生成到 ~/.claude/projects/' },
+    { value: 'ecc', label: 'ECC 外部資源', hint: '社群 commands/agents/rules 融合' },
+    { value: 'slack', label: 'Slack 通知', hint: 'P0/P1/P2 分級 + Channel/DM' },
+    { value: 'zsh', label: 'zsh 環境模組', hint: 'aliases · fzf · git · tools · history' },
+  ]
+  const prevFeatures = prev?.features || ['claude', 'claudemd', 'ecc', 'slack', 'zsh']
+  const features = handleCancel(await p.multiselect({
+    message: '選擇安裝項目（Space 切換，Enter 確認）',
+    options: featureChoices,
+    initialValues: prevFeatures,
+    required: true,
+  }))
+  if (features === BACK) { p.outro('已取消'); return }
 
-    p.log.info(`續裝：${selectedTargets.map(k => targets[k]?.label || k).join('、')}（${manual ? '手動' : '自動'}）`)
+  const has = (f) => features.includes(f)
+  const needsRepos = has('claudemd') || has('ecc') // 需要選 repos 的功能
 
-    const { installSelections, syncResult } = await runPhaseExecute({
-      repoDir: REPO, previewDir: PREVIEW_DIR, targets, selectedTargets,
-      manual, flagAll: true, flagQuick: false, needsClaude, needsZsh,
-      detectedSkills: prev.techStacks || [],
-      eccSelectedNames: prev.eccSelections ? {
-        commands: new Set(prev.eccSelections.commands || []),
-        agents: new Set(prev.eccSelections.agents || []),
-        rules: new Set(prev.eccSelections.rules || []),
-      } : null,
-      fetchedSources: { sources: [], localNames: new Set() },
-      selectedRepos: prev.repos || [], prev,
-    })
-
-    await runPhaseReport({
-      repoDir: REPO, manual, needsClaude, needsZsh,
-      selectedTargets, selectedRepos: prev.repos || [],
-      categorizedTechs: new Map(),
-      detectedSkills: prev.techStacks || [],
-      pipelineResult: null, syncResult, installSelections,
-      eccSelectedNames: null,
-    })
-    return
-  }
-
-  // ── Phase loop（支持 BACK 回退）──
-  let phase = 1
-  let intentResult = null
-  let analysisResult = null
-
-  while (phase <= 4) {
-    if (phase === 1) {
-      // Phase 1：意圖
-      intentResult = await runPhaseIntent({
-        targets, args, flagAll, flagManual, flagQuick, prev,
-      })
-      // Phase 1 是第一步，不支持回退
-      phase = 2
-      continue
-    }
-
-    if (phase === 2) {
-      // Phase 2：分析
-      const { needsClaude } = intentResult
-      analysisResult = {
-        selectedRepos: [], detectedSkills: [], categorizedTechs: new Map(),
-        eccSelectedNames: null, fetchedSources: { sources: [], localNames: new Set() },
-        pipelineResult: null, repoNpmMap: {}, allLangs: [],
-      }
-      if (needsClaude) {
-        const result = await runPhaseAnalysis({ sources, baseDir: REPO, prev, flagQuick })
-        if (result === BACK) { phase = 1; continue }
-        analysisResult = result
-      }
-
-      // dry-run
-      if (flagDryRun) {
-        const { selectedTargets, manual } = intentResult
-        p.log.info(pc.yellow('=== Dry Run 安裝計畫 ===') + '\n' + [
-          `Targets: ${selectedTargets.map(k => targets[k]?.label || k).join('、')}`,
-          `Mode: ${manual ? '手動' : '自動'}`,
-          `Repos: ${analysisResult.selectedRepos.length} 個`,
-          `Tech Stacks: ${analysisResult.detectedSkills.length} 個`,
-          `ECC: ${analysisResult.eccSelectedNames ? Object.values(analysisResult.eccSelectedNames).reduce((s, v) => s + v.size, 0) : 0} 個`,
-        ].join('\n'))
-        p.log.success(pc.yellow('Dry Run 完成 — 未寫入任何檔案'))
-        process.exit(0)
-      }
-      phase = 3
-      continue
-    }
-
-    if (phase === 3) {
-      // Phase 3：執行
-      const { selectedTargets, manual, needsClaude, needsZsh } = intentResult
-      const { installSelections, syncResult } = await runPhaseExecute({
-        repoDir: REPO, previewDir: PREVIEW_DIR, targets, selectedTargets,
-        manual, flagAll, flagQuick, needsClaude, needsZsh,
-        detectedSkills: analysisResult.detectedSkills,
-        eccSelectedNames: analysisResult.eccSelectedNames,
-        fetchedSources: analysisResult.fetchedSources,
-        selectedRepos: analysisResult.selectedRepos, prev,
-      })
-
-      // Phase 4：報告
-      await runPhaseReport({
-        repoDir: REPO, manual, needsClaude, needsZsh,
-        selectedTargets, selectedRepos: analysisResult.selectedRepos,
-        categorizedTechs: analysisResult.categorizedTechs,
-        detectedSkills: analysisResult.detectedSkills,
-        pipelineResult: analysisResult.pipelineResult,
-        syncResult, installSelections,
-        eccSelectedNames: analysisResult.eccSelectedNames,
-      })
-      phase = 5 // done
+  // Slack 通知設定
+  if (has('slack') && !prev?.slackChannel) {
+    const { setupSlackNotify } = await import('../lib/slack/slack-setup.mjs')
+    const slackResult = await setupSlackNotify(prev)
+    if (slackResult) {
+      const envPath = path.join(REPO, '.env')
+      let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
+      envContent = envContent.replace(/^SLACK_NOTIFY_CHANNEL=.*/m, '').replace(/^SLACK_NOTIFY_MODE=.*/m, '').trim()
+      envContent += `\nSLACK_NOTIFY_CHANNEL=${slackResult.channelId}\nSLACK_NOTIFY_MODE=${slackResult.mode}\n`
+      fs.writeFileSync(envPath, envContent)
+      if (!prev) prev = {}
+      prev.slackChannel = slackResult.channelId
+      prev.slackMode = slackResult.mode
     }
   }
+
+  // ── Phase loop（支持 BACK）──
+  let analyzeCache = null
+
+  while (true) {
+    // Step 1：選 repos（只有需要 repos 的功能才問）
+    let repos = []
+    if (needsRepos) {
+      phaseHeader('選擇倉庫', 1, 3)
+      repos = await interactiveRepoSelect(prev)
+      if (repos === BACK) break
+    }
+
+    // 角色分類（只有選了 repos 的功能才需要）
+    const roles = {}
+    if (needsRepos && repos.length > 0) {
+    const { determineRole } = await import('../lib/config/config-classifier.mjs')
+    for (const r of repos) {
+      roles[r.fullName] = prev?.roles?.[r.fullName] || determineRole(r)
+    }
+
+    let roleConfirmed = false
+    while (!roleConfirmed) {
+      const roleCounts = countBy(Object.values(roles))
+      const mc = roleCounts.main || 0
+      const tc = roleCounts.temp || 0
+      const toolc = roleCounts.tool || 0
+
+      // 顯示當前分配（⭐主力 → 🔄臨時 → 🔧工具）
+      const ROLE_ORDER = { main: 0, temp: 1, tool: 2 }
+      const sortedRepos = [...repos].sort((a, b) => (ROLE_ORDER[roles[a.fullName]] ?? 9) - (ROLE_ORDER[roles[b.fullName]] ?? 9))
+      const summary = sortedRepos.map(r => {
+        const icon = roles[r.fullName] === 'main' ? '⭐' : roles[r.fullName] === 'tool' ? '🔧' : '🔄'
+        return `  ${icon} ${r.fullName.split('/')[1]}`
+      }).join('\n')
+      p.log.info(`角色分配（${mc} ⭐主力 · ${tc} 🔄臨時${toolc ? ` · ${toolc} 🔧工具` : ''}）\n${summary}`)
+
+      const action = handleCancel(await p.select({
+        message: '角色分配',
+        options: [
+          { value: 'confirm', label: '確認', hint: '繼續安裝' },
+          { value: 'main', label: '調整 ⭐主力', hint: '完整 CLAUDE.md + AI 生成' },
+          { value: 'temp', label: '調整 🔄臨時', hint: '精簡 CLAUDE.md' },
+          { value: 'tool', label: '調整 🔧工具', hint: '最小配置' },
+          { value: 'back', label: '← 上一步' },
+        ],
+      }))
+
+      if (action === BACK || action === 'back') { roleConfirmed = null; break }
+
+      if (action === 'confirm') {
+        roleConfirmed = true
+        break
+      }
+
+      // 調整某個角色：選中 = 歸入該角色，未選 = 保持原角色
+      const targetRole = action
+      const items = repos.map(r => ({
+        value: r.fullName,
+        label: r.fullName.split('/')[1],
+        hint: r.commits > 0 ? `${r.commits} commits` : '',
+      }))
+      const currentInRole = repos.filter(r => roles[r.fullName] === targetRole).map(r => r.fullName)
+      const icon = targetRole === 'main' ? '⭐' : targetRole === 'tool' ? '🔧' : '🔄'
+      const label = targetRole === 'main' ? '主力' : targetRole === 'tool' ? '工具' : '臨時'
+
+      const selected = await smartSelect({
+        title: `${icon} ${label} repos`,
+        items,
+        preselected: currentInRole,
+        autoSelectThreshold: 0,
+      })
+      if (selected === BACK) continue
+
+      // 選中的歸入 targetRole，從該角色移除的降級
+      const selectedSet = new Set(selected)
+      // 降級映射：從 main 移除 → temp，從 temp 移除 → tool，從 tool 移除 → temp
+      const demoteMap = { main: 'temp', temp: 'tool', tool: 'temp' }
+      for (const r of repos) {
+        if (selectedSet.has(r.fullName)) {
+          roles[r.fullName] = targetRole
+        } else if (roles[r.fullName] === targetRole) {
+          // 用戶明確移除，降級而不是重新自動判定
+          roles[r.fullName] = demoteMap[targetRole]
+        }
+      }
+    }
+
+    if (roleConfirmed === null) continue // BACK
+
+    // 寫入角色到 repos
+    for (const r of repos) {
+      r._roleOverride = roles[r.fullName]
+    }
+
+    // 自動分析（快取：repos + 角色沒變就不重跑）
+    const reposKey = repos.map(r => `${r.fullName}:${r._roleOverride}`).sort().join(',')
+    if (!analyzeCache || analyzeCache.key !== reposKey) {
+      phaseHeader('自動分析')
+      analyzeCache = {
+        key: reposKey,
+        plan: await phaseAnalyze({ repos, sources, baseDir: REPO, projectFolders }),
+      }
+      // 應用用戶角色覆蓋
+      for (const r of analyzeCache.plan.repos) {
+        const src = repos.find(s => s.fullName === r.fullName)
+        if (src?._roleOverride) r.role = src._roleOverride
+      }
+      // 重算計數
+      const roleCounts2 = countBy(analyzeCache.plan.repos, 'role')
+      analyzeCache.plan.mainCount = roleCounts2.main || 0
+      analyzeCache.plan.tempCount = roleCounts2.temp || 0
+      analyzeCache.plan.toolCount = roleCounts2.tool || 0
+      // 更新 projects（只有找到 localPath 的才生成 CLAUDE.md）
+      const { getClaudeMdType } = await import('../lib/config/config-classifier.mjs')
+      analyzeCache.plan.projects = analyzeCache.plan.repos
+        .filter(r => r.localPath)
+        .map(r => ({ repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role) }))
+    }
+    } // end if (needsRepos)
+
+    // 不需要 repos 時建一個最小 plan
+    if (!needsRepos && !analyzeCache) {
+      const { generateInstallPlan } = await import('../lib/config/auto-plan.mjs')
+      analyzeCache = {
+        key: 'no-repos',
+        plan: generateInstallPlan({ repos: [], pipelineResult: null, eccResult: { recommended: [] }, localPaths: {}, roleOverrides: {}, profile: null }),
+      }
+    }
+
+    // 根據功能選擇裁剪 plan
+    if (analyzeCache?.plan) {
+      if (!has('ecc')) analyzeCache.plan.ecc = []
+      if (!has('claudemd')) analyzeCache.plan.projects = []
+      if (!has('zsh')) analyzeCache.plan.zshModules = []
+      analyzeCache.plan.features = features // 傳給下游
+    }
+
+    // Step 2：確認計畫
+    phaseHeader('確認安裝計畫', 2, 3)
+    const confirmedPlan = await phasePlan(analyzeCache.plan)
+    if (confirmedPlan === BACK) continue // 回到 Step 1
+    if (!confirmedPlan) break
+
+    // --dry-run
+    if (flagDryRun) {
+      p.log.success(pc.yellow('Dry Run 完成 — 未寫入任何檔案'))
+      p.outro('Dry Run 結束')
+      return
+    }
+
+    // --manual
+    if (flagManual) confirmedPlan.mode = 'manual'
+
+    // 安裝
+    phaseHeader('安裝中')
+    const { installSelections, syncResult, startTime } = await phaseExecute(confirmedPlan, {
+      repoDir: REPO,
+      previewDir: PREVIEW_DIR,
+      targets,
+      prev,
+      pipelineResult: confirmedPlan._pipelineResult || null,
+      fetchedSources: confirmedPlan._fetchedSources || null,
+    })
+
+    // Step 3：完成
+    phaseHeader('完成', 3, 3)
+    await phaseComplete(confirmedPlan, {
+      repoDir: REPO,
+      installSelections,
+      syncResult,
+      startTime,
+      pipelineResult: confirmedPlan._pipelineResult || null,
+      projectFolders,
+    })
+
+    break
+  }
+
+  p.outro('設定完成')
 }
 
 main().catch(e => { p.log.error(e.message); process.exit(1) })

@@ -1,5 +1,5 @@
 {
-  "description": "ab-claude-code hooks：自動格式化、PHP 語法檢查、保護受保護檔案、context 壓縮提示、任務完成確認",
+  "description": "ab-dotfiles hooks：格式化、檔案保護、危險攔截、Slack P0/P1/P2 通知、context 壓縮、任務確認",
   "hooks": {
     "PostToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; if [[ \"$FILE\" == *.ts || \"$FILE\" == *.vue || \"$FILE\" == *.js || \"$FILE\" == *.tsx ]]; then npx prettier --write \"$FILE\" 2>/dev/null; elif [[ \"$FILE\" == *.php ]]; then php -l \"$FILE\" 2>&1 | grep -v 'No syntax errors' || true; fi; exit 0",
+            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo '.'); if [ -f \"$ROOT/.prettierrc\" ] || [ -f \"$ROOT/.prettierrc.json\" ] || [ -f \"$ROOT/prettier.config.js\" ] || [ -f \"$ROOT/prettier.config.mjs\" ] || grep -q prettier \"$ROOT/package.json\" 2>/dev/null; then npx prettier --write \"$FILE\" 2>/dev/null; fi; D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" file-edited --file \"$FILE\"; exit 0",
             "timeout": 15
           }
         ]
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; for p in '.env' '.env.local' '.env.production' 'package-lock.json' 'pnpm-lock.yaml' 'yarn.lock' 'composer.lock' 'Podfile.lock'; do [[ \"$FILE\" == *\"$p\"* ]] && echo \"Blocked: $FILE is protected\" >&2 && exit 2; done; exit 0",
+            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; for p in '.env' '.env.local' '.env.production' 'package-lock.json' 'pnpm-lock.yaml' 'yarn.lock' 'composer.lock' 'Podfile.lock'; do [[ \"$FILE\" == *\"$p\"* ]] && { [ -x \"$D\" ] && \"$D\" protected-file --file \"$FILE\"; echo \"Blocked: $FILE is protected\" >&2; exit 2; }; done; exit 0",
             "timeout": 5
           }
         ]
@@ -28,19 +28,77 @@
         "matcher": "Bash",
         "hooks": [{
           "type": "command",
-          "command": "CMD=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command // empty' 2>/dev/null); [ -z \"$CMD\" ] && exit 0; for p in 'rm -rf /' 'git push --force main' 'git push --force master' 'git reset --hard' 'DROP TABLE' 'DROP DATABASE'; do echo \"$CMD\" | grep -qi \"$p\" && echo \"Blocked: dangerous command detected: $p\" >&2 && exit 2; done; exit 0",
+          "command": "CMD=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command // empty' 2>/dev/null); [ -z \"$CMD\" ] && exit 0; D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; for p in 'rm -rf /' 'git push --force main' 'git push --force master' 'git reset --hard' 'DROP TABLE' 'DROP DATABASE'; do echo \"$CMD\" | grep -qi \"$p\" && { [ -x \"$D\" ] && \"$D\" dangerous-command --cmd \"$p\"; echo \"Blocked: dangerous command detected: $p\" >&2; exit 2; }; done; exit 0",
           "timeout": 5
         }]
       }
     ],
     "SessionStart": [
       {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" session-start; exit 0",
+            "timeout": 3
+          }
+        ]
+      },
+      {
         "matcher": "compact",
         "hooks": [
           {
             "type": "command",
-            "command": "BRANCH=$(git branch --show-current 2>/dev/null); TICKET=$(echo \"$BRANCH\" | grep -oE '[A-Z]+-[0-9]+' | head -1); echo \"⚠️ Context 已壓縮。保留：當前任務目標、已修改檔案、驗證狀態、未完成 TODO。${TICKET:+Ticket: $TICKET}\"",
+            "command": "BRANCH=$(git branch --show-current 2>/dev/null); TICKET=$(echo \"$BRANCH\" | grep -oE '[A-Z]+-[0-9]+' | head -1); D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" session-compact; echo \"⚠️ Context 已壓縮。保留：當前任務目標、已修改檔案、驗證狀態、未完成 TODO。${TICKET:+Ticket: $TICKET}\"",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "MSG=$(cat 2>/dev/null || echo ''); D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" agent-blocked --msg \"$MSG\"; osascript -e 'display notification \"Claude Code 需要注意\" with title \"ab-dotfiles\"' 2>/dev/null; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "OUTPUT=$(echo \"$CLAUDE_TOOL_OUTPUT\" 2>/dev/null || echo ''); if echo \"$OUTPUT\" | grep -qi 'error\\|fail\\|exception'; then D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" subagent-fail --msg \"$(echo \"$OUTPUT\" | head -1 | cut -c1-80)\"; fi; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat); LEN=$(echo \"$INPUT\" | wc -c | tr -d ' '); [ \"$LEN\" -lt 3 ] && echo '提示太短，請描述你的需求' >&2 && exit 2; exit 0",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "上下文已壓縮。確認以下重要資訊仍在記憶中：1) 當前任務目標 2) 已修改的檔案 3) 未完成的步驟。如有遺失，從記憶中恢復。",
+            "timeout": 10
           }
         ]
       }
@@ -49,6 +107,11 @@
       {
         "matcher": "",
         "hooks": [
+          {
+            "type": "command",
+            "command": "D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" session-stop; exit 0",
+            "timeout": 5
+          },
           {
             "type": "prompt",
             "prompt": "檢查是否所有要求的任務都已完成。如果有遺漏，回傳 {\"ok\": false, \"reason\": \"尚未完成：<具體項目>\"}。如果都完成了，回傳 {\"ok\": true}。注意：如果 stop_hook_active 為 true，直接回傳 {\"ok\": true}。",

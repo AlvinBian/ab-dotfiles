@@ -1,5 +1,61 @@
 # ab-dotfiles
 
+## 2.0.0
+
+### Major Changes
+
+- [#2](https://github.com/AlvinBian/ab-dotfiles/pull/2) — v2.0.0 全面重構
+
+  ### 破壞性變更
+
+  - 安裝流程從 14 步互動縮減為 **3 步自動化**（選 repos → 確認計畫 → 安裝）
+  - `lib/` 目錄重組為分組架構（`core/` `detect/` `cli/` `config/` `external/` `slack/` `phases/`）
+  - `ui/` 目錄重命名為 `cli/`，所有 UI 元件路徑更新
+  - `lib/utils/` 合併至 `lib/core/`（`paths.mjs`、`concurrency.mjs`）
+  - `lib/github.mjs` 移至 `lib/external/github.mjs`
+  - `lib/claude-cli.mjs` 移至 `lib/external/claude-cli.mjs`
+  - `lib/doctor.mjs` 移至 `lib/detect/doctor.mjs`
+  - `lib/source-sync.mjs` 移至 `lib/external/source-sync.mjs`
+  - `lib/ai-generate.mjs` 移至 `lib/external/ai-generate.mjs`
+  - `lib/report.mjs` 保留原位
+  - Rules 中 `kkday-conventions` 重命名為 `project-conventions`
+
+  ### 新功能
+
+  - **功能選擇 multiselect** — 用戶可選擇安裝 claude / claudemd / ecc / slack / zsh，未選的跳過
+  - **角色分配選單** — ⭐主力 / 🔄臨時 / 🔧工具，支援互動調整
+  - **fd 全自動 repo 偵測** — 三策略（fd + git remote → 文件夾映射 → Spotlight），無需手動輸入路徑
+  - **CLAUDE.md AI 生成** — 按角色生成到 `~/.claude/projects/{path}/CLAUDE.md`
+  - **Slack P0/P1/P2 分級通知** — 透過 Claude CLI MCP，不需 Bot Token
+  - **Slack 互動設定精靈** — Channel / DM / 關閉三種模式
+  - **listr2 進度顯示** — 8 步安裝任務，含子任務和計時
+  - **首次安裝原始備份** — `pnpm run restore-original` 可完全還原
+  - **卸載工具** — `pnpm run uninstall` 只移除 ab-dotfiles 管理的配置
+  - **hooks 互動管理** — `pnpm run hooks` 啟用/停用個別 hook
+  - **ECC 繁體中文描述** — 60+ 項目完整翻譯，runtime 讀取 + 快取
+  - **安裝計畫 inline 摘要** — 網格排列，含現有安裝狀態對比
+  - **Report 專案 Tab** — Repos + 專案合併，含角色、路徑、CLAUDE.md 狀態
+
+  ### 架構重構
+
+  - **lib/ 重組** — 從扁平結構改為 7 個功能分組目錄
+  - **Phase 模組** — `phase-analyze` / `phase-plan` / `phase-execute` / `phase-complete`
+  - **lodash-es 全面優化** — 取代手寫的 array/object 操作
+  - **完整 JSDoc 中文註釋** — 所有 lib/ 模組補充完整 @param / @returns 文件
+
+  ### 效能優化
+
+  - 分析快取 key 改為 `repos + 角色`，角色沒變就不重跑 AI
+  - lodash-es `countBy` / `sumBy` / `orderBy` 取代手寫迴圈
+  - 背景預熱 Claude CLI 減少首次呼叫延遲
+
+  ### UX 改善
+
+  - 重入流程：上次安裝記錄顯示 repos 數 + stacks 數 + 日期
+  - 「調整設定」清除 org 讓用戶重選組織
+  - 「重新安裝」等同 --quick，直接用上次 session
+  - 所有排序統一為 ⭐主力 → 🔄臨時 → 🔧工具
+
 ## 1.1.0
 
 ### Minor Changes

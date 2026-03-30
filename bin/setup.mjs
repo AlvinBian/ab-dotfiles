@@ -10,7 +10,7 @@ import pc from 'picocolors'
 import fs from 'fs'
 import path from 'path'
 import { getDirname } from '../lib/utils/paths.mjs'
-import { handleCancel, BACK } from '../lib/ui/prompts.mjs'
+import { handleCancel, smartSelect, BACK } from '../lib/ui/prompts.mjs'
 import { phaseHeader } from '../lib/ui/task-runner.mjs'
 import { cleanOldBackups } from '../lib/backup.mjs'
 import { loadSession, checkIncompleteSession } from '../lib/session.mjs'
@@ -183,15 +183,55 @@ async function main() {
       }
     }
 
-    // 自動分析（快取：repos 沒變就不重跑）
-    // repos 現在是完整物件陣列（含 fullName/commits/pct/stars）
-    const reposKey = repos.map(r => r.fullName).sort().join(',')
+    // 角色分類：AI 預判 + 用戶確認
+    const { determineRole } = await import('../lib/config-classifier.mjs')
+    const roleItems = repos.map(r => {
+      const autoRole = determineRole(r)
+      const icon = autoRole === 'main' ? '⭐' : '🔄'
+      const info = r.commits > 0 ? `${r.commits} commits` : ''
+      return {
+        value: r.fullName,
+        label: `${icon} ${r.fullName.split('/')[1]}`,
+        hint: `${autoRole === 'main' ? '主力' : '臨時'}${info ? ` · ${info}` : ''}`,
+      }
+    })
+    const mainPreselected = repos.filter(r => determineRole(r) === 'main').map(r => r.fullName)
+
+    const mainRepoNames = await smartSelect({
+      title: '⭐ 主力 repos（完整 CLAUDE.md + AI 生成）',
+      items: roleItems,
+      preselected: mainPreselected,
+      autoSelectThreshold: 0,
+    })
+    if (mainRepoNames === BACK) continue
+
+    // 寫入角色到 repos 物件
+    const mainSet = new Set(mainRepoNames)
+    for (const r of repos) {
+      r._roleOverride = mainSet.has(r.fullName) ? 'main' : 'temp'
+    }
+
+    // 自動分析（快取：repos + 角色沒變就不重跑）
+    const reposKey = repos.map(r => `${r.fullName}:${r._roleOverride}`).sort().join(',')
     if (!analyzeCache || analyzeCache.key !== reposKey) {
       phaseHeader('自動分析')
       analyzeCache = {
         key: reposKey,
         plan: await phaseAnalyze({ repos, sources, baseDir: REPO, projectFolders }),
       }
+      // 應用用戶角色覆蓋
+      for (const r of analyzeCache.plan.repos) {
+        const src = repos.find(s => s.fullName === r.fullName)
+        if (src?._roleOverride) r.role = src._roleOverride
+      }
+      // 重算計數
+      analyzeCache.plan.mainCount = analyzeCache.plan.repos.filter(r => r.role === 'main').length
+      analyzeCache.plan.tempCount = analyzeCache.plan.repos.filter(r => r.role === 'temp').length
+      // 更新 projects（只有找到 localPath 的才生成 CLAUDE.md）
+      const { getClaudeMdType } = await import('../lib/config-classifier.mjs')
+      analyzeCache.plan.projects = analyzeCache.plan.repos
+        .filter(r => r.localPath)
+        .map(r => ({ repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role) }))
     }
 
     // Step 2：確認計畫

@@ -1,6 +1,6 @@
 {
   "name": "ab-dotfiles",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "開發環境統一管理工具 — Claude Code 配置、技術棧技能庫、zsh 模組、工作區生成",
   "license": "MIT",
   "private": true,
@@ -15,9 +15,15 @@
     "restore": "node bin/restore.mjs",
     "doctor": "node -e \"import('./lib/doctor.mjs').then(m => m.ensureEnvironment())\"",
     "workspace": "bash scripts/generate-workspace.sh",
-    "taxonomy:build": "node lib/taxonomy/build.mjs"
+    "taxonomy:build": "node lib/taxonomy/build.mjs",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset version && git add -A && git commit -m 'chore: version packages' && git tag v$(node -p \"require('./package.json').version\") && git push --follow-tags"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/cli": "^2.30.0"
+  },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
     "ora": "^9.3.0",

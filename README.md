@@ -77,7 +77,7 @@ setup 會修改以下檔案/目錄，**每次安裝前自動備份**：
 | `~/.claude/commands/` | 寫入 slash commands | `dist/backup/{timestamp}/claude/commands` |
 | `~/.claude/agents/` | 寫入 agents | `dist/backup/{timestamp}/claude/agents` |
 | `~/.claude/rules/` | 寫入 rules | `dist/backup/{timestamp}/claude/rules` |
-| `~/.claude/hooks.json` | 寫入 hooks | `dist/backup/{timestamp}/claude/hooks.json` |
+| `~/.claude/settings.json` | 寫入 hooks 設定 | `dist/backup/{timestamp}/claude/settings.json` |
 | `~/.zshrc` | 替換為模組化版本 | `dist/backup/{timestamp}/zshrc` |
 | `~/.zsh/modules/` | 寫入 zsh 模組 | `dist/backup/{timestamp}/zsh/modules` |
 
@@ -100,13 +100,15 @@ pnpm run setup -- --manual
 ```
 pnpm run setup
   │
+  ├─ 前置：--quick / --dry-run / 斷點續裝偵測
   ├─ 連結 GitHub → 選擇倉庫
+  ├─ 預選：smartSelect 確認/調整/跳過
   ├─ Per-repo AI 技術棧分析（並行）
   ├─ Taxonomy 查表分類（awesome-nodejs/php，1300+ 套件）
   ├─ 跨 repo 整合去重
   ├─ 開發者畫像（AI 推斷角色）
   ├─ 技術棧選擇（預選 + 確認）
-  ├─ ECC 外部資源（AI 推薦 + 選擇）
+  ├─ ECC 規則匹配推薦（即時）
   ├─ 生成 stacks/ 技能庫
   ├─ 安裝 Claude Code 配置（commands / agents / rules / hooks）
   ├─ 安裝 zsh 環境模組
@@ -122,11 +124,24 @@ pnpm run setup
 | `pnpm run setup` | 互動式安裝精靈 |
 | `pnpm run setup -- --all` | 全部自動安裝 |
 | `pnpm run setup -- --manual` | 手動模式（只生成到 dist/preview/） |
-| `pnpm run scan` | 技術棧掃描，生成 stacks/ |
+| `pnpm run setup -- --quick` | 用上次選擇快速安裝（0 次互動） |
+| `pnpm run setup -- --dry-run` | 只顯示安裝計畫，不寫入檔案 |
+| `pnpm run setup -- --all --manual` | 可組合使用 |
+| `pnpm run scan` | 技術棧掃描，生成 .cache/stacks/ |
 | `pnpm run restore` | 從備份還原 |
 | `pnpm run doctor` | 環境健康檢查 |
 | `pnpm run workspace` | 生成 .code-workspace |
 | `pnpm run taxonomy:build` | 重建 awesome-* 分類索引 |
+
+### 互動導航
+
+| 按鍵 | 行為 |
+|------|------|
+| ESC | ← 回退上一步 |
+| Ctrl+C | 退出安裝 |
+| Space | 選擇/取消選項 |
+| Enter | 確認 |
+| ↑↓ | 滾動列表 |
 
 ---
 
@@ -153,22 +168,39 @@ ab-dotfiles/
 │   │   ├── classify.mjs         # 查表分類（零 AI）
 │   │   ├── build.mjs            # 從 awesome-* 建構索引
 │   │   └── categories.json      # 標準分類定義
+│   ├── ui/                      # 互動 UI 元件
+│   │   ├── prompts.mjs          # smartSelect, multiselectWithAll
+│   │   ├── progress.mjs         # spinner / 進度條
+│   │   ├── files.mjs            # extractMatchWhen
+│   │   └── preselect.mjs        # matchWhen 條件預選
+│   ├── install/                 # 安裝處理器
+│   │   ├── index.mjs            # 入口，runTarget()
+│   │   ├── install-claude.mjs   # handleInstallClaude()
+│   │   ├── install-modules.mjs  # handleInstallModules()
+│   │   ├── build-plugin.mjs     # handleBuildPlugin()
+│   │   ├── common.mjs           # 共用工具
+│   │   ├── hooks-merge.mjs      # hooks 合併邏輯
+│   │   └── manifest.mjs         # 安裝清單管理
+│   ├── phases/                  # Phase 拆分模組
+│   │   ├── phase-intent.mjs     # Phase 1：意圖
+│   │   ├── phase-analysis.mjs   # Phase 2：分析
+│   │   ├── phase-execute.mjs    # Phase 3：執行
+│   │   └── phase-report.mjs     # Phase 4：報告
+│   ├── utils/                   # 通用工具
+│   │   ├── paths.mjs            # 路徑常量
+│   │   └── concurrency.mjs      # pMap 並行控制
 │   ├── claude-cli.mjs           # Claude CLI 封裝（streaming）
 │   ├── github.mjs               # GitHub API（GraphQL）
 │   └── ...
 │
 ├── claude/                      # Claude Code 配置
-│   ├── commands/                # 7 個 slash commands
-│   ├── agents/                  # 10 個 agents
-│   ├── rules/                   # 3 個規則
-│   └── hooks.json               # 4 個 hooks
+│   ├── commands/                # 15 個 slash commands
+│   ├── agents/                  # 13 個 agents
+│   ├── rules/                   # 6 個規則
+│   └── hooks.json               # 5 個 hooks
 │
-├── stacks/                      # 技能庫（setup 生成）
-│   └── {tech}/
-│       ├── detect.json          # 偵測規則
-│       ├── code-review.md       # 審查 checklist
-│       ├── test-gen.md          # 測試模式
-│       └── code-style.md        # 命名慣例
+├── scripts/
+│   └── verify.sh                # 安裝驗證腳本
 │
 ├── zsh/                         # zsh 環境模組
 │   ├── zshrc                    # ~/.zshrc 模板
@@ -179,17 +211,22 @@ ab-dotfiles/
 │   ├── repo-ai/                 # Per-repo AI 分類快取
 │   ├── taxonomy/                # awesome-* 查表索引
 │   ├── sources/                 # ECC 來源快取
+│   ├── stacks/                  # 技能庫快取（每次 setup 重新生成）
+│   ├── translations.json        # 翻譯快取
+│   ├── last-session.json        # 上次安裝 session
 │   └── audit/                   # 決策審計鏈
 │
 └── docs/
-    └── scaffold-plan.md         # 腳手架方案規劃
+    ├── architecture.md          # 架構全覽
+    ├── refactor-plan-v2.md      # v2 重構方案
+    └── scaffold-plan.md         # 腳手架方案（FUTURE）
 ```
 
 ---
 
 ## Claude Code 配置
 
-### Slash Commands（7 個）
+### Slash Commands（15 個）
 
 | 指令 | 說明 |
 |------|------|
@@ -200,8 +237,16 @@ ab-dotfiles/
 | `/draft-slack` | 生成結構化 Slack 訊息（9 種場景） |
 | `/slack-formatting` | Slack mrkdwn 格式指南 |
 | `/review-slack` | 檢查 Slack 訊息格式 |
+| `/tdd` | 測試驅動開發流程引導 |
+| `/build-fix` | 分析並修復 build 錯誤 |
+| `/simplify` | 簡化過度複雜的代碼 |
+| `/refactor-clean` | 清潔式重構（不改行為） |
+| `/e2e` | 生成端對端測試 |
+| `/test-coverage` | 提升測試覆蓋率 |
+| `/multi-frontend` | 多前端專案協調 |
+| `/changeset` | 生成 changeset / CHANGELOG |
 
-### Agents（10 個）
+### Agents（13 個）
 
 | Agent | 模型 | 讀/寫 | 用途 |
 |-------|------|-------|------|
@@ -215,8 +260,22 @@ ab-dotfiles/
 | `@documenter` | sonnet | 讀寫 | 生成文件 |
 | `@deployer` | sonnet | 讀寫 | PR + Release |
 | `@monitor` | haiku | 唯讀 | 日誌分析、效能檢查 |
+| `@security` | sonnet | 唯讀 | 安全掃描 |
+| `@migrator` | sonnet | 讀寫 | 版本遷移 |
+| `@perf-analyzer` | sonnet | 唯讀 | 效能分析 |
 
-### Hooks（4 個，可個別選擇）
+### Rules（6 個）
+
+| Rule | 說明 |
+|------|------|
+| `code-style` | 格式、命名、函式設計規範 |
+| `git-workflow` | Conventional Commits + branch 命名 |
+| `slack-mrkdwn` | Slack mrkdwn 格式規範 |
+| `kkday-conventions` | KKday 特定開發慣例（TypeScript / Vue / API） |
+| `testing` | 測試策略與覆蓋率規範 |
+| `performance` | AI 模型選擇與 Context 管理策略 |
+
+### Hooks（5 個，可個別選擇）
 
 | Hook | 說明 |
 |------|------|
@@ -224,6 +283,7 @@ ab-dotfiles/
 | 檔案保護 | 阻止修改 .env、lock 等 |
 | Context 壓縮提示 | 壓縮時保留重要資訊 |
 | 任務完成檢查 | 停止前確認任務完成 |
+| 危險命令攔截 | 阻止 rm -rf /、force push main 等 |
 
 ---
 
@@ -236,7 +296,7 @@ repos fetch + ECC fetch（並行）
   → 跨 repo 整合去重（多數決仲裁）
   → 開發者畫像（AI 推斷角色）
   → 技術棧預選（主力 repo + 共用 + AI 核心分類）
-  → ECC AI 推薦（背景並行）
+  → ECC 規則匹配推薦（即時）
   → 決策審計鏈（JSONL）
 ```
 
@@ -248,6 +308,8 @@ repos fetch + ECC fetch（並行）
 | Taxonomy 索引 | `.cache/taxonomy/` | `pnpm run taxonomy:build` |
 | ECC 來源 | `.cache/sources/` | 1h TTL or SHA 改變 |
 | 審計鏈 | `.cache/audit/` | 保留最近 10 次 |
+| Session | `.cache/last-session.json` | 手動清除 |
+| Stacks | `.cache/stacks/` | 每次 setup 重新生成 |
 
 ---
 
@@ -291,6 +353,13 @@ AI_REPO_EFFORT=low
 AI_REPO_TIMEOUT=60000
 AI_REPO_CACHE=true
 
+# ECC 翻譯（背景，haiku 足夠）
+AI_ECC_MODEL=haiku
+AI_ECC_TIMEOUT=90000
+
+# 開發者畫像
+AI_PROFILE_MODEL=haiku
+
 # GitHub
 GITHUB_ORG=
 GH_API_TIMEOUT=15000
@@ -315,39 +384,53 @@ AI_CONCURRENCY=3
 ```
 dist/preview/
 ├── claude/
-│   ├── commands/
+│   ├── commands/          # 15 個
 │   │   ├── auto-setup.md
+│   │   ├── build-fix.md
+│   │   ├── changeset.md
 │   │   ├── code-review.md
 │   │   ├── draft-slack.md
+│   │   ├── e2e.md
+│   │   ├── multi-frontend.md
 │   │   ├── pr-workflow.md
+│   │   ├── refactor-clean.md
 │   │   ├── review-slack.md
+│   │   ├── simplify.md
 │   │   ├── slack-formatting.md
+│   │   ├── tdd.md
+│   │   ├── test-coverage.md
 │   │   └── test-gen.md
-│   ├── agents/
+│   ├── agents/            # 13 個
 │   │   ├── coder.md
 │   │   ├── debugger.md
 │   │   ├── deployer.md
 │   │   ├── documenter.md
 │   │   ├── explorer.md
+│   │   ├── migrator.md
 │   │   ├── monitor.md
+│   │   ├── perf-analyzer.md
 │   │   ├── planner.md
 │   │   ├── refactor.md
 │   │   ├── reviewer.md
+│   │   ├── security.md
 │   │   └── tester.md
-│   ├── rules/
+│   ├── rules/             # 6 個
 │   │   ├── code-style.md
 │   │   ├── git-workflow.md
-│   │   └── slack-mrkdwn.md
+│   │   ├── kkday-conventions.md
+│   │   ├── performance.md
+│   │   ├── slack-mrkdwn.md
+│   │   └── testing.md
 │   └── hooks.json
 └── zsh/
     ├── modules/*.zsh (10 個)
     └── zshrc
 ```
 
-### stacks/ 技能庫範例
+### .cache/stacks/ 技能庫範例
 
 ```
-stacks/
+.cache/stacks/
 ├── vue/
 │   ├── detect.json        # { "detect": { "deps": ["vue"] } }
 │   ├── code-review.md     # Vue 組件審查 checklist

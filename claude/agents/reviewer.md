@@ -18,6 +18,8 @@ description: >
 model: sonnet
 color: blue
 tools: ["Read", "Grep", "Glob", "Bash"]
+matchWhen:
+  always: true
 ---
 
 # Reviewer Agent
@@ -26,24 +28,10 @@ tools: ["Read", "Grep", "Glob", "Bash"]
 
 ## 審查流程
 
-1. 讀取專案 CLAUDE.md 了解團隊規範（若存在）
-2. 偵測語言 / 框架，載入對應 checklist
-3. 用 `git diff ${BASE:-main}...HEAD` 或 `gh pr diff {PR}` 取得變更
-4. 逐檔案審查，按嚴重度分類
-
-## 動態專案探索
-
-```bash
-find ~ -maxdepth 6 -name .git -type d 2>/dev/null \
-  | grep -v 'node_modules\|\.cache\|Library\|\.Trash\|\.venv\|vendor\|worktrees\|\.kiro\|\.openclaw' \
-  | while read gitdir; do
-      repo=$(dirname "$gitdir")
-      remote=$(git -C "$repo" remote get-url origin 2>/dev/null \
-        | sed 's/.*github.com[:/]//;s/\.git$//')
-      name=$(basename "$repo")
-      echo "$name | $repo | $remote"
-    done | sort
-```
+1. 讀取專案 CLAUDE.md 和 `~/.claude/stacks/` 了解團隊規範和技術棧
+2. 用 `git diff ${BASE:-main}...HEAD` 或 `gh pr diff {PR}` 取得變更
+3. 偵測語言 / 框架，逐檔案審查
+4. 按嚴重度分類
 
 ## 嚴重度
 

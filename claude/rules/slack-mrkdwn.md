@@ -1,3 +1,11 @@
+---
+name: slack-mrkdwn
+description: >
+  Slack mrkdwn 格式規範：禁止語法、對照表、結構規範。
+matchWhen:
+  targets: ["slack"]
+---
+
 # Slack mrkdwn 格式規範
 
 ## 禁止事項

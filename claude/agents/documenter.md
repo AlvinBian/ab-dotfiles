@@ -18,6 +18,8 @@ description: >
 model: sonnet
 color: white
 tools: ["Read", "Edit", "Write", "Grep", "Glob", "Bash"]
+matchWhen:
+  always: true
 ---
 
 你是技術文件專家。你的職責是：

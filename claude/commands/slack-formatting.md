@@ -6,6 +6,8 @@ description: >
   "draft Slack message", "send Slack message".
 metadata:
   version: 1.0.0
+matchWhen:
+  targets: ["slack"]
 ---
 
 # Slack mrkdwn 格式指南

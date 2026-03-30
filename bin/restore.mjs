@@ -11,10 +11,10 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
+import { getDirname } from '../lib/utils/paths.mjs'
 import { cpDir } from '../lib/backup.mjs'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const __dirname = getDirname(import.meta)
 const REPO = path.resolve(__dirname, '..')
 const BACKUP_BASE = path.join(REPO, 'dist', 'backup')
 const HOME = process.env.HOME
@@ -41,18 +41,15 @@ async function main() {
   const backups = getBackups()
 
   if (backups.length === 0) {
-    p.log.warn('沒有找到任何備份')
-    p.log.message(`備份目錄：${pc.dim(BACKUP_BASE)}`)
+    p.log.warn(`沒有找到任何備份\n  備份目錄：${pc.dim(BACKUP_BASE)}`)
     p.outro('執行 pnpm run setup 會自動建立備份')
     return
   }
 
   // 列出模式
   if (flagList) {
-    p.log.info(`共 ${backups.length} 個備份：`)
-    for (const b of backups) {
-      p.log.message(`  ${pc.cyan(b.name)}  ${pc.dim(b.contents.join(', '))}`)
-    }
+    const backupLines = backups.map(b => `  ${pc.cyan(b.name)}  ${pc.dim(b.contents.join(', '))}`).join('\n')
+    p.log.info(`共 ${backups.length} 個備份：\n${backupLines}`)
     p.outro('')
     return
   }
@@ -70,11 +67,11 @@ async function main() {
   const backup = backups.find(b => b.name === selected)
 
   // 確認還原
-  p.log.info(`即將還原 ${pc.cyan(selected)}：`)
-  for (const item of backup.contents) {
+  const restoreLines = backup.contents.map(item => {
     const targetPath = item === 'zshrc' ? path.join(HOME, '.zshrc') : path.join(HOME, `.${item}`)
-    p.log.message(`  ${pc.yellow(item)} → ${targetPath}`)
-  }
+    return `  ${pc.yellow(item)} → ${targetPath}`
+  }).join('\n')
+  p.log.info(`即將還原 ${pc.cyan(selected)}：\n${restoreLines}`)
 
   const confirm = await p.confirm({
     message: '確認還原？  Y 確認 · n 取消',
@@ -102,11 +99,10 @@ async function main() {
     }
   }
 
-  s.stop('還原完成')
-  p.log.success(`已還原備份 ${pc.cyan(selected)}`)
-  if (backup.contents.includes('zshrc') || backup.contents.includes('zsh')) {
-    p.log.message(`  執行 ${pc.cyan('source ~/.zshrc')} 讓 zsh 設定生效`)
-  }
+  const zshHint = (backup.contents.includes('zshrc') || backup.contents.includes('zsh'))
+    ? `\n  執行 ${pc.cyan('source ~/.zshrc')} 讓 zsh 設定生效`
+    : ''
+  s.stop(`已還原備份 ${pc.cyan(selected)}${zshHint}`)
   p.outro('✔ 還原完成')
 }
 

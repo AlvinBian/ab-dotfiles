@@ -18,6 +18,8 @@ description: >
 model: haiku
 color: cyan
 tools: ["Read", "Grep", "Glob", "Bash"]
+matchWhen:
+  always: true
 ---
 
 # Explorer Agent

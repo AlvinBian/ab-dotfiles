@@ -6,6 +6,8 @@ description: >
   "Slack 審查", "check Slack format".
 metadata:
   version: 1.0.0
+matchWhen:
+  targets: ["slack"]
 ---
 
 # Review Slack Message

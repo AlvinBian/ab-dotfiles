@@ -5,6 +5,8 @@ description: >
   Use when: "發 PR", "open PR", "pull request", "commit", "開分支", "create branch".
 metadata:
   version: 1.0.0
+matchWhen:
+  always: true
 ---
 
 # PR Workflow

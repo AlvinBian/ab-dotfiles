@@ -5,6 +5,8 @@ description: >
   Use when: "寫測試", "unit test", "加測試", "補測試", "測試覆蓋率", "test coverage".
 metadata:
   version: 1.0.0
+matchWhen:
+  skills: ["vitest", "jest", "phpunit", "pytest", "go"]
 ---
 
 # 測試生成

@@ -18,6 +18,8 @@ description: >
 model: sonnet
 color: blue
 tools: ["Read", "Edit", "Write", "Grep", "Glob", "Bash"]
+matchWhen:
+  always: true
 ---
 
 你是部署流程專家。你的職責是：

@@ -6,7 +6,7 @@
 import fs from 'fs'
 import path from 'path'
 import * as p from '@clack/prompts'
-import { getDescription } from '../lib/descriptions.mjs'
+import { getDescription } from '../lib/config/descriptions.mjs'
 
 const HOME = process.env.HOME
 const HOOKS_PATH = path.join(HOME, '.claude', 'hooks.json')

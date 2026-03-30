@@ -27,11 +27,11 @@ import { execSync } from 'child_process'
 
 // ── lib 模組匯入 ────────────────────────────────────────────────
 // repo 分析引擎：GitHub API 掃描、deps 提取、路徑常量
-import { analyzeRepo, parseRepoEntry, REPO_DIR, STACKS_DIR } from '../lib/skill-detect.mjs'
+import { analyzeRepo, parseRepoEntry, REPO_DIR, STACKS_DIR } from '../lib/detect/skill-detect.mjs'
 // 多生態技術偵測：整合 npm/PHP/Python/Go API 的統一入口
-import { identifySignificantTechs } from '../lib/tech-detect-api.mjs'
+import { identifySignificantTechs } from '../lib/detect/tech-detect-api.mjs'
 // AI 生成：可用性檢查 + stack 目錄建立（含 AI 生成 / 預設模板 fallback）
-import { isAIAvailable, ensureStack } from '../lib/ai-generate.mjs'
+import { isAIAvailable, ensureStack } from '../lib/external/ai-generate.mjs'
 
 // ── CLI 參數解析 ────────────────────────────────────────────────
 const args = process.argv.slice(2)

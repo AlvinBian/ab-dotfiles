@@ -11,8 +11,8 @@ import * as p from '@clack/prompts'
 import pc from 'picocolors'
 import fs from 'fs'
 import path from 'path'
-import { getDirname } from '../lib/utils/paths.mjs'
-import { cpDir } from '../lib/backup.mjs'
+import { getDirname } from '../lib/core/paths.mjs'
+import { cpDir } from '../lib/core/backup.mjs'
 
 const __dirname = getDirname(import.meta)
 const REPO = path.resolve(__dirname, '..')

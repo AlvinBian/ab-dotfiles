@@ -9,7 +9,7 @@
 import fs from 'fs'
 import path from 'path'
 import * as p from '@clack/prompts'
-import { ALL_COMMANDS, ALL_AGENTS, ALL_RULES } from '../lib/config-classifier.mjs'
+import { ALL_COMMANDS, ALL_AGENTS, ALL_RULES } from '../lib/config/config-classifier.mjs'
 
 const HOME = process.env.HOME
 const CLAUDE_DIR = path.join(HOME, '.claude')

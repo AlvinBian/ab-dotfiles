@@ -10,20 +10,20 @@ import pc from 'picocolors'
 import { countBy, sumBy } from 'lodash-es'
 import fs from 'fs'
 import path from 'path'
-import { getDirname } from '../lib/utils/paths.mjs'
-import { handleCancel, smartSelect, BACK } from '../lib/ui/prompts.mjs'
-import { phaseHeader } from '../lib/ui/task-runner.mjs'
-import { cleanOldBackups } from '../lib/backup.mjs'
-import { loadSession } from '../lib/session.mjs'
-import { env } from '../lib/env.mjs'
-import { warmupCli } from '../lib/claude-cli.mjs'
-import { ensureEnvironment } from '../lib/doctor.mjs'
-import { interactiveRepoSelect } from '../lib/repo-select.mjs'
+import { getDirname } from '../lib/core/paths.mjs'
+import { handleCancel, smartSelect, BACK } from '../lib/cli/prompts.mjs'
+import { phaseHeader } from '../lib/cli/task-runner.mjs'
+import { cleanOldBackups } from '../lib/core/backup.mjs'
+import { loadSession } from '../lib/core/session.mjs'
+import { env } from '../lib/core/env.mjs'
+import { warmupCli } from '../lib/external/claude-cli.mjs'
+import { ensureEnvironment } from '../lib/detect/doctor.mjs'
+import { interactiveRepoSelect } from '../lib/detect/repo-select.mjs'
 import { phaseAnalyze } from '../lib/phases/phase-analyze.mjs'
 import { phasePlan } from '../lib/phases/phase-plan.mjs'
 import { phaseExecute } from '../lib/phases/phase-execute.mjs'
 import { phaseComplete } from '../lib/phases/phase-complete.mjs'
-import { detectLegacyInstallation, runUpgrade } from '../lib/upgrade.mjs'
+import { detectLegacyInstallation, runUpgrade } from '../lib/config/upgrade.mjs'
 
 const __dirname = getDirname(import.meta)
 const REPO = path.resolve(__dirname, '..')
@@ -116,7 +116,7 @@ async function main() {
     if (flagManual) plan.mode = 'manual'
 
     // 應用 session 保存的角色
-    const { getClaudeMdType } = await import('../lib/config-classifier.mjs')
+    const { getClaudeMdType } = await import('../lib/config/config-classifier.mjs')
     for (const r of plan.repos) {
       if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
     }
@@ -181,7 +181,7 @@ async function main() {
       const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
 
       // 應用 session 保存的角色
-      const { getClaudeMdType } = await import('../lib/config-classifier.mjs')
+      const { getClaudeMdType } = await import('../lib/config/config-classifier.mjs')
       for (const r of plan.repos) {
         if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
       }
@@ -237,7 +237,7 @@ async function main() {
 
   // Slack 通知設定
   if (has('slack') && !prev?.slackChannel) {
-    const { setupSlackNotify } = await import('../lib/slack-setup.mjs')
+    const { setupSlackNotify } = await import('../lib/slack/slack-setup.mjs')
     const slackResult = await setupSlackNotify(prev)
     if (slackResult) {
       const envPath = path.join(REPO, '.env')
@@ -266,7 +266,7 @@ async function main() {
     // 角色分類（只有選了 repos 的功能才需要）
     const roles = {}
     if (needsRepos && repos.length > 0) {
-    const { determineRole } = await import('../lib/config-classifier.mjs')
+    const { determineRole } = await import('../lib/config/config-classifier.mjs')
     for (const r of repos) {
       roles[r.fullName] = prev?.roles?.[r.fullName] || determineRole(r)
     }
@@ -364,7 +364,7 @@ async function main() {
       analyzeCache.plan.tempCount = roleCounts2.temp || 0
       analyzeCache.plan.toolCount = roleCounts2.tool || 0
       // 更新 projects（只有找到 localPath 的才生成 CLAUDE.md）
-      const { getClaudeMdType } = await import('../lib/config-classifier.mjs')
+      const { getClaudeMdType } = await import('../lib/config/config-classifier.mjs')
       analyzeCache.plan.projects = analyzeCache.plan.repos
         .filter(r => r.localPath)
         .map(r => ({ repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role) }))
@@ -373,7 +373,7 @@ async function main() {
 
     // 不需要 repos 時建一個最小 plan
     if (!needsRepos && !analyzeCache) {
-      const { generateInstallPlan } = await import('../lib/auto-plan.mjs')
+      const { generateInstallPlan } = await import('../lib/config/auto-plan.mjs')
       analyzeCache = {
         key: 'no-repos',
         plan: generateInstallPlan({ repos: [], pipelineResult: null, eccResult: { recommended: [] }, localPaths: {}, roleOverrides: {}, profile: null }),

@@ -1,6 +1,6 @@
 {
   "name": "ab-dotfiles",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "開發環境統一管理工具 — Claude Code 配置、技術棧技能庫、zsh 模組、工作區生成",
   "license": "MIT",
   "private": true,
@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
+    "listr2": "^10.2.1",
     "ora": "^9.3.0",
     "picocolors": "^1.1.1",
     "semver": "^7.7.4"

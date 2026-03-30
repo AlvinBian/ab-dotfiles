@@ -1,0 +1,7 @@
+{
+  "ctrl+r": "code-review",
+  "ctrl+t": "tdd",
+  "ctrl+p": "pr-workflow",
+  "ctrl+b": "build-fix",
+  "ctrl+shift+s": "simplify"
+}

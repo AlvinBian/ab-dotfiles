@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 /**
- * ab-dotfiles 統一安裝 CLI（config-driven）
+ * ab-dotfiles v2.0 統一安裝 CLI
  *
- * 流程：
- *   Phase 1: 環境檢查 + 選 targets + mode
- *   Phase 2: 選 repos → Pipeline 分析 → 技術棧/ECC 選擇
- *   Phase 3: 備份 → 生成 → 安裝執行
- *   Phase 4: 驗證 → 報告 → session 保存
+ * 3 步流程：選 repos → 確認計畫 → 安裝
  */
 
 import * as p from '@clack/prompts'
@@ -15,15 +11,18 @@ import fs from 'fs'
 import path from 'path'
 import { getDirname } from '../lib/utils/paths.mjs'
 import { handleCancel, BACK } from '../lib/ui/prompts.mjs'
+import { phaseHeader } from '../lib/ui/task-runner.mjs'
 import { cleanOldBackups } from '../lib/backup.mjs'
 import { loadSession, checkIncompleteSession } from '../lib/session.mjs'
 import { env } from '../lib/env.mjs'
 import { warmupCli } from '../lib/claude-cli.mjs'
-
-import { runPhaseIntent } from '../lib/phases/phase-intent.mjs'
-import { runPhaseAnalysis } from '../lib/phases/phase-analysis.mjs'
-import { runPhaseExecute } from '../lib/phases/phase-execute.mjs'
-import { runPhaseReport } from '../lib/phases/phase-report.mjs'
+import { ensureEnvironment } from '../lib/doctor.mjs'
+import { interactiveRepoSelect } from '../lib/repo-select.mjs'
+import { phaseAnalyze } from '../lib/phases/phase-analyze.mjs'
+import { phasePlan } from '../lib/phases/phase-plan.mjs'
+import { phaseExecute } from '../lib/phases/phase-execute.mjs'
+import { phaseComplete } from '../lib/phases/phase-complete.mjs'
+import { detectV1Installation, runUpgrade } from '../lib/upgrade.mjs'
 
 const __dirname = getDirname(import.meta)
 const REPO = path.resolve(__dirname, '..')
@@ -46,7 +45,6 @@ function loadSources(configSources) {
 
 cleanOldBackups()
 
-// ══════════════════════════════════════════════════════════════════
 async function main() {
   const config = loadConfig()
   const targets = config.targets || {}
@@ -56,141 +54,164 @@ async function main() {
   const flagManual = args.includes('--manual')
   const flagQuick = args.includes('--quick')
   const flagDryRun = args.includes('--dry-run')
-  const prev = loadSession()
+  let prev = loadSession()
 
-  // --quick 前置檢查
-  if (flagQuick && !prev) {
-    p.log.error('無歷史安裝記錄，無法使用 --quick 模式。請先執行 pnpm setup。')
-    process.exit(1)
+  // Splash
+  console.log()
+  if (prev) {
+    p.intro(` ab-dotfiles v2.0 — 上次：${prev.repos?.length || '?'} repos · ${prev.techStacks?.length || '?'} stacks · ${prev.timestamp?.slice(0, 10) || ''} `)
+  } else {
+    p.intro(' ab-dotfiles v2.0 安裝精靈 ')
   }
-  if (flagQuick) p.log.info(`Quick 模式：重放上次安裝（${prev.timestamp?.slice(0, 19) || '未知時間'}）`)
-  if (flagDryRun) p.log.info(pc.yellow('Dry Run 模式：只顯示安裝計畫，不寫入任何檔案'))
 
-  // 斷點續裝
-  const incomplete = checkIncompleteSession()
-  let resumeMode = false
-  if (incomplete.hasIncomplete && !flagAll && !flagQuick) {
-    const resume = handleCancel(await p.select({
-      message: `偵測到未完成的安裝（上次停在 ${incomplete.lastPhase}，剩餘：${incomplete.pendingTargets.join('、')}）`,
+  // v1 → v2 升級偵測
+  const v1Info = detectV1Installation()
+  if (v1Info.hasV1) {
+    const upgradeResult = await runUpgrade(v1Info)
+    if (upgradeResult === 'cleaned') {
+      prev = null // 清除後不使用舊 session
+    }
+  }
+
+  // --quick：直接用上次 session 重裝，跳過所有互動
+  if (flagQuick) {
+    if (!prev) { p.log.error('無歷史記錄，無法 --quick。請先執行 pnpm setup。'); process.exit(1) }
+    p.log.info(`Quick 模式：重放上次安裝（${prev.repos?.length} repos）`)
+
+    if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
+    phaseHeader('環境檢查')
+    await ensureEnvironment()
+
+    // 用 session 重建 plan
+    const repoObjects = (prev.repos || []).map(r => ({
+      fullName: r,
+      commits: 10, // quick 模式假設都是主力
+      pct: 0,
+    }))
+    phaseHeader('快速分析')
+    const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO })
+    if (flagManual) plan.mode = 'manual'
+
+    phaseHeader('安裝中')
+    const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
+      repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
+      pipelineResult: null, fetchedSources: null,
+    })
+
+    phaseHeader('完成', 3, 3)
+    await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: null })
+    return
+  }
+
+  // 重入
+  if (prev && !flagAll && !flagQuick) {
+    const action = handleCancel(await p.select({
+      message: `上次安裝：${prev.repos?.length || '?'} repos · ${prev.installMode || 'full'}`,
       options: [
-        { value: 'resume', label: '繼續上次安裝', hint: '直接跳到執行，推薦' },
-        { value: 'restart', label: '重新開始' },
-        { value: 'cancel', label: '取消' },
+        { value: 'reinstall', label: '重新安裝（用上次設定）', hint: 'Enter 直接裝' },
+        { value: 'adjust', label: '調整設定' },
+        { value: 'report', label: '查看上次報告' },
       ],
     }))
-    if (resume === 'cancel') process.exit(0)
-    resumeMode = resume === 'resume'
+    if (action === BACK) process.exit(0)
+    if (action === 'report') {
+      const reportPath = path.join(REPO, 'dist', 'report.html')
+      if (fs.existsSync(reportPath)) {
+        const { openInBrowser } = await import('../lib/report.mjs')
+        await openInBrowser(reportPath)
+      } else {
+        p.log.warn('找不到上次報告')
+      }
+      process.exit(0)
+    }
+    if (action === 'reinstall') {
+      // 等同 --quick
+      if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
+      phaseHeader('環境檢查')
+      await ensureEnvironment()
+
+      const repoObjects = (prev.repos || []).map(r => ({ fullName: r, commits: 10, pct: 0 }))
+      phaseHeader('快速分析')
+      const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO })
+
+      phaseHeader('安裝中')
+      const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
+        repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
+        pipelineResult: null, fetchedSources: null,
+      })
+
+      phaseHeader('完成', 3, 3)
+      await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: null })
+      return
+    }
   }
 
   if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
 
-  console.log()
-  p.intro(' ab-dotfiles 安裝精靈 ')
+  // 環境檢查
+  phaseHeader('環境檢查')
+  await ensureEnvironment()
+  warmupCli()
 
-  // ── 續裝模式：跳過 Phase 1+2，用 session 中的選擇直接執行 ──
-  if (resumeMode && prev) {
-    const selectedTargets = incomplete.pendingTargets
-    const manual = prev.mode === 'manual'
-    const needsClaude = selectedTargets.includes('claude-dev') || selectedTargets.includes('slack')
-    const needsZsh = selectedTargets.includes('zsh')
+  // ── Phase loop（支持 BACK）──
+  let analyzeCache = null
 
-    p.log.info(`續裝：${selectedTargets.map(k => targets[k]?.label || k).join('、')}（${manual ? '手動' : '自動'}）`)
+  while (true) {
+    // Step 1：選 repos
+    phaseHeader('選擇倉庫', 1, 3)
+    const repos = await interactiveRepoSelect(prev)
+    if (repos === BACK) break
 
-    const { installSelections, syncResult } = await runPhaseExecute({
-      repoDir: REPO, previewDir: PREVIEW_DIR, targets, selectedTargets,
-      manual, flagAll: true, flagQuick: false, needsClaude, needsZsh,
-      detectedSkills: prev.techStacks || [],
-      eccSelectedNames: prev.eccSelections ? {
-        commands: new Set(prev.eccSelections.commands || []),
-        agents: new Set(prev.eccSelections.agents || []),
-        rules: new Set(prev.eccSelections.rules || []),
-      } : null,
-      fetchedSources: { sources: [], localNames: new Set() },
-      selectedRepos: prev.repos || [], prev,
+    // 自動分析（快取：repos 沒變就不重跑）
+    const reposKey = [...repos].sort().join(',')
+    if (!analyzeCache || analyzeCache.key !== reposKey) {
+      phaseHeader('自動分析')
+      // 需要有 commits 資訊的 repo 物件，但 interactiveRepoSelect 返回 fullName 陣列
+      // 暫用簡化版
+      const repoObjects = repos.map(r => ({ fullName: r, commits: 0, pct: 0 }))
+      analyzeCache = {
+        key: reposKey,
+        plan: await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO }),
+      }
+    }
+
+    // Step 2：確認計畫
+    phaseHeader('確認安裝計畫', 2, 3)
+    const confirmedPlan = await phasePlan(analyzeCache.plan)
+    if (confirmedPlan === BACK) continue // 回到 Step 1
+    if (!confirmedPlan) break
+
+    // --dry-run
+    if (flagDryRun) {
+      p.log.success(pc.yellow('Dry Run 完成 — 未寫入任何檔案'))
+      break
+    }
+
+    // --manual
+    if (flagManual) confirmedPlan.mode = 'manual'
+
+    // 安裝
+    phaseHeader('安裝中')
+    const { installSelections, syncResult, startTime } = await phaseExecute(confirmedPlan, {
+      repoDir: REPO,
+      previewDir: PREVIEW_DIR,
+      targets,
+      prev,
+      pipelineResult: confirmedPlan._pipelineResult || null,
+      fetchedSources: confirmedPlan._fetchedSources || null,
     })
 
-    await runPhaseReport({
-      repoDir: REPO, manual, needsClaude, needsZsh,
-      selectedTargets, selectedRepos: prev.repos || [],
-      categorizedTechs: new Map(),
-      detectedSkills: prev.techStacks || [],
-      pipelineResult: null, syncResult, installSelections,
-      eccSelectedNames: null,
+    // Step 3：完成
+    phaseHeader('完成', 3, 3)
+    await phaseComplete(confirmedPlan, {
+      repoDir: REPO,
+      installSelections,
+      syncResult,
+      startTime,
+      pipelineResult: confirmedPlan._pipelineResult || null,
     })
-    return
-  }
 
-  // ── Phase loop（支持 BACK 回退）──
-  let phase = 1
-  let intentResult = null
-  let analysisResult = null
-
-  while (phase <= 4) {
-    if (phase === 1) {
-      // Phase 1：意圖
-      intentResult = await runPhaseIntent({
-        targets, args, flagAll, flagManual, flagQuick, prev,
-      })
-      // Phase 1 是第一步，不支持回退
-      phase = 2
-      continue
-    }
-
-    if (phase === 2) {
-      // Phase 2：分析
-      const { needsClaude } = intentResult
-      analysisResult = {
-        selectedRepos: [], detectedSkills: [], categorizedTechs: new Map(),
-        eccSelectedNames: null, fetchedSources: { sources: [], localNames: new Set() },
-        pipelineResult: null, repoNpmMap: {}, allLangs: [],
-      }
-      if (needsClaude) {
-        const result = await runPhaseAnalysis({ sources, baseDir: REPO, prev, flagQuick })
-        if (result === BACK) { phase = 1; continue }
-        analysisResult = result
-      }
-
-      // dry-run
-      if (flagDryRun) {
-        const { selectedTargets, manual } = intentResult
-        p.log.info(pc.yellow('=== Dry Run 安裝計畫 ===') + '\n' + [
-          `Targets: ${selectedTargets.map(k => targets[k]?.label || k).join('、')}`,
-          `Mode: ${manual ? '手動' : '自動'}`,
-          `Repos: ${analysisResult.selectedRepos.length} 個`,
-          `Tech Stacks: ${analysisResult.detectedSkills.length} 個`,
-          `ECC: ${analysisResult.eccSelectedNames ? Object.values(analysisResult.eccSelectedNames).reduce((s, v) => s + v.size, 0) : 0} 個`,
-        ].join('\n'))
-        p.log.success(pc.yellow('Dry Run 完成 — 未寫入任何檔案'))
-        process.exit(0)
-      }
-      phase = 3
-      continue
-    }
-
-    if (phase === 3) {
-      // Phase 3：執行
-      const { selectedTargets, manual, needsClaude, needsZsh } = intentResult
-      const { installSelections, syncResult } = await runPhaseExecute({
-        repoDir: REPO, previewDir: PREVIEW_DIR, targets, selectedTargets,
-        manual, flagAll, flagQuick, needsClaude, needsZsh,
-        detectedSkills: analysisResult.detectedSkills,
-        eccSelectedNames: analysisResult.eccSelectedNames,
-        fetchedSources: analysisResult.fetchedSources,
-        selectedRepos: analysisResult.selectedRepos, prev,
-      })
-
-      // Phase 4：報告
-      await runPhaseReport({
-        repoDir: REPO, manual, needsClaude, needsZsh,
-        selectedTargets, selectedRepos: analysisResult.selectedRepos,
-        categorizedTechs: analysisResult.categorizedTechs,
-        detectedSkills: analysisResult.detectedSkills,
-        pipelineResult: analysisResult.pipelineResult,
-        syncResult, installSelections,
-        eccSelectedNames: analysisResult.eccSelectedNames,
-      })
-      phase = 5 // done
-    }
+    break
   }
 }
 

@@ -77,7 +77,10 @@ setup 會修改以下檔案/目錄，**每次安裝前自動備份**：
 | `~/.claude/commands/` | 寫入 slash commands | `dist/backup/{timestamp}/claude/commands` |
 | `~/.claude/agents/` | 寫入 agents | `dist/backup/{timestamp}/claude/agents` |
 | `~/.claude/rules/` | 寫入 rules | `dist/backup/{timestamp}/claude/rules` |
-| `~/.claude/settings.json` | 寫入 hooks 設定 | `dist/backup/{timestamp}/claude/settings.json` |
+| `~/.claude/hooks.json` | 寫入 hooks 設定 | backup |
+| `~/.claude/settings.json` | 合併 permissions + model | backup |
+| `~/.claude/keybindings.json` | 寫入快捷鍵（skip if exists） | backup |
+| `repo/.claude/` | 注入專案級配置 | 不備份（可重生） |
 | `~/.zshrc` | 替換為模組化版本 | `dist/backup/{timestamp}/zshrc` |
 | `~/.zsh/modules/` | 寫入 zsh 模組 | `dist/backup/{timestamp}/zsh/modules` |
 
@@ -100,19 +103,29 @@ pnpm run setup -- --manual
 ```
 pnpm run setup
   │
-  ├─ 前置：--quick / --dry-run / 斷點續裝偵測
-  ├─ 連結 GitHub → 選擇倉庫
-  ├─ 預選：smartSelect 確認/調整/跳過
-  ├─ Per-repo AI 技術棧分析（並行）
-  ├─ Taxonomy 查表分類（awesome-nodejs/php，1300+ 套件）
-  ├─ 跨 repo 整合去重
-  ├─ 開發者畫像（AI 推斷角色）
-  ├─ 技術棧選擇（預選 + 確認）
-  ├─ ECC 規則匹配推薦（即時）
-  ├─ 生成 stacks/ 技能庫
-  ├─ 安裝 Claude Code 配置（commands / agents / rules / hooks）
-  ├─ 安裝 zsh 環境模組
-  └─ 生成 HTML 報告
+  ├─ v1 → v2 升級偵測（自動）
+  ├─ 環境檢查 + CLI 預熱
+  ├─ Step 1：選擇倉庫
+  │   └─ GitHub 帳號 → 組織/個人 → 選 repos
+  ├─ 自動分析
+  │   ├─ Per-repo AI 技術棧分析（並行）
+  │   ├─ Spotlight 偵測本機路徑
+  │   ├─ 開發者畫像
+  │   ├─ ECC 規則匹配推薦
+  │   └─ 生成安裝計畫
+  ├─ Step 2：確認安裝計畫
+  │   └─ 全部安裝 / 逐項確認 / 精簡安裝
+  ├─ 安裝（listr2 7 步）
+  │   ├─ [1/7] 備份現有配置
+  │   ├─ [2/7] 全局配置（settings + keybindings）
+  │   ├─ [3/7] Claude 安裝（commands + agents + rules + hooks）
+  │   ├─ [4/7] ECC + Stacks
+  │   ├─ [5/7] Plugin 打包
+  │   ├─ [6/7] zsh 模組
+  │   └─ [7/7] 驗證安裝完整性
+  └─ Step 3：完成
+      ├─ 安裝摘要 + 快速上手
+      └─ HTML 報告（5 Tab + ECharts）
 ```
 
 ---
@@ -181,11 +194,15 @@ ab-dotfiles/
 │   │   ├── common.mjs           # 共用工具
 │   │   ├── hooks-merge.mjs      # hooks 合併邏輯
 │   │   └── manifest.mjs         # 安裝清單管理
-│   ├── phases/                  # Phase 拆分模組
-│   │   ├── phase-intent.mjs     # Phase 1：意圖
-│   │   ├── phase-analysis.mjs   # Phase 2：分析
-│   │   ├── phase-execute.mjs    # Phase 3：執行
-│   │   └── phase-report.mjs     # Phase 4：報告
+│   ├── deploy/                  # 部署策略
+│   │   ├── deploy-global.mjs   # settings/keybindings 合併
+│   │   ├── deploy-project.mjs  # 專案級配置注入
+│   │   └── generate-claude-md.mjs # CLAUDE.md AI 生成
+│   ├── phases/                  # Phase 拆分模組（v2.0）
+│   │   ├── phase-analyze.mjs   # 自動分析（Pipeline + Spotlight + 計畫）
+│   │   ├── phase-plan.mjs      # 安裝計畫展示 + 確認
+│   │   ├── phase-execute.mjs   # 安裝執行（listr2 7 步）
+│   │   └── phase-complete.mjs  # 完成（報告 + 引導 + session）
 │   ├── utils/                   # 通用工具
 │   │   ├── paths.mjs            # 路徑常量
 │   │   └── concurrency.mjs      # pMap 並行控制
@@ -275,15 +292,18 @@ ab-dotfiles/
 | `testing` | 測試策略與覆蓋率規範 |
 | `performance` | AI 模型選擇與 Context 管理策略 |
 
-### Hooks（5 個，可個別選擇）
+### Hooks（8 個，可個別選擇）
 
 | Hook | 說明 |
 |------|------|
-| 自動格式化 | 寫檔後 prettier / php -l |
+| 自動格式化（prettier）| 寫檔後自動 prettier |
+| 自動格式化（eslint）| 寫檔後自動 eslint |
 | 檔案保護 | 阻止修改 .env、lock 等 |
+| 危險命令攔截 | 阻止 rm -rf /、force push main 等 |
 | Context 壓縮提示 | 壓縮時保留重要資訊 |
 | 任務完成檢查 | 停止前確認任務完成 |
-| 危險命令攔截 | 阻止 rm -rf /、force push main 等 |
+| macOS 通知 | 任務完成後系統通知 |
+| 空提示檢查 | 阻止發送空白提示 |
 
 ---
 
@@ -458,6 +478,25 @@ dist/preview/
   專注 Vue 生態系的電商前端工程師，橫跨 SSR 應用與行動會員平台開發。
 
   即將根據你的技術棧，打造專屬的 Claude Code 技能庫
+```
+
+---
+
+## v1 → v2 遷移
+
+`pnpm run setup` 會自動偵測是否存在 v1 安裝（根據 `.cache/last-session.json` 或舊版目錄結構判斷），並在啟動時詢問是否升級。
+
+升級流程：
+
+1. **自動備份** — 將現有 `~/.claude/` 配置備份至 `dist/backup/{timestamp}/`
+2. **資料遷移** — 將 v1 的技術棧快取、ECC 選擇、repo 清單轉換為 v2 格式的安裝計畫
+3. **重新安裝** — 以 v2 的 3-step 流程完成安裝，無需重新選擇 repo 或技術棧
+
+若不想升級，可選擇「略過」繼續使用 v1 配置，或手動清除快取後以全新流程安裝：
+
+```bash
+rm -rf .cache/
+pnpm run setup
 ```
 
 ---

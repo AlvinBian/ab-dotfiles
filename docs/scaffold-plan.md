@@ -2,8 +2,6 @@
 
 > **狀態：FUTURE** — 此方案尚未實作，待 ab-flash monorepo 方向確認後決定。
 
-> 狀態：規劃中，尚未實作
-
 ## 目標
 
 把 ab-dotfiles 從 `git clone` + `pnpm run setup` 改為 `npx ab-dotfiles init` 一行命令初始化。

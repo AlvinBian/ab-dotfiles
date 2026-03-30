@@ -1,5 +1,5 @@
 {
-  "description": "ab-dotfiles hooks：格式化、檔案保護、危險攔截、Slack 通知、context 壓縮、任務確認",
+  "description": "ab-dotfiles hooks：格式化、檔案保護、危險攔截、Slack P0/P1/P2 通知、context 壓縮、任務確認",
   "hooks": {
     "PostToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo '.'); if [ -f \"$ROOT/.prettierrc\" ] || [ -f \"$ROOT/.prettierrc.json\" ] || [ -f \"$ROOT/prettier.config.js\" ] || [ -f \"$ROOT/prettier.config.mjs\" ] || grep -q prettier \"$ROOT/package.json\" 2>/dev/null; then npx prettier --write \"$FILE\" 2>/dev/null; fi; DISPATCH=\"$(dirname \"$0\")/../../claude/hooks/slack-dispatch.sh\"; [ -x \"$DISPATCH\" ] && \"$DISPATCH\" file-edited --file \"$FILE\"; exit 0",
+            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo '.'); if [ -f \"$ROOT/.prettierrc\" ] || [ -f \"$ROOT/.prettierrc.json\" ] || [ -f \"$ROOT/prettier.config.js\" ] || [ -f \"$ROOT/prettier.config.mjs\" ] || grep -q prettier \"$ROOT/package.json\" 2>/dev/null; then npx prettier --write \"$FILE\" 2>/dev/null; fi; D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" file-edited --file \"$FILE\"; exit 0",
             "timeout": 15
           }
         ]
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; DISPATCH=\"$(cd \"$(dirname \"$0\")/../..\" 2>/dev/null && pwd)/claude/hooks/slack-dispatch.sh\"; for p in '.env' '.env.local' '.env.production' 'package-lock.json' 'pnpm-lock.yaml' 'yarn.lock' 'composer.lock' 'Podfile.lock'; do [[ \"$FILE\" == *\"$p\"* ]] && { [ -x \"$DISPATCH\" ] && \"$DISPATCH\" protected-file --file \"$FILE\"; echo \"Blocked: $FILE is protected\" >&2; exit 2; }; done; exit 0",
+            "command": "FILE=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty' 2>/dev/null); [ -z \"$FILE\" ] && exit 0; D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; for p in '.env' '.env.local' '.env.production' 'package-lock.json' 'pnpm-lock.yaml' 'yarn.lock' 'composer.lock' 'Podfile.lock'; do [[ \"$FILE\" == *\"$p\"* ]] && { [ -x \"$D\" ] && \"$D\" protected-file --file \"$FILE\"; echo \"Blocked: $FILE is protected\" >&2; exit 2; }; done; exit 0",
             "timeout": 5
           }
         ]
@@ -28,7 +28,7 @@
         "matcher": "Bash",
         "hooks": [{
           "type": "command",
-          "command": "CMD=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command // empty' 2>/dev/null); [ -z \"$CMD\" ] && exit 0; DISPATCH=\"$(cd \"$(dirname \"$0\")/../..\" 2>/dev/null && pwd)/claude/hooks/slack-dispatch.sh\"; for p in 'rm -rf /' 'git push --force main' 'git push --force master' 'git reset --hard' 'DROP TABLE' 'DROP DATABASE'; do echo \"$CMD\" | grep -qi \"$p\" && { [ -x \"$DISPATCH\" ] && \"$DISPATCH\" dangerous-command --cmd \"$p\"; echo \"Blocked: dangerous command detected: $p\" >&2; exit 2; }; done; exit 0",
+          "command": "CMD=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command // empty' 2>/dev/null); [ -z \"$CMD\" ] && exit 0; D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; for p in 'rm -rf /' 'git push --force main' 'git push --force master' 'git reset --hard' 'DROP TABLE' 'DROP DATABASE'; do echo \"$CMD\" | grep -qi \"$p\" && { [ -x \"$D\" ] && \"$D\" dangerous-command --cmd \"$p\"; echo \"Blocked: dangerous command detected: $p\" >&2; exit 2; }; done; exit 0",
           "timeout": 5
         }]
       }
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "DISPATCH=\"$(cd \"$(dirname \"$0\")/../..\" 2>/dev/null && pwd)/claude/hooks/slack-dispatch.sh\"; [ -x \"$DISPATCH\" ] && \"$DISPATCH\" session-start; exit 0",
+            "command": "D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" session-start; exit 0",
             "timeout": 3
           }
         ]
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "BRANCH=$(git branch --show-current 2>/dev/null); TICKET=$(echo \"$BRANCH\" | grep -oE '[A-Z]+-[0-9]+' | head -1); DISPATCH=\"$(cd \"$(dirname \"$0\")/../..\" 2>/dev/null && pwd)/claude/hooks/slack-dispatch.sh\"; [ -x \"$DISPATCH\" ] && \"$DISPATCH\" session-compact; echo \"⚠️ Context 已壓縮。保留：當前任務目標、已修改檔案、驗證狀態、未完成 TODO。${TICKET:+Ticket: $TICKET}\"",
+            "command": "BRANCH=$(git branch --show-current 2>/dev/null); TICKET=$(echo \"$BRANCH\" | grep -oE '[A-Z]+-[0-9]+' | head -1); D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" session-compact; echo \"⚠️ Context 已壓縮。保留：當前任務目標、已修改檔案、驗證狀態、未完成 TODO。${TICKET:+Ticket: $TICKET}\"",
             "timeout": 5
           }
         ]
@@ -61,7 +61,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "MSG=$(cat 2>/dev/null || echo ''); DISPATCH=\"$(cd \"$(dirname \"$0\")/../..\" 2>/dev/null && pwd)/claude/hooks/slack-dispatch.sh\"; [ -x \"$DISPATCH\" ] && \"$DISPATCH\" agent-blocked --msg \"$MSG\"; osascript -e 'display notification \"Claude Code 需要注意\" with title \"ab-dotfiles\"' 2>/dev/null; exit 0",
+            "command": "MSG=$(cat 2>/dev/null || echo ''); D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" agent-blocked --msg \"$MSG\"; osascript -e 'display notification \"Claude Code 需要注意\" with title \"ab-dotfiles\"' 2>/dev/null; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "OUTPUT=$(echo \"$CLAUDE_TOOL_OUTPUT\" 2>/dev/null || echo ''); if echo \"$OUTPUT\" | grep -qi 'error\\|fail\\|exception'; then D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" subagent-fail --msg \"$(echo \"$OUTPUT\" | head -1 | cut -c1-80)\"; fi; exit 0",
             "timeout": 5
           }
         ]
@@ -97,7 +109,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "DISPATCH=\"$(cd \"$(dirname \"$0\")/../..\" 2>/dev/null && pwd)/claude/hooks/slack-dispatch.sh\"; [ -x \"$DISPATCH\" ] && \"$DISPATCH\" session-stop; exit 0",
+            "command": "D=\"$HOME/.claude/hooks/slack-dispatch.sh\"; [ -x \"$D\" ] && \"$D\" session-stop; exit 0",
             "timeout": 5
           },
           {

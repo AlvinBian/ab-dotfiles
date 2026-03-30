@@ -215,6 +215,23 @@ async function main() {
   await ensureEnvironment()
   warmupCli()
 
+  // Slack 通知設定（首次或調整時）
+  if (!prev?.slackChannel) {
+    const { setupSlackNotify } = await import('../lib/slack-setup.mjs')
+    const slackResult = await setupSlackNotify(prev)
+    if (slackResult) {
+      // 寫入 .env（供 hooks 讀取）
+      const envPath = path.join(REPO, '.env')
+      let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
+      envContent = envContent.replace(/^SLACK_NOTIFY_CHANNEL=.*/m, '').replace(/^SLACK_NOTIFY_MODE=.*/m, '').trim()
+      envContent += `\nSLACK_NOTIFY_CHANNEL=${slackResult.channelId}\nSLACK_NOTIFY_MODE=${slackResult.mode}\n`
+      fs.writeFileSync(envPath, envContent)
+      if (!prev) prev = {}
+      prev.slackChannel = slackResult.channelId
+      prev.slackMode = slackResult.mode
+    }
+  }
+
   // ── Phase loop（支持 BACK）──
   let analyzeCache = null
 

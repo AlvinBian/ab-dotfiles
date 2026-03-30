@@ -13,14 +13,16 @@ set -uo pipefail
 
 # ── 配置 ──────────────────────────────────────────────────────
 
-# 載入 .env
-for envfile in "$HOME/.env" "$HOME/.claude/.env"; do
-  [ -f "$envfile" ] && . "$envfile" 2>/dev/null
+# 載入 .env（ab-dotfiles 目錄 → HOME）
+for envfile in "$HOME/Documents/MyProjects/ab-dotfiles/.env" "$HOME/.env" "$HOME/.claude/.env"; do
+  [ -f "$envfile" ] && . "$envfile" 2>/dev/null && break
 done
 
 LEVEL="${CLAUDE_SLACK_LEVEL:-normal}"
 MIN_SESSION="${CLAUDE_SLACK_MIN_SESSION_SECS:-300}"
-SLACK_DM_ID="${SLACK_DM_CHANNEL:-}"
+# 統一用 SLACK_NOTIFY_CHANNEL（支持 channel ID 或 user ID）
+SLACK_DM_ID="${SLACK_NOTIFY_CHANNEL:-${SLACK_DM_CHANNEL:-}}"
+SLACK_MODE="${SLACK_NOTIFY_MODE:-dm}"
 [ -z "$SLACK_DM_ID" ] && exit 0
 STATE_DIR="/tmp/claude-slack"
 SESSION="${CLAUDE_SESSION_ID:-$$}"

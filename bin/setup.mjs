@@ -7,6 +7,7 @@
 
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
+import { countBy, sumBy } from 'lodash-es'
 import fs from 'fs'
 import path from 'path'
 import { getDirname } from '../lib/utils/paths.mjs'
@@ -117,9 +118,10 @@ async function main() {
     for (const r of plan.repos) {
       if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
     }
-    plan.mainCount = plan.repos.filter(r => r.role === 'main').length
-    plan.tempCount = plan.repos.filter(r => r.role === 'temp').length
-    plan.toolCount = plan.repos.filter(r => r.role === 'tool').length
+    const rc = countBy(plan.repos, 'role')
+    plan.mainCount = rc.main || 0
+    plan.tempCount = rc.temp || 0
+    plan.toolCount = rc.tool || 0
     plan.projects = plan.repos.filter(r => r.localPath).map(r => ({
       repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
     }))
@@ -239,9 +241,10 @@ async function main() {
 
     let roleConfirmed = false
     while (!roleConfirmed) {
-      const mc = Object.values(roles).filter(v => v === 'main').length
-      const tc = Object.values(roles).filter(v => v === 'temp').length
-      const toolc = Object.values(roles).filter(v => v === 'tool').length
+      const roleCounts = countBy(Object.values(roles))
+      const mc = roleCounts.main || 0
+      const tc = roleCounts.temp || 0
+      const toolc = roleCounts.tool || 0
 
       // 顯示當前分配
       const summary = repos.map(r => {

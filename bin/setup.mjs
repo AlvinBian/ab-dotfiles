@@ -179,7 +179,7 @@ async function main() {
         projectFolders = foldersInput.split(',')
           .map(s => s.trim())
           .filter(Boolean)
-          .map(p => ({ path: p, role: 'auto' }))
+          .map(f => ({ path: f, role: 'auto' }))
       }
     }
 

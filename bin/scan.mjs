@@ -103,10 +103,14 @@ function getRepos() {
 
 // ── main：主程式編排 ────────────────────────────────────────────
 async function main() {
-  const repos = getRepos()
+  // --skills 模式：不需要 repos，直接生成指定的 stacks
+  const needsRepos = !onlySkills || onlySkills.length === 0
+  const repos = needsRepos ? getRepos() : []
   const repoList = top > 0 ? repos.slice(0, top) : repos
 
-  console.log(`\n🔍 掃描 ${orgName || 'config.json'} 中的 ${repoList.length} 個 repos...\n`)
+  if (needsRepos) {
+    console.log(`\n🔍 掃描 ${orgName || 'config.json'} 中的 ${repoList.length} 個 repos...\n`)
+  }
 
   // --init：清空舊的 stacks/ 目錄
   if (flagInit && fs.existsSync(STACKS_DIR)) {

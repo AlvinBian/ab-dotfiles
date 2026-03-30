@@ -380,7 +380,16 @@ async function main() {
       const { patchSession } = await import('../lib/core/session.mjs')
       patchSession({ gmail: gmailResult })
       const filterUrl = 'https://mail.google.com/mail/u/0/#settings/filters'
-      setupResults.push(`Gmail ${pc.green('✔')} ${pc.dim('filters →')} ${pc.cyan(filterUrl)}  ${pc.dim('script →')} ${pc.cyan(gmailResult.scriptUrl)}`)
+      setupResults.push([
+        `Gmail ${pc.green('✔')} 5-Tier 分級已啟用（14 條 filter）`,
+        `    Tier 0  ${pc.dim('GitHub/CI noise → 歸檔靜音 + github/noise 標籤')}`,
+        `    Tier 1  ${pc.dim('Jira/Slack/SaaS bot → 歸檔靜音 + auto/skip 標籤')}`,
+        `    Tier 2  ${pc.dim('公司公告/收據 → 留收件匣 + auto/info 標籤')}`,
+        `    Tier 3  ${pc.dim('行事曆邀請 → 留收件匣 + auto/meeting 標籤')}`,
+        `    Tier 4  ${pc.dim('HR/財務/緊急 → 標 IMPORTANT + STARRED')}`,
+        `    ${pc.dim('查看 filters →')} ${pc.cyan(filterUrl)}`,
+        `    ${pc.dim('編輯 script →')} ${pc.cyan(gmailResult.scriptUrl)}`,
+      ].join('\n'))
     } else {
       setupResults.push(`Gmail ${pc.dim('跳過')}`)
     }
@@ -388,7 +397,7 @@ async function main() {
 
   // 外部服務設定摘要
   if (setupResults.length > 0) {
-    p.log.success(`外部服務設定完成\n${setupResults.map(r => `  ${r}`).join('\n')}`)
+    p.log.success(`外部服務設定完成\n${setupResults.map(r => `  ${r}`).join('\n\n')}`)
   }
 
   // ── Phase loop（支持 BACK）──

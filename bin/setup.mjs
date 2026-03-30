@@ -101,8 +101,10 @@ async function main() {
     if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
     phaseHeader('環境檢查')
     await ensureEnvironment()
+    warmupCli()
 
     // 用 session 重建 plan
+    if (!prev.roles) p.log.warn('上次 session 無角色資訊，全部預設為🔄臨時')
     const repoObjects = (prev.repos || []).map(r => ({
       fullName: r,
       commits: 10, // quick 模式假設都是主力
@@ -169,7 +171,9 @@ async function main() {
       if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
       phaseHeader('環境檢查')
       await ensureEnvironment()
+      warmupCli()
 
+      if (!prev.roles) p.log.warn('上次 session 無角色資訊，全部預設為🔄臨時')
       const repoObjects = (prev.repos || []).map(r => ({
         fullName: r, commits: 10, pct: 0, _roleOverride: prev.roles?.[r] || 'temp',
       }))
@@ -348,7 +352,8 @@ async function main() {
     // --dry-run
     if (flagDryRun) {
       p.log.success(pc.yellow('Dry Run 完成 — 未寫入任何檔案'))
-      break
+      p.outro('Dry Run 結束')
+      return
     }
 
     // --manual

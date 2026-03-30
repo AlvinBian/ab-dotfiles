@@ -183,56 +183,83 @@ async function main() {
       }
     }
 
-    // 角色分類：兩步選擇 ⭐主力 → 🔧工具 → 其餘🔄臨時
+    // 角色分類：自動預判 + 選單調整（循環直到確認）
     const { determineRole } = await import('../lib/config-classifier.mjs')
 
-    // Step 1: 選⭐主力
-    const mainItems = repos.map(r => {
-      const info = r.commits > 0 ? `${r.commits} commits` : ''
-      return { value: r.fullName, label: r.fullName.split('/')[1], hint: info }
-    })
-    const mainPreselected = repos.filter(r => determineRole(r) === 'main').map(r => r.fullName)
+    // 初始化角色（自動判定或沿用 session）
+    const roles = {} // { fullName: 'main'|'temp'|'tool' }
+    for (const r of repos) {
+      roles[r.fullName] = prev?.roles?.[r.fullName] || determineRole(r)
+    }
 
-    const mainRepoNames = await smartSelect({
-      title: '⭐ 主力 repos（完整 CLAUDE.md + AI 生成）',
-      items: mainItems,
-      preselected: mainPreselected,
-      autoSelectThreshold: 0,
-    })
-    if (mainRepoNames === BACK) continue
+    let roleConfirmed = false
+    while (!roleConfirmed) {
+      const mc = Object.values(roles).filter(v => v === 'main').length
+      const tc = Object.values(roles).filter(v => v === 'temp').length
+      const toolc = Object.values(roles).filter(v => v === 'tool').length
 
-    // Step 2: 從剩餘中選🔧工具（可選，有剩餘才問）
-    const mainSet = new Set(mainRepoNames)
-    const remaining = repos.filter(r => !mainSet.has(r.fullName))
-    let toolSet = new Set()
+      // 顯示當前分配
+      const summary = repos.map(r => {
+        const icon = roles[r.fullName] === 'main' ? '⭐' : roles[r.fullName] === 'tool' ? '🔧' : '🔄'
+        return `  ${icon} ${r.fullName.split('/')[1]}`
+      }).join('\n')
+      p.log.info(`角色分配（${mc} ⭐主力 · ${tc} 🔄臨時${toolc ? ` · ${toolc} 🔧工具` : ''}）\n${summary}`)
 
-    if (remaining.length > 0) {
-      const toolItems = remaining.map(r => ({
-        value: r.fullName, label: r.fullName.split('/')[1], hint: '不選 = 🔄臨時',
+      const action = handleCancel(await p.select({
+        message: '角色分配',
+        options: [
+          { value: 'confirm', label: '確認', hint: '繼續安裝' },
+          { value: 'main', label: '調整 ⭐主力', hint: '完整 CLAUDE.md + AI 生成' },
+          { value: 'temp', label: '調整 🔄臨時', hint: '精簡 CLAUDE.md' },
+          { value: 'tool', label: '調整 🔧工具', hint: '最小配置' },
+          { value: 'back', label: '← 上一步' },
+        ],
       }))
-      const toolRepoNames = await smartSelect({
-        title: '🔧 工具 repos（最小配置，可跳過）',
-        items: toolItems,
-        preselected: [],
+
+      if (action === BACK || action === 'back') { roleConfirmed = null; break }
+
+      if (action === 'confirm') {
+        roleConfirmed = true
+        break
+      }
+
+      // 調整某個角色：選中 = 歸入該角色，未選 = 保持原角色
+      const targetRole = action
+      const items = repos.map(r => ({
+        value: r.fullName,
+        label: r.fullName.split('/')[1],
+        hint: r.commits > 0 ? `${r.commits} commits` : '',
+      }))
+      const currentInRole = repos.filter(r => roles[r.fullName] === targetRole).map(r => r.fullName)
+      const icon = targetRole === 'main' ? '⭐' : targetRole === 'tool' ? '🔧' : '🔄'
+      const label = targetRole === 'main' ? '主力' : targetRole === 'tool' ? '工具' : '臨時'
+
+      const selected = await smartSelect({
+        title: `${icon} ${label} repos`,
+        items,
+        preselected: currentInRole,
         autoSelectThreshold: 0,
       })
-      if (toolRepoNames !== BACK) {
-        toolSet = new Set(toolRepoNames)
+      if (selected === BACK) continue
+
+      // 選中的歸入 targetRole，其餘不動（除非被搶走）
+      const selectedSet = new Set(selected)
+      for (const r of repos) {
+        if (selectedSet.has(r.fullName)) {
+          roles[r.fullName] = targetRole
+        } else if (roles[r.fullName] === targetRole) {
+          // 從該角色中移除的，回到自動判定
+          roles[r.fullName] = determineRole(r)
+        }
       }
     }
 
-    // 寫入角色
-    for (const r of repos) {
-      if (mainSet.has(r.fullName)) r._roleOverride = 'main'
-      else if (toolSet.has(r.fullName)) r._roleOverride = 'tool'
-      else r._roleOverride = 'temp'
-    }
+    if (roleConfirmed === null) continue // BACK
 
-    // 摘要
-    const mc = repos.filter(r => r._roleOverride === 'main').length
-    const tc = repos.filter(r => r._roleOverride === 'temp').length
-    const toolc = repos.filter(r => r._roleOverride === 'tool').length
-    p.log.info(`角色分配：${mc} ⭐主力 · ${tc} 🔄臨時${toolc ? ` · ${toolc} 🔧工具` : ''}`)
+    // 寫入角色到 repos
+    for (const r of repos) {
+      r._roleOverride = roles[r.fullName]
+    }
 
     // 自動分析（快取：repos + 角色沒變就不重跑）
     const reposKey = repos.map(r => `${r.fullName}:${r._roleOverride}`).sort().join(',')

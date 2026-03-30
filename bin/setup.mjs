@@ -160,6 +160,10 @@ async function main() {
       p.outro()
       process.exit(0)
     }
+    // 「調整設定」：不自動跳過組織選擇，讓用戶重選一切
+    if (action === 'adjust') {
+      prev = { ...prev, org: null } // 清除 org 讓 interactiveRepoSelect 重新問
+    }
     if (action === 'reinstall') {
       // 等同 --quick
       if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })

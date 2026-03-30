@@ -7,7 +7,7 @@
 
 import * as p from '@clack/prompts'
 import fs from 'fs'
-import { countBy } from 'lodash-es'
+import { cloneDeep, countBy } from 'lodash-es'
 import path from 'path'
 import pc from 'picocolors'
 import { BACK, handleCancel, smartSelect } from '../lib/cli/prompts.mjs'
@@ -167,43 +167,102 @@ async function main() {
       process.exit(0)
     }
     if (action === 'status') {
-      // 展示配置健康度，並提供快速調整選項
+      // 展示完整配置狀態，並提供快速調整選項
       const { getConfigStatus } = await import('../lib/core/config-status.mjs')
       const {
         adjustClaude, adjustGlobalSettings, adjustSlack, adjustClaudeMd, adjustZsh, adjustGmail,
       } = await import('../lib/phases/phase-adjust.mjs')
 
       const status = getConfigStatus()
-      const { summary, claude, zsh, slack } = status
+      const { summary, claude, claudeMd, zsh, slack, env: envStatus } = status
+      const HOME = process.env.HOME
+      const claudeDir = path.join(HOME, '.claude')
+
+      // ── 健康度 bar ──
+      const bar = '█'.repeat(Math.round(summary.pct / 5)) + '░'.repeat(20 - Math.round(summary.pct / 5))
       const healthIcon = summary.pct >= 90 ? pc.green('✔') : summary.pct >= 70 ? pc.yellow('⚠') : pc.red('✘')
-      p.log.info(
-        `配置健康度  ${healthIcon} ${pc.bold(summary.pct + '%')} (${summary.ok}/${summary.total})\n` +
-        `  Claude    commands ${claude.installedCommands.length} · agents ${claude.installedAgents.length} · rules ${claude.installedRules.length}` +
-        (claude.missing.length > 0 ? pc.red(` · 缺 ${claude.missing.length} 個`) : '') + '\n' +
-        `  zsh       ${zsh.installed.length}/${zsh.expected.length} 模組` +
-        (zsh.missing.length > 0 ? pc.red(` · 缺 ${zsh.missing.join(', ')}`) : '') + '\n' +
-        `  Slack     ${slack.mode ? pc.cyan(slack.mode) : pc.dim('未設定')}`
-      )
+
+      // ── Claude 配置 ──
+      const cmdOk = pc.green(claude.installedCommands.length)
+      const agentOk = pc.green(claude.installedAgents.length)
+      const ruleOk = pc.green(claude.installedRules.length)
+      const hasHooks = fs.existsSync(path.join(claudeDir, 'hooks.json'))
+      const hasSettings = fs.existsSync(path.join(claudeDir, 'settings.json'))
+
+      const lines = [
+        `${healthIcon}  [${bar}]  ${pc.bold(summary.pct + '%')}  (${summary.ok}/${summary.total})`,
+        '',
+        pc.bold('Claude 配置'),
+        `  Commands   ${cmdOk} 個${claude.installedCommands.length > 0 ? pc.dim('  ' + claude.installedCommands.slice(0, 6).join(', ') + (claude.installedCommands.length > 6 ? '…' : '')) : ''}`,
+        `  Agents     ${agentOk} 個${claude.installedAgents.length > 0 ? pc.dim('  ' + claude.installedAgents.slice(0, 6).join(', ') + (claude.installedAgents.length > 6 ? '…' : '')) : ''}`,
+        `  Rules      ${ruleOk} 個${claude.installedRules.length > 0 ? pc.dim('  ' + claude.installedRules.join(', ')) : ''}`,
+        `  Hooks      ${hasHooks ? pc.green('已啟用') : pc.dim('未安裝')}`,
+        `  Settings   ${hasSettings ? pc.green('已配置') : pc.dim('未安裝')}`,
+        `  CLAUDE.md  ${pc.cyan(claudeMd.count)} 個 repo`,
+      ]
+
+      if (claude.missing.length > 0) {
+        lines.push(pc.red(`  缺少 ${claude.missing.length} 個：${claude.missing.slice(0, 5).join(', ')}${claude.missing.length > 5 ? '…' : ''}`))
+      }
+      if (claude.extra.length > 0) {
+        lines.push(pc.dim(`  額外 ${claude.extra.length} 個（非 ab-dotfiles 管理）`))
+      }
+
+      // ── zsh 模組 ──
+      lines.push('', pc.bold('zsh 模組'))
+      lines.push(`  已安裝  ${pc.green(zsh.installed.length)}/${zsh.expected.length}  ${pc.dim(zsh.installed.join(', ') || '無')}`)
+      if (zsh.missing.length > 0) {
+        lines.push(pc.red(`  缺少：${zsh.missing.join(', ')}`))
+      }
+
+      // ── Slack ──
+      lines.push('', pc.bold('Slack 通知'))
+      if (slack.mode && slack.mode !== 'off') {
+        const label = slack.mode === 'dm' ? 'DM（私訊自己）' : `頻道 ${slack.channel || ''}`
+        lines.push(`  模式  ${pc.cyan(label)}`)
+      } else {
+        lines.push(`  ${pc.dim('未設定')}`)
+      }
+
+      // ── Gmail ──
+      lines.push('', pc.bold('Gmail 分級'))
+      if (prev?.gmail?.scriptId) {
+        lines.push(`  Script ID  ${pc.cyan(prev.gmail.scriptId)}`)
+        lines.push(`  設定時間   ${pc.dim(prev.gmail.setupAt?.slice(0, 10) || '')}`)
+      } else {
+        lines.push(`  ${pc.dim('未設定')}`)
+      }
+
+      // ── AI ──
+      if (envStatus.aiModel) {
+        lines.push('', pc.bold('AI 設定'))
+        lines.push(`  模型  ${pc.cyan(envStatus.aiModel)}`)
+      }
+
+      p.log.info(lines.join('\n'))
 
       const adjustAction = handleCancel(await p.select({
         message: '選擇要調整的項目',
         options: [
-          { value: 'claude',    label: '重新安裝 Claude 配置', hint: 'commands / agents / rules / hooks' },
-          { value: 'settings',  label: '重新套用全局設定', hint: 'settings.json permissions' },
-          { value: 'claudemd',  label: '重新生成 CLAUDE.md', hint: '需 AI 呼叫，約 30 秒' },
-          { value: 'zsh',       label: '重新安裝 zsh 模組', hint: 'aliases / git / nvm / fzf...' },
-          { value: 'slack',     label: '重新設定 Slack 通知', hint: 'DM / Channel / 關閉' },
-          { value: 'gmail',     label: '重新設定 Gmail 分級', hint: 'clasp + Apps Script 5-Tier' },
+          { value: 'claude',    label: '重新安裝 Claude 配置', hint: `commands ${claude.installedCommands.length} · agents ${claude.installedAgents.length} · rules ${claude.installedRules.length}` },
+          { value: 'settings',  label: '重新套用全局設定', hint: `settings ${hasSettings ? '✔' : '✘'}` },
+          { value: 'claudemd',  label: '重新生成 CLAUDE.md', hint: `${claudeMd.count} 個 repo · 需 AI` },
+          { value: 'zsh',       label: '重新安裝 zsh 模組', hint: `${zsh.installed.length}/${zsh.expected.length} 已安裝` },
+          { value: 'slack',     label: '重新設定 Slack 通知', hint: slack.mode ? `${slack.mode}` : '未設定' },
+          { value: 'gmail',     label: '重新設定 Gmail 分級', hint: prev?.gmail?.scriptId ? '已設定' : '未設定' },
           { value: 'back',      label: '← 返回' },
         ],
       }))
       if (adjustAction === BACK || adjustAction === 'back') { p.outro('已取消'); process.exit(0) }
-      if (adjustAction === 'claude')   await adjustClaude({ flagAll })
-      if (adjustAction === 'settings') await adjustGlobalSettings()
-      if (adjustAction === 'claudemd') await adjustClaudeMd()
-      if (adjustAction === 'zsh')      await adjustZsh({ flagAll })
-      if (adjustAction === 'slack')    await adjustSlack()
-      if (adjustAction === 'gmail')    await adjustGmail()
+      const adjustMap = {
+        claude:   () => adjustClaude({ flagAll }),
+        settings: () => adjustGlobalSettings(),
+        claudemd: () => adjustClaudeMd(),
+        zsh:      () => adjustZsh({ flagAll }),
+        slack:    () => adjustSlack(),
+        gmail:    () => adjustGmail(),
+      }
+      if (adjustMap[adjustAction]) await adjustMap[adjustAction]()
       p.outro('調整完成')
       process.exit(0)
     }
@@ -444,17 +503,19 @@ async function main() {
       }
     }
 
-    // 根據功能選擇裁剪 plan
-    if (analyzeCache?.plan) {
-      if (!has('ecc')) analyzeCache.plan.ecc = []
-      if (!has('claudemd')) analyzeCache.plan.projects = []
-      if (!has('zsh')) analyzeCache.plan.zshModules = []
-      analyzeCache.plan.features = features // 傳給下游
+    // 根據功能選擇裁剪 plan（用 cloneDeep 避免破壞 cache 原始資料）
+    let planForReview = analyzeCache?.plan
+    if (planForReview) {
+      planForReview = cloneDeep(planForReview)
+      if (!has('ecc')) planForReview.ecc = []
+      if (!has('claudemd')) planForReview.projects = []
+      if (!has('zsh')) planForReview.zshModules = []
+      planForReview.features = features // 傳給下游
     }
 
     // Step 2：確認計畫
     phaseHeader('確認安裝計畫', 2, 3)
-    const confirmedPlan = await phasePlan(analyzeCache.plan)
+    const confirmedPlan = await phasePlan(planForReview)
     if (confirmedPlan === BACK) continue // 回到 Step 1
     if (!confirmedPlan) break
 

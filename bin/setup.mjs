@@ -93,10 +93,23 @@ async function main() {
       fullName: r,
       commits: 10, // quick 模式假設都是主力
       pct: 0,
+      _roleOverride: prev.roles?.[r] || 'temp',
     }))
     phaseHeader('快速分析')
     const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
     if (flagManual) plan.mode = 'manual'
+
+    // 應用 session 保存的角色
+    const { getClaudeMdType } = await import('../lib/config-classifier.mjs')
+    for (const r of plan.repos) {
+      if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
+    }
+    plan.mainCount = plan.repos.filter(r => r.role === 'main').length
+    plan.tempCount = plan.repos.filter(r => r.role === 'temp').length
+    plan.toolCount = plan.repos.filter(r => r.role === 'tool').length
+    plan.projects = plan.repos.filter(r => r.localPath).map(r => ({
+      repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
+    }))
 
     phaseHeader('安裝中')
     const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
@@ -136,9 +149,23 @@ async function main() {
       phaseHeader('環境檢查')
       await ensureEnvironment()
 
-      const repoObjects = (prev.repos || []).map(r => ({ fullName: r, commits: 10, pct: 0 }))
+      const repoObjects = (prev.repos || []).map(r => ({
+        fullName: r, commits: 10, pct: 0, _roleOverride: prev.roles?.[r] || 'temp',
+      }))
       phaseHeader('快速分析')
       const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
+
+      // 應用 session 保存的角色
+      const { getClaudeMdType } = await import('../lib/config-classifier.mjs')
+      for (const r of plan.repos) {
+        if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
+      }
+      plan.mainCount = plan.repos.filter(r => r.role === 'main').length
+      plan.tempCount = plan.repos.filter(r => r.role === 'temp').length
+      plan.toolCount = plan.repos.filter(r => r.role === 'tool').length
+      plan.projects = plan.repos.filter(r => r.localPath).map(r => ({
+        repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
+      }))
 
       phaseHeader('安裝中')
       const { installSelections, syncResult, startTime } = await phaseExecute(plan, {

@@ -5,7 +5,7 @@
  * Tier 1  auto/skip      → 歸檔靜音 + 標籤（SaaS bot、促銷）
  * Tier 2  auto/info      → 留在收件匣 + 標籤，移除 IMPORTANT（公司公告、CC）
  * Tier 3  auto/meeting   → 留在收件匣 + 標籤（行事曆邀請）
- * Tier 4  action_required → 標 IMPORTANT + STARRED（HR、主管、財務審核）
+ * Tier 4  action/required → IMPORTANT + STARRED + 紅色標籤（HR、主管、財務審核）
  *
  * 函式：
  *   setupAllFilters()    — 建立 filter（只影響新郵件）
@@ -142,16 +142,16 @@ function buildRules(labelIds) {
     { desc: "Calendar invites", criteria: { query: "filename:invite.ics OR filename:*.ics" },
       action: { addLabelIds: [labelIds["auto/meeting"]], removeLabelIds: [] } },
 
-    // TIER 4 — action_required（標 IMPORTANT + STARRED，突出重要郵件）
+    // TIER 4 — action_required（IMPORTANT + STARRED + action/required 標籤）
     // 自訂：加入你的 HR / 主管 / 財務信箱
     { desc: "HR keywords", criteria: { subject: "薪資 OR 考績 OR 績效 OR 調薪 OR offer OR 合約 OR 請假 OR 假單 OR onboarding OR offboarding OR 離職 OR performance review OR salary" },
-      action: { addLabelIds: ["IMPORTANT", "STARRED"], removeLabelIds: [] } },
+      action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
     { desc: "Finance / expense", criteria: { subject: "報帳 OR 費用申請 OR 核銷 OR expense OR reimbursement OR 審核通過 OR 請款" },
-      action: { addLabelIds: ["IMPORTANT", "STARRED"], removeLabelIds: [] } },
+      action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
     { desc: "Legal / compliance", criteria: { subject: "合約 OR contract OR NDA OR legal OR 法務 OR 合規 OR compliance" },
-      action: { addLabelIds: ["IMPORTANT", "STARRED"], removeLabelIds: [] } },
+      action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
     { desc: "Urgent escalation", criteria: { subject: "URGENT OR 緊急 OR ACTION REQUIRED OR 請盡快 OR 立即處理" },
-      action: { addLabelIds: ["IMPORTANT", "STARRED"], removeLabelIds: [] } },
+      action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
   ];
 }
 
@@ -160,10 +160,11 @@ function buildRules(labelIds) {
 // ─────────────────────────────────────────
 function createLabelsIfNeeded() {
   var wanted = [
-    { name: "github/noise",  color: { backgroundColor: "#cccccc", textColor: "#434343" } },
-    { name: "auto/skip",     color: { backgroundColor: "#efefef", textColor: "#434343" } },
-    { name: "auto/info",     color: { backgroundColor: "#c9daf8", textColor: "#1c4587" } },
-    { name: "auto/meeting",  color: { backgroundColor: "#d9ead3", textColor: "#274e13" } },
+    { name: "github/noise",    color: { backgroundColor: "#cccccc", textColor: "#434343" } },
+    { name: "auto/skip",       color: { backgroundColor: "#efefef", textColor: "#434343" } },
+    { name: "auto/info",       color: { backgroundColor: "#c9daf8", textColor: "#1c4587" } },
+    { name: "auto/meeting",    color: { backgroundColor: "#d9ead3", textColor: "#274e13" } },
+    { name: "action/required", color: { backgroundColor: "#e06666", textColor: "#ffffff" } },
   ];
 
   var existing = Gmail.Users.Labels.list("me").labels || [];

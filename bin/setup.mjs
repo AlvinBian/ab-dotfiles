@@ -386,7 +386,7 @@ async function main() {
         `    Tier 1  ${pc.dim('Jira/Slack/SaaS bot → auto/skip 標籤')}`,
         `    Tier 2  ${pc.dim('公司公告/收據 → auto/info 標籤')}`,
         `    Tier 3  ${pc.dim('行事曆邀請 → auto/meeting 標籤')}`,
-        `    Tier 4  ${pc.dim('HR/財務/緊急 → ⭐ IMPORTANT + STARRED（不會錯過）')}`,
+        `    Tier 4  ${pc.dim('HR/財務/緊急 → ⭐ STARRED + IMPORTANT + action/required 紅色標籤')}`,
         `    ${pc.dim('查看 filters →')} ${pc.cyan(filterUrl)}`,
         `    ${pc.dim('編輯 script →')} ${pc.cyan(gmailResult.scriptUrl)}`,
       ].join('\n'))

@@ -1,3 +1,11 @@
+---
+name: code-style
+description: >
+  代碼格式、函式設計、命名慣例規範。
+matchWhen:
+  always: true
+---
+
 # Code Style
 
 ## 格式

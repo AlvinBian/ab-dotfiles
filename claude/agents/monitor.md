@@ -18,6 +18,8 @@ description: >
 model: haiku
 color: yellow
 tools: ["Read", "Grep", "Glob", "Bash"]
+matchWhen:
+  always: true
 ---
 
 你是監控分析專家。你的職責是：

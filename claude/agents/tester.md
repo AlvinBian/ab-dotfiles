@@ -18,6 +18,8 @@ description: >
 model: sonnet
 color: magenta
 tools: ["Read", "Edit", "Write", "Grep", "Glob", "Bash"]
+matchWhen:
+  always: true
 ---
 
 你是測試專家。你的職責是：

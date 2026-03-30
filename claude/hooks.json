@@ -23,6 +23,14 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{
+          "type": "command",
+          "command": "CMD=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.command // empty' 2>/dev/null); [ -z \"$CMD\" ] && exit 0; for p in 'rm -rf /' 'git push --force main' 'git push --force master' 'git reset --hard' 'DROP TABLE' 'DROP DATABASE'; do echo \"$CMD\" | grep -qi \"$p\" && echo \"Blocked: dangerous command detected: $p\" >&2 && exit 2; done; exit 0",
+          "timeout": 5
+        }]
       }
     ],
     "SessionStart": [

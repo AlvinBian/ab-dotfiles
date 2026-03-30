@@ -6,6 +6,8 @@ description: >
   "寫 Slack 公告", "寫 Slack 告警", "寫 Slack 進度更新".
 metadata:
   version: 2.0.0
+matchWhen:
+  targets: ["slack"]
 ---
 
 # Draft Slack Message

@@ -6,6 +6,8 @@ description: >
   "檢查缺少什麼", "幫我配置", "優化環境", "建議配置".
 metadata:
   version: 1.0.0
+matchWhen:
+  always: true
 ---
 
 # 專案自動檢測與配置推薦

@@ -215,12 +215,31 @@ async function main() {
   await ensureEnvironment()
   warmupCli()
 
-  // Slack 通知設定（首次或調整時）
-  if (!prev?.slackChannel) {
+  // ── 功能選擇 ──
+  const featureChoices = [
+    { value: 'claude', label: 'Claude Code 開發配置', hint: 'commands · agents · rules · hooks · settings · keybindings' },
+    { value: 'claudemd', label: '專案 CLAUDE.md', hint: '按 repo 角色 AI 生成到 ~/.claude/projects/' },
+    { value: 'ecc', label: 'ECC 外部資源', hint: '社群 commands/agents/rules 融合' },
+    { value: 'slack', label: 'Slack 通知', hint: 'P0/P1/P2 分級 + Channel/DM' },
+    { value: 'zsh', label: 'zsh 環境模組', hint: 'aliases · fzf · git · tools · history' },
+  ]
+  const prevFeatures = prev?.features || ['claude', 'claudemd', 'ecc', 'slack', 'zsh']
+  const features = handleCancel(await p.multiselect({
+    message: '選擇安裝項目（Space 切換，Enter 確認）',
+    options: featureChoices,
+    initialValues: prevFeatures,
+    required: true,
+  }))
+  if (features === BACK) { p.outro('已取消'); return }
+
+  const has = (f) => features.includes(f)
+  const needsRepos = has('claudemd') || has('ecc') // 需要選 repos 的功能
+
+  // Slack 通知設定
+  if (has('slack') && !prev?.slackChannel) {
     const { setupSlackNotify } = await import('../lib/slack-setup.mjs')
     const slackResult = await setupSlackNotify(prev)
     if (slackResult) {
-      // 寫入 .env（供 hooks 讀取）
       const envPath = path.join(REPO, '.env')
       let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
       envContent = envContent.replace(/^SLACK_NOTIFY_CHANNEL=.*/m, '').replace(/^SLACK_NOTIFY_MODE=.*/m, '').trim()
@@ -236,19 +255,18 @@ async function main() {
   let analyzeCache = null
 
   while (true) {
-    // Step 1：選 repos
-    phaseHeader('選擇倉庫', 1, 3)
-    const repos = await interactiveRepoSelect(prev)
-    if (repos === BACK) break
+    // Step 1：選 repos（只有需要 repos 的功能才問）
+    let repos = []
+    if (needsRepos) {
+      phaseHeader('選擇倉庫', 1, 3)
+      repos = await interactiveRepoSelect(prev)
+      if (repos === BACK) break
+    }
 
-    // 本機路徑偵測：fd 全自動，不需要用戶輸入文件夾
-    // projectFolders 仍支持 config.json 配置（用於角色覆蓋）
-
-    // 角色分類：自動預判 + 選單調整（循環直到確認）
+    // 角色分類（只有選了 repos 的功能才需要）
+    const roles = {}
+    if (needsRepos && repos.length > 0) {
     const { determineRole } = await import('../lib/config-classifier.mjs')
-
-    // 初始化角色（自動判定或沿用 session）
-    const roles = {} // { fullName: 'main'|'temp'|'tool' }
     for (const r of repos) {
       roles[r.fullName] = prev?.roles?.[r.fullName] || determineRole(r)
     }
@@ -350,6 +368,24 @@ async function main() {
       analyzeCache.plan.projects = analyzeCache.plan.repos
         .filter(r => r.localPath)
         .map(r => ({ repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role) }))
+    }
+    } // end if (needsRepos)
+
+    // 不需要 repos 時建一個最小 plan
+    if (!needsRepos && !analyzeCache) {
+      const { generateInstallPlan } = await import('../lib/auto-plan.mjs')
+      analyzeCache = {
+        key: 'no-repos',
+        plan: generateInstallPlan({ repos: [], pipelineResult: null, eccResult: { recommended: [] }, localPaths: {}, roleOverrides: {}, profile: null }),
+      }
+    }
+
+    // 根據功能選擇裁剪 plan
+    if (analyzeCache?.plan) {
+      if (!has('ecc')) analyzeCache.plan.ecc = []
+      if (!has('claudemd')) analyzeCache.plan.projects = []
+      if (!has('zsh')) analyzeCache.plan.zshModules = []
+      analyzeCache.plan.features = features // 傳給下游
     }
 
     // Step 2：確認計畫

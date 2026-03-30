@@ -243,8 +243,10 @@ async function main() {
       const tc = roleCounts.temp || 0
       const toolc = roleCounts.tool || 0
 
-      // 顯示當前分配
-      const summary = repos.map(r => {
+      // 顯示當前分配（⭐主力 → 🔄臨時 → 🔧工具）
+      const ROLE_ORDER = { main: 0, temp: 1, tool: 2 }
+      const sortedRepos = [...repos].sort((a, b) => (ROLE_ORDER[roles[a.fullName]] ?? 9) - (ROLE_ORDER[roles[b.fullName]] ?? 9))
+      const summary = sortedRepos.map(r => {
         const icon = roles[r.fullName] === 'main' ? '⭐' : roles[r.fullName] === 'tool' ? '🔧' : '🔄'
         return `  ${icon} ${r.fullName.split('/')[1]}`
       }).join('\n')

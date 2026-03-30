@@ -54,13 +54,13 @@ async function main() {
   const config = loadConfig()
   const targets = config.targets || {}
   const sources = loadSources(config.sources)
-  let projectFolders = loadProjectFolders(config, prev)
   const args = process.argv.slice(2)
   const flagAll = args.includes('--all')
   const flagManual = args.includes('--manual')
   const flagQuick = args.includes('--quick')
   const flagDryRun = args.includes('--dry-run')
   let prev = loadSession()
+  let projectFolders = loadProjectFolders(config, prev)
 
   // Splash
   console.log()

@@ -54,7 +54,7 @@ async function main() {
   const config = loadConfig()
   const targets = config.targets || {}
   const sources = loadSources(config.sources)
-  const projectFolders = loadProjectFolders(config, prev)
+  let projectFolders = loadProjectFolders(config, prev)
   const args = process.argv.slice(2)
   const flagAll = args.includes('--all')
   const flagManual = args.includes('--manual')
@@ -105,7 +105,7 @@ async function main() {
     })
 
     phaseHeader('完成', 3, 3)
-    await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: null })
+    await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: null, projectFolders })
     return
   }
 
@@ -147,7 +147,7 @@ async function main() {
       })
 
       phaseHeader('完成', 3, 3)
-      await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: null })
+      await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: null, projectFolders })
       return
     }
   }
@@ -168,12 +168,25 @@ async function main() {
     const repos = await interactiveRepoSelect(prev)
     if (repos === BACK) break
 
+    // 專案文件夾：首次詢問，之後用 session 記憶
+    if (!projectFolders.length) {
+      const foldersInput = handleCancel(await p.text({
+        message: '專案文件夾（逗號分隔，Enter 跳過用 Spotlight 自動搜索）',
+        placeholder: '~/Kkday, ~/Projects, ~/Work',
+        defaultValue: '',
+      }))
+      if (foldersInput && foldersInput !== BACK) {
+        projectFolders = foldersInput.split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+          .map(p => ({ path: p, role: 'auto' }))
+      }
+    }
+
     // 自動分析（快取：repos 沒變就不重跑）
     const reposKey = [...repos].sort().join(',')
     if (!analyzeCache || analyzeCache.key !== reposKey) {
       phaseHeader('自動分析')
-      // 需要有 commits 資訊的 repo 物件，但 interactiveRepoSelect 返回 fullName 陣列
-      // 暫用簡化版
       const repoObjects = repos.map(r => ({ fullName: r, commits: 0, pct: 0 }))
       analyzeCache = {
         key: reposKey,
@@ -215,6 +228,7 @@ async function main() {
       syncResult,
       startTime,
       pipelineResult: confirmedPlan._pipelineResult || null,
+      projectFolders,
     })
 
     break

@@ -381,12 +381,12 @@ async function main() {
       patchSession({ gmail: gmailResult })
       const filterUrl = 'https://mail.google.com/mail/u/0/#settings/filters'
       setupResults.push([
-        `Gmail ${pc.green('✔')} 5-Tier 分級已啟用（14 條 filter）`,
-        `    Tier 0  ${pc.dim('GitHub/CI noise → 歸檔靜音 + github/noise 標籤')}`,
-        `    Tier 1  ${pc.dim('Jira/Slack/SaaS bot → 歸檔靜音 + auto/skip 標籤')}`,
-        `    Tier 2  ${pc.dim('公司公告/收據 → 留收件匣 + auto/info 標籤')}`,
-        `    Tier 3  ${pc.dim('行事曆邀請 → 留收件匣 + auto/meeting 標籤')}`,
-        `    Tier 4  ${pc.dim('HR/財務/緊急 → 標 IMPORTANT + STARRED')}`,
+        `Gmail ${pc.green('✔')} 5-Tier 分級已啟用 — 所有郵件留收件匣，重要郵件突出顯示`,
+        `    Tier 0  ${pc.dim('GitHub/CI noise → github/noise 標籤')}`,
+        `    Tier 1  ${pc.dim('Jira/Slack/SaaS bot → auto/skip 標籤')}`,
+        `    Tier 2  ${pc.dim('公司公告/收據 → auto/info 標籤')}`,
+        `    Tier 3  ${pc.dim('行事曆邀請 → auto/meeting 標籤')}`,
+        `    Tier 4  ${pc.dim('HR/財務/緊急 → ⭐ IMPORTANT + STARRED（不會錯過）')}`,
         `    ${pc.dim('查看 filters →')} ${pc.cyan(filterUrl)}`,
         `    ${pc.dim('編輯 script →')} ${pc.cyan(gmailResult.scriptUrl)}`,
       ].join('\n'))

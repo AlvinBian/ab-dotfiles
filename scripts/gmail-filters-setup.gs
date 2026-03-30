@@ -109,40 +109,40 @@ function applyToExisting() {
 // ─────────────────────────────────────────
 function buildRules(labelIds) {
   return [
-    // TIER 0 — GitHub noise
+    // TIER 0 — GitHub noise（留收件匣 + 加標籤辨識）
     { desc: "GitHub PR / CI / bot", criteria: { from: "notifications@github.com OR noreply@github.com" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["github/noise"]] } },
+      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: [] } },
     { desc: "Dependabot / Renovate", criteria: { from: "dependabot[bot] OR renovate-bot OR renovateapp.com" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["github/noise"]] } },
+      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: [] } },
     { desc: "GitLab / Bitbucket", criteria: { from: "gitlab.com OR bitbucket.org" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["github/noise"]] } },
+      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: [] } },
     { desc: "CI/CD services", criteria: { from: "circleci.com OR travis-ci.com OR buildkite.com OR semaphoreci.com" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["github/noise"]] } },
+      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: [] } },
 
-    // TIER 1 — skip
+    // TIER 1 — SaaS bot（留收件匣 + 加標籤辨識）
     { desc: "Jira / Confluence", criteria: { from: "jira@ OR confluence@ OR atlassian.net" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["auto/skip"]] } },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
     { desc: "Slack notifications", criteria: { from: "slack.com" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["auto/skip"]] } },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
     { desc: "Notion / Linear / Figma / Sentry", criteria: { from: "notion.so OR linear.app OR figma.com OR sentry.io" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["auto/skip"]] } },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
     { desc: "Datadog / PagerDuty / OpsGenie", criteria: { from: "datadoghq.com OR pagerduty.com OR opsgenie.com" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["auto/skip"]] } },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
     { desc: "npm / package registry", criteria: { from: "npmjs.com OR pypi.org" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], addLabelIds: [labelIds["auto/skip"]] } },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
 
-    // TIER 2 — info_only
+    // TIER 2 — info_only（留收件匣 + 加標籤）
     // 自訂：加入你的公司 noreply / it 信箱
     { desc: "Company announcements", criteria: { subject: "[全員公告] OR [All Staff] OR [公司公告] OR [Company Notice] OR [Company Update]" },
-      action: { removeLabelIds: ["IMPORTANT"], addLabelIds: [labelIds["auto/info"]] } },
+      action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: [] } },
     { desc: "Receipt / invoice", criteria: { subject: "receipt OR invoice OR billing OR 收據 OR 發票 OR 帳單" },
-      action: { removeLabelIds: ["IMPORTANT"], addLabelIds: [labelIds["auto/info"]] } },
+      action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: [] } },
 
-    // TIER 3 — meeting
+    // TIER 3 — meeting（留收件匣 + 加標籤）
     { desc: "Calendar invites", criteria: { query: "filename:invite.ics OR filename:*.ics" },
       action: { addLabelIds: [labelIds["auto/meeting"]], removeLabelIds: [] } },
 
-    // TIER 4 — action_required
+    // TIER 4 — action_required（標 IMPORTANT + STARRED，突出重要郵件）
     // 自訂：加入你的 HR / 主管 / 財務信箱
     { desc: "HR keywords", criteria: { subject: "薪資 OR 考績 OR 績效 OR 調薪 OR offer OR 合約 OR 請假 OR 假單 OR onboarding OR offboarding OR 離職 OR performance review OR salary" },
       action: { addLabelIds: ["IMPORTANT", "STARRED"], removeLabelIds: [] } },

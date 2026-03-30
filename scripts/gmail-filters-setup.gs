@@ -27,6 +27,8 @@ function setupAndApply() {
 
 /** 只建立 filter（只影響新郵件） */
 function setupAllFilters() {
+  // 先清除舊 filter 避免重複
+  deleteAllFilters();
   var labelIds = createLabelsIfNeeded();
   var rules = buildRules(labelIds);
 
@@ -81,7 +83,8 @@ function applyToExisting() {
       if (addLabels.length > 0 || removeLabels.length > 0) {
         modifyRequest.addLabelIds = addLabels;
         modifyRequest.removeLabelIds = removeLabels;
-        Gmail.Users.Messages.batchModify(modifyRequest, "me");
+        try { Gmail.Users.Messages.batchModify(modifyRequest, "me"); }
+        catch (e) { Logger.log("WARN batchModify: " + rule.desc + " → " + e.message); }
       }
 
       // STARRED 需要單獨處理（batchModify 不支援 STARRED）
@@ -175,12 +178,14 @@ function buildRules(labelIds) {
 // Labels（冪等）
 // ─────────────────────────────────────────
 function createLabelsIfNeeded() {
+  // Gmail API 只接受固定調色盤的顏色值
+  // 參考：https://developers.google.com/gmail/api/reference/rest/v1/users.labels
   var wanted = [
-    { name: "github/noise",    color: { backgroundColor: "#cccccc", textColor: "#434343" } },
-    { name: "auto/skip",       color: { backgroundColor: "#efefef", textColor: "#434343" } },
-    { name: "auto/info",       color: { backgroundColor: "#c9daf8", textColor: "#1c4587" } },
-    { name: "auto/meeting",    color: { backgroundColor: "#d9ead3", textColor: "#274e13" } },
-    { name: "action/required", color: { backgroundColor: "#e06666", textColor: "#ffffff" } },
+    { name: "github/noise" },
+    { name: "auto/skip" },
+    { name: "auto/info" },
+    { name: "auto/meeting" },
+    { name: "action/required" },
   ];
 
   var existing = Gmail.Users.Labels.list("me").labels || [];
@@ -193,9 +198,9 @@ function createLabelsIfNeeded() {
       labelIds[w.name] = existingMap[w.name];
       Logger.log("exists: " + w.name + " → " + existingMap[w.name]);
     } else {
-      var created = Gmail.Users.Labels.create({
-        name: w.name, labelListVisibility: "labelShow", messageListVisibility: "show", color: w.color,
-      }, "me");
+      var opts = { name: w.name, labelListVisibility: "labelShow", messageListVisibility: "show" };
+      if (w.color) opts.color = w.color;
+      var created = Gmail.Users.Labels.create(opts, "me");
       labelIds[w.name] = created.id;
       Logger.log("created: " + w.name + " → " + created.id);
     }
@@ -253,9 +258,14 @@ function listFilters() {
 /** 清除所有 filter（重來用） */
 function deleteAllFilters() {
   var list = Gmail.Users.Settings.Filters.list("me").filter || [];
+  var deleted = 0;
   list.forEach(function(f) {
-    Gmail.Users.Settings.Filters.remove("me", f.id);
-    Logger.log("deleted: " + f.id);
+    try {
+      Gmail.Users.Settings.Filters.remove("me", f.id);
+      deleted++;
+    } catch (e) {
+      Logger.log("WARN delete failed: " + f.id + " → " + e.message);
+    }
   });
-  Logger.log("Deleted: " + list.length + " filters");
+  Logger.log("Deleted: " + deleted + "/" + list.length + " filters");
 }

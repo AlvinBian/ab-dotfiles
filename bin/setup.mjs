@@ -185,9 +185,10 @@ async function main() {
       for (const r of plan.repos) {
         if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
       }
-      plan.mainCount = plan.repos.filter(r => r.role === 'main').length
-      plan.tempCount = plan.repos.filter(r => r.role === 'temp').length
-      plan.toolCount = plan.repos.filter(r => r.role === 'tool').length
+      const roleCounts1 = countBy(plan.repos, 'role')
+      plan.mainCount = roleCounts1.main || 0
+      plan.tempCount = roleCounts1.temp || 0
+      plan.toolCount = roleCounts1.tool || 0
       plan.projects = plan.repos.filter(r => r.localPath).map(r => ({
         repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
       }))
@@ -321,9 +322,10 @@ async function main() {
         if (src?._roleOverride) r.role = src._roleOverride
       }
       // 重算計數
-      analyzeCache.plan.mainCount = analyzeCache.plan.repos.filter(r => r.role === 'main').length
-      analyzeCache.plan.tempCount = analyzeCache.plan.repos.filter(r => r.role === 'temp').length
-      analyzeCache.plan.toolCount = analyzeCache.plan.repos.filter(r => r.role === 'tool').length
+      const roleCounts2 = countBy(analyzeCache.plan.repos, 'role')
+      analyzeCache.plan.mainCount = roleCounts2.main || 0
+      analyzeCache.plan.tempCount = roleCounts2.temp || 0
+      analyzeCache.plan.toolCount = roleCounts2.tool || 0
       // 更新 projects（只有找到 localPath 的才生成 CLAUDE.md）
       const { getClaudeMdType } = await import('../lib/config-classifier.mjs')
       analyzeCache.plan.projects = analyzeCache.plan.repos

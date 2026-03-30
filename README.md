@@ -459,7 +459,7 @@ GH_API_TIMEOUT=15000
 ECC_SOURCES=everything-claude-code|affaan-m/everything-claude-code|10
 
 # AI 並發數
-AI_CONCURRENCY=3
+AI_CONCURRENCY=5
 
 # Slack 通知
 SLACK_NOTIFY_CHANNEL=

@@ -223,20 +223,8 @@ async function main() {
     const repos = await interactiveRepoSelect(prev)
     if (repos === BACK) break
 
-    // 專案文件夾：首次詢問，之後用 session 記憶
-    if (!projectFolders.length) {
-      const foldersInput = handleCancel(await p.text({
-        message: '專案文件夾（逗號分隔，Enter 跳過用 Spotlight 自動搜索）',
-        placeholder: '~/Kkday, ~/Projects, ~/Work',
-        defaultValue: '',
-      }))
-      if (foldersInput && foldersInput !== BACK) {
-        projectFolders = foldersInput.split(',')
-          .map(s => s.trim())
-          .filter(Boolean)
-          .map(f => ({ path: f, role: 'auto' }))
-      }
-    }
+    // 本機路徑偵測：fd 全自動，不需要用戶輸入文件夾
+    // projectFolders 仍支持 config.json 配置（用於角色覆蓋）
 
     // 角色分類：自動預判 + 選單調整（循環直到確認）
     const { determineRole } = await import('../lib/config-classifier.mjs')

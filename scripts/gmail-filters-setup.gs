@@ -109,42 +109,58 @@ function applyToExisting() {
 // ─────────────────────────────────────────
 function buildRules(labelIds) {
   return [
-    // TIER 0 — GitHub noise（留收件匣 + 加標籤辨識）
+    // ══════════════════════════════════════════════════
+    // TIER 0 — GitHub/CI noise（加標籤 + 移除 IMPORTANT）
+    // Gmail 自動把 GitHub 通知標為 IMPORTANT，需要矯正
+    // ══════════════════════════════════════════════════
     { desc: "GitHub PR / CI / bot", criteria: { from: "notifications@github.com OR noreply@github.com" },
-      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: [] } },
+      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: ["IMPORTANT"] } },
     { desc: "Dependabot / Renovate", criteria: { from: "dependabot[bot] OR renovate-bot OR renovateapp.com" },
-      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: [] } },
+      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: ["IMPORTANT"] } },
     { desc: "GitLab / Bitbucket", criteria: { from: "gitlab.com OR bitbucket.org" },
-      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: [] } },
+      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: ["IMPORTANT"] } },
     { desc: "CI/CD services", criteria: { from: "circleci.com OR travis-ci.com OR buildkite.com OR semaphoreci.com" },
-      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: [] } },
+      action: { addLabelIds: [labelIds["github/noise"]], removeLabelIds: ["IMPORTANT"] } },
 
-    // TIER 1 — SaaS bot（留收件匣 + 加標籤辨識）
-    { desc: "Jira / Confluence", criteria: { from: "jira@ OR confluence@ OR atlassian.net" },
-      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
+    // ══════════════════════════════════════════════════
+    // TIER 1 — SaaS bot（加標籤 + 移除 IMPORTANT）
+    // ══════════════════════════════════════════════════
+    { desc: "Jira / Confluence digests", criteria: { from: "jira@ OR confluence@ OR atlassian.net" },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: ["IMPORTANT"] } },
     { desc: "Slack notifications", criteria: { from: "slack.com" },
-      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
-    { desc: "Notion / Linear / Figma / Sentry", criteria: { from: "notion.so OR linear.app OR figma.com OR sentry.io" },
-      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: ["IMPORTANT"] } },
+    { desc: "Notion / Linear / Sentry marketing", criteria: { from: "notion.so OR linear.app OR sentry.io" },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: ["IMPORTANT"] } },
     { desc: "Datadog / PagerDuty / OpsGenie", criteria: { from: "datadoghq.com OR pagerduty.com OR opsgenie.com" },
-      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: ["IMPORTANT"] } },
     { desc: "npm / package registry", criteria: { from: "npmjs.com OR pypi.org" },
-      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: [] } },
+      action: { addLabelIds: [labelIds["auto/skip"]], removeLabelIds: ["IMPORTANT"] } },
 
-    // TIER 2 — info_only（留收件匣 + 加標籤）
-    // 自訂：加入你的公司 noreply / it 信箱
-    { desc: "Company announcements", criteria: { subject: "[全員公告] OR [All Staff] OR [公司公告] OR [Company Notice] OR [Company Update]" },
+    // ══════════════════════════════════════════════════
+    // TIER 2 — info（公告、系統通知、設計稿）
+    // ══════════════════════════════════════════════════
+    { desc: "IT system notifications", criteria: { from: "it@kkday.com OR noreply@kkday.com OR no-reply@kkday.com" },
+      action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: ["IMPORTANT"] } },
+    { desc: "Company announcements", criteria: { subject: "[全員公告] OR [All Staff] OR [公司公告] OR [Company Notice] OR [HR Announcement] OR [人力資源處公告]" },
       action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: [] } },
     { desc: "Receipt / invoice", criteria: { subject: "receipt OR invoice OR billing OR 收據 OR 發票 OR 帳單" },
       action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: [] } },
+    { desc: "Figma ready for dev", criteria: { from: "figma.com" },
+      action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: [] } },
 
-    // TIER 3 — meeting（留收件匣 + 加標籤）
+    // ══════════════════════════════════════════════════
+    // TIER 3 — meeting（行事曆邀請、會議變更）
+    // ══════════════════════════════════════════════════
     { desc: "Calendar invites", criteria: { query: "filename:invite.ics OR filename:*.ics" },
       action: { addLabelIds: [labelIds["auto/meeting"]], removeLabelIds: [] } },
 
-    // TIER 4 — action_required（IMPORTANT + STARRED + action/required 標籤）
-    // 自訂：加入你的 HR / 主管 / 財務信箱
-    { desc: "HR keywords", criteria: { subject: "薪資 OR 考績 OR 績效 OR 調薪 OR offer OR 合約 OR 請假 OR 假單 OR onboarding OR offboarding OR 離職 OR performance review OR salary" },
+    // ══════════════════════════════════════════════════
+    // TIER 4 — action_required（需要行動的重要郵件）
+    // 最後執行，IMPORTANT + STARRED 會覆蓋前面的移除
+    // ══════════════════════════════════════════════════
+    { desc: "HR team direct", criteria: { from: "hr@kkday.com OR people@kkday.com OR payroll@kkday.com" },
+      action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
+    { desc: "HR / payroll keywords", criteria: { subject: "薪資 OR Payroll OR 考績 OR 績效 OR 調薪 OR offer OR 請假 OR 假單 OR onboarding OR offboarding OR 離職 OR performance review OR salary OR Bonus OR 年終 OR 晉升 OR promotion" },
       action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
     { desc: "Finance / expense", criteria: { subject: "報帳 OR 費用申請 OR 核銷 OR expense OR reimbursement OR 審核通過 OR 請款" },
       action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },

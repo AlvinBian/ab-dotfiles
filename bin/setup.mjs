@@ -6,24 +6,24 @@
  */
 
 import * as p from '@clack/prompts'
-import pc from 'picocolors'
-import { countBy, sumBy } from 'lodash-es'
 import fs from 'fs'
+import { countBy } from 'lodash-es'
 import path from 'path'
-import { getDirname } from '../lib/core/paths.mjs'
-import { handleCancel, smartSelect, BACK } from '../lib/cli/prompts.mjs'
+import pc from 'picocolors'
+import { BACK, handleCancel, smartSelect } from '../lib/cli/prompts.mjs'
 import { phaseHeader } from '../lib/cli/task-runner.mjs'
+import { detectLegacyInstallation, runUpgrade } from '../lib/config/upgrade.mjs'
 import { cleanOldBackups } from '../lib/core/backup.mjs'
-import { loadSession } from '../lib/core/session.mjs'
 import { env } from '../lib/core/env.mjs'
-import { warmupCli } from '../lib/external/claude-cli.mjs'
+import { getDirname } from '../lib/core/paths.mjs'
+import { loadSession } from '../lib/core/session.mjs'
 import { ensureEnvironment } from '../lib/detect/doctor.mjs'
 import { interactiveRepoSelect } from '../lib/detect/repo-select.mjs'
+import { warmupCli } from '../lib/external/claude-cli.mjs'
 import { phaseAnalyze } from '../lib/phases/phase-analyze.mjs'
-import { phasePlan } from '../lib/phases/phase-plan.mjs'
-import { phaseExecute } from '../lib/phases/phase-execute.mjs'
 import { phaseComplete } from '../lib/phases/phase-complete.mjs'
-import { detectLegacyInstallation, runUpgrade } from '../lib/config/upgrade.mjs'
+import { phaseExecute } from '../lib/phases/phase-execute.mjs'
+import { phasePlan } from '../lib/phases/phase-plan.mjs'
 
 const __dirname = getDirname(import.meta)
 const REPO = path.resolve(__dirname, '..')

@@ -1,10 +1,10 @@
 /**
  * Gmail 5-Tier Filter Setup（通用化版本）
  *
- * Tier 0  github/noise   → 歸檔靜音（PR、CI、bot）
- * Tier 1  auto/skip      → 歸檔靜音（SaaS bot、促銷）
- * Tier 2  auto/info      → 留在收件匣但不標重要（公司公告、CC）
- * Tier 3  auto/meeting   → 留在收件匣（行事曆邀請）
+ * Tier 0  github/noise   → 歸檔靜音 + 標籤（PR、CI、bot）
+ * Tier 1  auto/skip      → 歸檔靜音 + 標籤（SaaS bot、促銷）
+ * Tier 2  auto/info      → 留在收件匣 + 標籤，移除 IMPORTANT（公司公告、CC）
+ * Tier 3  auto/meeting   → 留在收件匣 + 標籤（行事曆邀請）
  * Tier 4  action_required → 標 IMPORTANT + STARRED（HR、主管、財務審核）
  *
  * 使用方式：
@@ -21,7 +21,7 @@ function setupAllFilters() {
   const rules = [
 
     // ══════════════════════════════════════
-    // TIER 0 — GitHub noise（最優先）
+    // TIER 0 — GitHub noise（歸檔 + github/noise 標籤）
     // ══════════════════════════════════════
     {
       desc: "GitHub PR / CI / bot — all noise",
@@ -42,66 +42,103 @@ function setupAllFilters() {
     {
       desc: "GitLab / Bitbucket",
       criteria: { from: "gitlab.com OR bitbucket.org" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], markRead: true }
+      action: {
+        removeLabelIds: ["INBOX", "IMPORTANT"],
+        addLabelIds: [labelIds["github/noise"]],
+      }
     },
     {
       desc: "CI/CD services (CircleCI, Travis, Buildkite)",
       criteria: { from: "circleci.com OR travis-ci.com OR buildkite.com OR semaphoreci.com" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], markRead: true }
+      action: {
+        removeLabelIds: ["INBOX", "IMPORTANT"],
+        addLabelIds: [labelIds["github/noise"]],
+      }
     },
 
     // ══════════════════════════════════════
-    // TIER 1 — skip（SaaS bot、促銷）
+    // TIER 1 — skip（歸檔 + auto/skip 標籤）
     // ══════════════════════════════════════
     {
       desc: "Jira / Confluence bot",
       criteria: { from: "jira@ OR confluence@ OR atlassian.net" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], markRead: true }
+      action: {
+        removeLabelIds: ["INBOX", "IMPORTANT"],
+        addLabelIds: [labelIds["auto/skip"]],
+      }
     },
     {
       desc: "Slack email notifications",
       criteria: { from: "slack.com" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], markRead: true }
+      action: {
+        removeLabelIds: ["INBOX", "IMPORTANT"],
+        addLabelIds: [labelIds["auto/skip"]],
+      }
     },
     {
       desc: "Notion / Linear / Figma / Sentry bot",
       criteria: { from: "notion.so OR linear.app OR figma.com OR sentry.io" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], markRead: true }
+      action: {
+        removeLabelIds: ["INBOX", "IMPORTANT"],
+        addLabelIds: [labelIds["auto/skip"]],
+      }
     },
     {
       desc: "Datadog / PagerDuty / OpsGenie alerts",
       criteria: { from: "datadoghq.com OR pagerduty.com OR opsgenie.com" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], markRead: true }
+      action: {
+        removeLabelIds: ["INBOX", "IMPORTANT"],
+        addLabelIds: [labelIds["auto/skip"]],
+      }
     },
     {
       desc: "npm / package registry notifications",
       criteria: { from: "npmjs.com OR pypi.org" },
-      action: { removeLabelIds: ["INBOX", "IMPORTANT"], markRead: true }
+      action: {
+        removeLabelIds: ["INBOX", "IMPORTANT"],
+        addLabelIds: [labelIds["auto/skip"]],
+      }
     },
 
     // ══════════════════════════════════════
-    // TIER 2 — info_only（公司公告、全員信）
-    // 留收件匣，但移除 IMPORTANT
+    // TIER 2 — info_only（留收件匣 + auto/info 標籤，移除 IMPORTANT）
     //
     // 自訂：加入你的公司 noreply / it 信箱，例如：
     //   { desc: "IT system notice",
     //     criteria: { from: "it@yourcompany.com OR noreply@yourcompany.com" },
-    //     action: { removeLabelIds: ["IMPORTANT"], addLabelIds: [] } },
+    //     action: { removeLabelIds: ["IMPORTANT"], addLabelIds: [labelIds["auto/info"]] } },
     // ══════════════════════════════════════
     {
       desc: "Company-wide announcement subjects (通用關鍵字)",
       criteria: { subject: "[全員公告] OR [All Staff] OR [公司公告] OR [Company Notice] OR [Company Update]" },
-      action: { removeLabelIds: ["IMPORTANT"], addLabelIds: [] }
+      action: {
+        removeLabelIds: ["IMPORTANT"],
+        addLabelIds: [labelIds["auto/info"]],
+      }
     },
     {
       desc: "Receipt / invoice / billing",
       criteria: { subject: "receipt OR invoice OR billing OR 收據 OR 發票 OR 帳單" },
-      action: { removeLabelIds: ["IMPORTANT"], addLabelIds: [] }
+      action: {
+        removeLabelIds: ["IMPORTANT"],
+        addLabelIds: [labelIds["auto/info"]],
+      }
     },
 
     // ══════════════════════════════════════
-    // TIER 4 — action_required（最後設定，覆蓋前面規則）
-    // 加 IMPORTANT + STARRED
+    // TIER 3 — meeting_info（留收件匣 + auto/meeting 標籤）
+    // ══════════════════════════════════════
+    {
+      desc: "Calendar invites",
+      criteria: { query: "filename:invite.ics OR filename:*.ics" },
+      action: {
+        addLabelIds: [labelIds["auto/meeting"]],
+        removeLabelIds: [],
+      }
+    },
+
+    // ══════════════════════════════════════
+    // TIER 4 — action_required（標 IMPORTANT + STARRED）
     //
     // 自訂：加入你的 HR / 主管 / 財務信箱，例如：
     //   { desc: "HR team",

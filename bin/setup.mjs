@@ -74,7 +74,7 @@ async function main() {
   // Splash
   console.log()
   if (prev) {
-    p.intro(` ab-dotfiles v${APP_VERSION} — 上次：${prev.repos?.length || '?'} repos · ${prev.techStacks?.length || '?'} stacks · ${prev.timestamp?.slice(0, 10) || ''} `)
+    p.intro(` ab-dotfiles v${APP_VERSION} — 上次：${prev.repos?.length ?? 0} repos · ${prev.techStacks?.length ?? 0} stacks · ${prev.timestamp?.slice(0, 10) || ''} `)
   } else {
     p.intro(` ab-dotfiles v${APP_VERSION} 安裝精靈 `)
   }

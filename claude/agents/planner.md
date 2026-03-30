@@ -15,7 +15,7 @@ description: >
   assistant: "用 planner 分析現狀並規劃重構步驟。"
   </example>
 
-model: sonnet
+model: opus
 color: yellow
 tools: ["Read", "Grep", "Glob", "Bash"]
 matchWhen:

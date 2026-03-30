@@ -14,6 +14,8 @@
     "scan": "node bin/scan.mjs",
     "restore": "node bin/restore.mjs",
     "restore-original": "node bin/restore-original.mjs",
+    "uninstall": "node bin/uninstall.mjs",
+    "hooks": "node bin/hooks.mjs",
     "backup-original": "node bin/backup-original.mjs",
     "doctor": "node -e \"import('./lib/doctor.mjs').then(m => m.ensureEnvironment())\"",
     "workspace": "bash scripts/generate-workspace.sh",

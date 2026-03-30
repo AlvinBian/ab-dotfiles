@@ -183,33 +183,56 @@ async function main() {
       }
     }
 
-    // 角色分類：AI 預判 + 用戶確認
+    // 角色分類：兩步選擇 ⭐主力 → 🔧工具 → 其餘🔄臨時
     const { determineRole } = await import('../lib/config-classifier.mjs')
-    const roleItems = repos.map(r => {
-      const autoRole = determineRole(r)
-      const icon = autoRole === 'main' ? '⭐' : '🔄'
+
+    // Step 1: 選⭐主力
+    const mainItems = repos.map(r => {
       const info = r.commits > 0 ? `${r.commits} commits` : ''
-      return {
-        value: r.fullName,
-        label: `${icon} ${r.fullName.split('/')[1]}`,
-        hint: `${autoRole === 'main' ? '主力' : '臨時'}${info ? ` · ${info}` : ''}`,
-      }
+      return { value: r.fullName, label: r.fullName.split('/')[1], hint: info }
     })
     const mainPreselected = repos.filter(r => determineRole(r) === 'main').map(r => r.fullName)
 
     const mainRepoNames = await smartSelect({
       title: '⭐ 主力 repos（完整 CLAUDE.md + AI 生成）',
-      items: roleItems,
+      items: mainItems,
       preselected: mainPreselected,
       autoSelectThreshold: 0,
     })
     if (mainRepoNames === BACK) continue
 
-    // 寫入角色到 repos 物件
+    // Step 2: 從剩餘中選🔧工具（可選，有剩餘才問）
     const mainSet = new Set(mainRepoNames)
-    for (const r of repos) {
-      r._roleOverride = mainSet.has(r.fullName) ? 'main' : 'temp'
+    const remaining = repos.filter(r => !mainSet.has(r.fullName))
+    let toolSet = new Set()
+
+    if (remaining.length > 0) {
+      const toolItems = remaining.map(r => ({
+        value: r.fullName, label: r.fullName.split('/')[1], hint: '不選 = 🔄臨時',
+      }))
+      const toolRepoNames = await smartSelect({
+        title: '🔧 工具 repos（最小配置，可跳過）',
+        items: toolItems,
+        preselected: [],
+        autoSelectThreshold: 0,
+      })
+      if (toolRepoNames !== BACK) {
+        toolSet = new Set(toolRepoNames)
+      }
     }
+
+    // 寫入角色
+    for (const r of repos) {
+      if (mainSet.has(r.fullName)) r._roleOverride = 'main'
+      else if (toolSet.has(r.fullName)) r._roleOverride = 'tool'
+      else r._roleOverride = 'temp'
+    }
+
+    // 摘要
+    const mc = repos.filter(r => r._roleOverride === 'main').length
+    const tc = repos.filter(r => r._roleOverride === 'temp').length
+    const toolc = repos.filter(r => r._roleOverride === 'tool').length
+    p.log.info(`角色分配：${mc} ⭐主力 · ${tc} 🔄臨時${toolc ? ` · ${toolc} 🔧工具` : ''}`)
 
     // 自動分析（快取：repos + 角色沒變就不重跑）
     const reposKey = repos.map(r => `${r.fullName}:${r._roleOverride}`).sort().join(',')
@@ -227,6 +250,7 @@ async function main() {
       // 重算計數
       analyzeCache.plan.mainCount = analyzeCache.plan.repos.filter(r => r.role === 'main').length
       analyzeCache.plan.tempCount = analyzeCache.plan.repos.filter(r => r.role === 'temp').length
+      analyzeCache.plan.toolCount = analyzeCache.plan.repos.filter(r => r.role === 'tool').length
       // 更新 projects（只有找到 localPath 的才生成 CLAUDE.md）
       const { getClaudeMdType } = await import('../lib/config-classifier.mjs')
       analyzeCache.plan.projects = analyzeCache.plan.repos

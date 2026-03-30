@@ -290,14 +290,16 @@ async function main() {
       })
       if (selected === BACK) continue
 
-      // 選中的歸入 targetRole，其餘不動（除非被搶走）
+      // 選中的歸入 targetRole，從該角色移除的降級
       const selectedSet = new Set(selected)
+      // 降級映射：從 main 移除 → temp，從 temp 移除 → tool，從 tool 移除 → temp
+      const demoteMap = { main: 'temp', temp: 'tool', tool: 'temp' }
       for (const r of repos) {
         if (selectedSet.has(r.fullName)) {
           roles[r.fullName] = targetRole
         } else if (roles[r.fullName] === targetRole) {
-          // 從該角色中移除的，回到自動判定
-          roles[r.fullName] = determineRole(r)
+          // 用戶明確移除，降級而不是重新自動判定
+          roles[r.fullName] = demoteMap[targetRole]
         }
       }
     }

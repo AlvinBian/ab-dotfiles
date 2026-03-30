@@ -80,12 +80,14 @@ async function main() {
 
   // 舊版安裝偵測
   const legacyInfo = detectLegacyInstallation()
+  let justUpgraded = false
   if (legacyInfo.hasLegacy) {
     const upgradeResult = await runUpgrade(legacyInfo)
     if (upgradeResult === 'cleaned') {
       prev = null
       projectFolders = [] // 清除後重新詢問文件夾
     }
+    justUpgraded = true // 不論哪種升級結果，都跳過 reinstall 快速路徑
   }
 
   // --quick + --dry-run 衝突檢查
@@ -141,7 +143,7 @@ async function main() {
   }
 
   // 重入
-  if (prev && !flagAll && !flagQuick) {
+  if (prev && !flagAll && !flagQuick && !justUpgraded) {
     const action = handleCancel(await p.select({
       message: `上次安裝：${prev.repos?.length || '?'} repos · ${prev.installMode || 'full'}`,
       options: [
@@ -371,8 +373,8 @@ async function main() {
     }
     } // end if (needsRepos)
 
-    // 不需要 repos 時建一個最小 plan
-    if (!needsRepos && !analyzeCache) {
+    // 不需要 repos，或 repos 為空（GitHub 無倉庫）時建最小 plan
+    if (!analyzeCache) {
       const { generateInstallPlan } = await import('../lib/config/auto-plan.mjs')
       analyzeCache = {
         key: 'no-repos',

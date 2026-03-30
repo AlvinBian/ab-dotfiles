@@ -33,6 +33,11 @@ function loadConfig() {
   return fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')) : { targets: {} }
 }
 
+function loadProjectFolders(config, session) {
+  // 優先用 config.json 的 projectFolders，再用 session 保存的
+  return config.projectFolders || session?.projectFolders || []
+}
+
 function loadSources(configSources) {
   const eccEnv = env('ECC_SOURCES', '')
   if (!eccEnv) return configSources || []
@@ -49,6 +54,7 @@ async function main() {
   const config = loadConfig()
   const targets = config.targets || {}
   const sources = loadSources(config.sources)
+  const projectFolders = loadProjectFolders(config, prev)
   const args = process.argv.slice(2)
   const flagAll = args.includes('--all')
   const flagManual = args.includes('--manual')
@@ -89,7 +95,7 @@ async function main() {
       pct: 0,
     }))
     phaseHeader('快速分析')
-    const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO })
+    const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
     if (flagManual) plan.mode = 'manual'
 
     phaseHeader('安裝中')
@@ -132,7 +138,7 @@ async function main() {
 
       const repoObjects = (prev.repos || []).map(r => ({ fullName: r, commits: 10, pct: 0 }))
       phaseHeader('快速分析')
-      const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO })
+      const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
 
       phaseHeader('安裝中')
       const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
@@ -171,7 +177,7 @@ async function main() {
       const repoObjects = repos.map(r => ({ fullName: r, commits: 0, pct: 0 }))
       analyzeCache = {
         key: reposKey,
-        plan: await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO }),
+        plan: await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders }),
       }
     }
 

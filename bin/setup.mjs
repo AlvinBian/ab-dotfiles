@@ -62,6 +62,13 @@ async function main() {
   let prev = loadSession()
   let projectFolders = loadProjectFolders(config, prev)
 
+  // 首次使用：備份原始配置（~/.zshrc、~/.claude/ 等）
+  const { ensureOriginalBackup } = await import('./backup-original.mjs')
+  const origBackup = ensureOriginalBackup()
+  if (origBackup && origBackup.length > 0) {
+    p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
+  }
+
   // Splash
   console.log()
   if (prev) {

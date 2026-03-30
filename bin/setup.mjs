@@ -82,8 +82,14 @@ async function main() {
   if (v1Info.hasV1) {
     const upgradeResult = await runUpgrade(v1Info)
     if (upgradeResult === 'cleaned') {
-      prev = null // 清除後不使用舊 session
+      prev = null
+      projectFolders = [] // 清除後重新詢問文件夾
     }
+  }
+
+  // --quick + --dry-run 衝突檢查
+  if (flagQuick && flagDryRun) {
+    p.log.warn('--quick 和 --dry-run 不能同時使用，已忽略 --dry-run')
   }
 
   // --quick：直接用上次 session 重裝，跳過所有互動
@@ -126,6 +132,7 @@ async function main() {
 
     phaseHeader('完成', 3, 3)
     await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders })
+    p.outro('設定完成')
     return
   }
 
@@ -139,7 +146,7 @@ async function main() {
         { value: 'report', label: '查看上次報告' },
       ],
     }))
-    if (action === BACK) process.exit(0)
+    if (action === BACK) { p.outro('已取消'); process.exit(0) }
     if (action === 'report') {
       const reportPath = path.join(REPO, 'dist', 'report.html')
       if (fs.existsSync(reportPath)) {
@@ -148,6 +155,7 @@ async function main() {
       } else {
         p.log.warn('找不到上次報告')
       }
+      p.outro()
       process.exit(0)
     }
     if (action === 'reinstall') {
@@ -174,6 +182,8 @@ async function main() {
         repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
       }))
 
+      if (flagManual) plan.mode = 'manual'
+
       phaseHeader('安裝中')
       const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
         repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
@@ -182,6 +192,7 @@ async function main() {
 
       phaseHeader('完成', 3, 3)
       await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders })
+      p.outro('設定完成')
       return
     }
   }
@@ -358,6 +369,8 @@ async function main() {
 
     break
   }
+
+  p.outro('設定完成')
 }
 
 main().catch(e => { p.log.error(e.message); process.exit(1) })

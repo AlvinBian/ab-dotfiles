@@ -146,7 +146,7 @@ async function main() {
   // 重入
   if (prev && !flagAll && !flagQuick && !justUpgraded) {
     const action = handleCancel(await p.select({
-      message: `上次安裝：${prev.repos?.length || '?'} repos · ${prev.installMode || 'full'}`,
+      message: `上次安裝：${prev.repos?.length ?? 0} repos · ${prev.installMode || 'full'}`,
       options: [
         { value: 'reinstall', label: '重新安裝（用上次設定）', hint: 'Enter 直接裝' },
         { value: 'adjust', label: '調整設定' },
@@ -189,7 +189,7 @@ async function main() {
         message: '選擇要調整的項目',
         options: [
           { value: 'claude',    label: '重新安裝 Claude 配置', hint: 'commands / agents / rules / hooks' },
-          { value: 'settings',  label: '重新套用全局設定', hint: 'settings.json + keybindings.json' },
+          { value: 'settings',  label: '重新套用全局設定', hint: 'settings.json permissions' },
           { value: 'claudemd',  label: '重新生成 CLAUDE.md', hint: '需 AI 呼叫，約 30 秒' },
           { value: 'zsh',       label: '重新安裝 zsh 模組', hint: 'aliases / git / nvm / fzf...' },
           { value: 'slack',     label: '重新設定 Slack 通知', hint: 'DM / Channel / 關閉' },
@@ -262,7 +262,7 @@ async function main() {
 
   // ── 功能選擇 ──
   const featureChoices = [
-    { value: 'claude', label: 'Claude Code 開發配置', hint: 'commands · agents · rules · hooks · settings · keybindings' },
+    { value: 'claude', label: 'Claude Code 開發配置', hint: 'commands · agents · rules · hooks · settings' },
     { value: 'claudemd', label: '專案 CLAUDE.md', hint: '按 repo 角色 AI 生成到 ~/.claude/projects/' },
     { value: 'ecc', label: 'ECC 外部資源', hint: '社群 commands/agents/rules 融合' },
     { value: 'slack', label: 'Slack 通知', hint: 'P0/P1/P2 分級 + Channel/DM' },

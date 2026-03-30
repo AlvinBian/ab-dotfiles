@@ -184,13 +184,13 @@ async function main() {
     }
 
     // 自動分析（快取：repos 沒變就不重跑）
-    const reposKey = [...repos].sort().join(',')
+    // repos 現在是完整物件陣列（含 fullName/commits/pct/stars）
+    const reposKey = repos.map(r => r.fullName).sort().join(',')
     if (!analyzeCache || analyzeCache.key !== reposKey) {
       phaseHeader('自動分析')
-      const repoObjects = repos.map(r => ({ fullName: r, commits: 0, pct: 0 }))
       analyzeCache = {
         key: reposKey,
-        plan: await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders }),
+        plan: await phaseAnalyze({ repos, sources, baseDir: REPO, projectFolders }),
       }
     }
 

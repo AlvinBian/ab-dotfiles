@@ -16,7 +16,7 @@
 // 入口：執行這個函式
 // ─────────────────────────────────────────
 function setupAllFilters() {
-  createLabelsIfNeeded();
+  var labelIds = createLabelsIfNeeded();
 
   const rules = [
 
@@ -28,8 +28,7 @@ function setupAllFilters() {
       criteria: { from: "notifications@github.com OR noreply@github.com" },
       action: {
         removeLabelIds: ["INBOX", "IMPORTANT"],
-        addLabelIds: ["Label_github_noise"],
-        markRead: true,
+        addLabelIds: [labelIds["github/noise"]],
       }
     },
     {
@@ -37,8 +36,7 @@ function setupAllFilters() {
       criteria: { from: "dependabot[bot] OR renovate-bot OR renovateapp.com" },
       action: {
         removeLabelIds: ["INBOX", "IMPORTANT"],
-        addLabelIds: ["Label_github_noise"],
-        markRead: true,
+        addLabelIds: [labelIds["github/noise"]],
       }
     },
     {
@@ -167,21 +165,26 @@ function createLabelsIfNeeded() {
   ];
 
   const existing = Gmail.Users.Labels.list("me").labels || [];
-  const existingNames = existing.map(l => l.name);
+  const existingMap = {};
+  existing.forEach(l => { existingMap[l.name] = l.id; });
 
+  var labelIds = {};
   wanted.forEach(w => {
-    if (existingNames.includes(w.name)) {
-      Logger.log("exists: " + w.name);
+    if (existingMap[w.name]) {
+      labelIds[w.name] = existingMap[w.name];
+      Logger.log("exists: " + w.name + " → " + existingMap[w.name]);
     } else {
-      Gmail.Users.Labels.create({
+      var created = Gmail.Users.Labels.create({
         name: w.name,
         labelListVisibility: "labelShow",
         messageListVisibility: "show",
         color: w.color,
       }, "me");
-      Logger.log("created: " + w.name);
+      labelIds[w.name] = created.id;
+      Logger.log("created: " + w.name + " → " + created.id);
     }
   });
+  return labelIds;
 }
 
 // ─────────────────────────────────────────
@@ -193,7 +196,7 @@ function buildFilter(criteria, action) {
   if (criteria.to)      f.criteria.to      = criteria.to;
   if (criteria.subject) f.criteria.subject = criteria.subject;
   if (criteria.query)   f.criteria.query   = criteria.query;
-  f.action.addLabelIds    = action.addLabelIds    || [];
+  f.action.addLabelIds    = (action.addLabelIds || []).filter(Boolean);
   f.action.removeLabelIds = action.removeLabelIds || [];
   return f;
 }

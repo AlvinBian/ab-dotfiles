@@ -305,6 +305,8 @@ async function main() {
     if (gmailResult) {
       if (!prev) prev = {}
       prev.gmail = gmailResult
+      const { patchSession } = await import('../lib/core/session.mjs')
+      patchSession({ gmail: gmailResult })
     }
   }
 

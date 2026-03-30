@@ -23,7 +23,7 @@ import { phaseAnalyze } from '../lib/phases/phase-analyze.mjs'
 import { phasePlan } from '../lib/phases/phase-plan.mjs'
 import { phaseExecute } from '../lib/phases/phase-execute.mjs'
 import { phaseComplete } from '../lib/phases/phase-complete.mjs'
-import { detectV1Installation, runUpgrade } from '../lib/upgrade.mjs'
+import { detectLegacyInstallation, runUpgrade } from '../lib/upgrade.mjs'
 
 const __dirname = getDirname(import.meta)
 const REPO = path.resolve(__dirname, '..')
@@ -78,10 +78,10 @@ async function main() {
     p.intro(' ab-dotfiles v2.0 安裝精靈 ')
   }
 
-  // v1 → v2 升級偵測
-  const v1Info = detectV1Installation()
-  if (v1Info.hasV1) {
-    const upgradeResult = await runUpgrade(v1Info)
+  // 舊版安裝偵測
+  const legacyInfo = detectLegacyInstallation()
+  if (legacyInfo.hasLegacy) {
+    const upgradeResult = await runUpgrade(legacyInfo)
     if (upgradeResult === 'cleaned') {
       prev = null
       projectFolders = [] // 清除後重新詢問文件夾

@@ -346,8 +346,12 @@ async function main() {
   const has = (f) => features.includes(f)
   const needsRepos = has('claudemd') || has('ecc') // 需要選 repos 的功能
 
+  // ── 外部服務設定 ──
+  const setupResults = []
+
   // Slack 通知設定
   if (has('slack') && !prev?.slackChannel) {
+    p.log.step(pc.bold('Slack 通知設定'))
     const { setupSlackNotify } = await import('../lib/slack/slack-setup.mjs')
     const slackResult = await setupSlackNotify(prev)
     if (slackResult) {
@@ -359,11 +363,15 @@ async function main() {
       if (!prev) prev = {}
       prev.slackChannel = slackResult.channelId
       prev.slackMode = slackResult.mode
+      setupResults.push(`Slack ${pc.green('✔')} ${slackResult.mode === 'dm' ? 'DM' : `#${slackResult.channelId}`}`)
+    } else {
+      setupResults.push(`Slack ${pc.dim('跳過')}`)
     }
   }
 
   // Gmail 5-Tier 分級設定
   if (has('gmail')) {
+    p.log.step(pc.bold('Gmail 5-Tier 分級設定'))
     const { setupGmailFilters } = await import('../lib/gmail/gmail-setup.mjs')
     const gmailResult = await setupGmailFilters(prev)
     if (gmailResult) {
@@ -371,7 +379,15 @@ async function main() {
       prev.gmail = gmailResult
       const { patchSession } = await import('../lib/core/session.mjs')
       patchSession({ gmail: gmailResult })
+      setupResults.push(`Gmail ${pc.green('✔')} Script ID: ${gmailResult.scriptId.slice(0, 12)}...`)
+    } else {
+      setupResults.push(`Gmail ${pc.dim('跳過')}`)
     }
+  }
+
+  // 外部服務設定摘要
+  if (setupResults.length > 0) {
+    p.log.success(`外部服務設定完成\n${setupResults.map(r => `  ${r}`).join('\n')}`)
   }
 
   // ── Phase loop（支持 BACK）──

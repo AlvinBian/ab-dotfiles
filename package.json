@@ -1,6 +1,6 @@
 {
   "name": "ab-dotfiles",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "開發環境統一管理工具 — Claude Code 配置、技術棧技能庫、zsh 模組、工作區生成",
   "license": "MIT",
   "private": true,
@@ -11,6 +11,7 @@
   },
   "scripts": {
     "setup": "node bin/setup.mjs",
+    "status": "node bin/status.mjs",
     "scan": "node bin/scan.mjs",
     "restore": "node bin/restore.mjs",
     "restore-original": "node bin/restore-original.mjs",

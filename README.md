@@ -150,6 +150,7 @@ pnpm run setup
 | `pnpm run uninstall`          | 移除 ab-dotfiles 管理的所有配置    |
 | `pnpm run hooks`              | 互動式管理個別 hook 啟用/停用      |
 | `pnpm run doctor`             | 環境健康檢查                       |
+| `pnpm run status`             | 查看已安裝配置的健康狀態           |
 | `pnpm run workspace`          | 生成 .code-workspace               |
 | `pnpm run taxonomy:build`     | 重建 awesome-* 分類索引            |
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ab-dotfiles v2.0 統一安裝 CLI
+ * ab-dotfiles v2.1 統一安裝 CLI
  *
  * 3 步流程：選 repos → 確認計畫 → 安裝
  */
@@ -14,6 +14,7 @@ import { BACK, handleCancel, smartSelect } from '../lib/cli/prompts.mjs'
 import { phaseHeader } from '../lib/cli/task-runner.mjs'
 import { detectLegacyInstallation, runUpgrade } from '../lib/config/upgrade.mjs'
 import { cleanOldBackups } from '../lib/core/backup.mjs'
+import { APP_VERSION } from '../lib/core/constants.mjs'
 import { env } from '../lib/core/env.mjs'
 import { getDirname } from '../lib/core/paths.mjs'
 import { loadSession } from '../lib/core/session.mjs'
@@ -73,9 +74,9 @@ async function main() {
   // Splash
   console.log()
   if (prev) {
-    p.intro(` ab-dotfiles v2.0 — 上次：${prev.repos?.length || '?'} repos · ${prev.techStacks?.length || '?'} stacks · ${prev.timestamp?.slice(0, 10) || ''} `)
+    p.intro(` ab-dotfiles v${APP_VERSION} — 上次：${prev.repos?.length || '?'} repos · ${prev.techStacks?.length || '?'} stacks · ${prev.timestamp?.slice(0, 10) || ''} `)
   } else {
-    p.intro(' ab-dotfiles v2.0 安裝精靈 ')
+    p.intro(` ab-dotfiles v${APP_VERSION} 安裝精靈 `)
   }
 
   // 舊版安裝偵測
@@ -149,6 +150,7 @@ async function main() {
       options: [
         { value: 'reinstall', label: '重新安裝（用上次設定）', hint: 'Enter 直接裝' },
         { value: 'adjust', label: '調整設定' },
+        { value: 'status', label: '查看/調整配置', hint: 'Claude / zsh / Slack 健康狀態' },
         { value: 'report', label: '查看上次報告' },
       ],
     }))
@@ -161,7 +163,48 @@ async function main() {
       } else {
         p.log.warn('找不到上次報告')
       }
-      p.outro()
+      p.outro('已關閉')
+      process.exit(0)
+    }
+    if (action === 'status') {
+      // 展示配置健康度，並提供快速調整選項
+      const { getConfigStatus } = await import('../lib/core/config-status.mjs')
+      const {
+        adjustClaude, adjustGlobalSettings, adjustSlack, adjustClaudeMd, adjustZsh, adjustGmail,
+      } = await import('../lib/phases/phase-adjust.mjs')
+
+      const status = getConfigStatus()
+      const { summary, claude, zsh, slack } = status
+      const healthIcon = summary.pct >= 90 ? pc.green('✔') : summary.pct >= 70 ? pc.yellow('⚠') : pc.red('✘')
+      p.log.info(
+        `配置健康度  ${healthIcon} ${pc.bold(summary.pct + '%')} (${summary.ok}/${summary.total})\n` +
+        `  Claude    commands ${claude.installedCommands.length} · agents ${claude.installedAgents.length} · rules ${claude.installedRules.length}` +
+        (claude.missing.length > 0 ? pc.red(` · 缺 ${claude.missing.length} 個`) : '') + '\n' +
+        `  zsh       ${zsh.installed.length}/${zsh.expected.length} 模組` +
+        (zsh.missing.length > 0 ? pc.red(` · 缺 ${zsh.missing.join(', ')}`) : '') + '\n' +
+        `  Slack     ${slack.mode ? pc.cyan(slack.mode) : pc.dim('未設定')}`
+      )
+
+      const adjustAction = handleCancel(await p.select({
+        message: '選擇要調整的項目',
+        options: [
+          { value: 'claude',    label: '重新安裝 Claude 配置', hint: 'commands / agents / rules / hooks' },
+          { value: 'settings',  label: '重新套用全局設定', hint: 'settings.json + keybindings.json' },
+          { value: 'claudemd',  label: '重新生成 CLAUDE.md', hint: '需 AI 呼叫，約 30 秒' },
+          { value: 'zsh',       label: '重新安裝 zsh 模組', hint: 'aliases / git / nvm / fzf...' },
+          { value: 'slack',     label: '重新設定 Slack 通知', hint: 'DM / Channel / 關閉' },
+          { value: 'gmail',     label: '重新設定 Gmail 分級', hint: 'clasp + Apps Script 5-Tier' },
+          { value: 'back',      label: '← 返回' },
+        ],
+      }))
+      if (adjustAction === BACK || adjustAction === 'back') { p.outro('已取消'); process.exit(0) }
+      if (adjustAction === 'claude')   await adjustClaude({ flagAll })
+      if (adjustAction === 'settings') await adjustGlobalSettings()
+      if (adjustAction === 'claudemd') await adjustClaudeMd()
+      if (adjustAction === 'zsh')      await adjustZsh({ flagAll })
+      if (adjustAction === 'slack')    await adjustSlack()
+      if (adjustAction === 'gmail')    await adjustGmail()
+      p.outro('調整完成')
       process.exit(0)
     }
     // 「調整設定」：不自動跳過組織選擇，讓用戶重選一切
@@ -224,8 +267,10 @@ async function main() {
     { value: 'ecc', label: 'ECC 外部資源', hint: '社群 commands/agents/rules 融合' },
     { value: 'slack', label: 'Slack 通知', hint: 'P0/P1/P2 分級 + Channel/DM' },
     { value: 'zsh', label: 'zsh 環境模組', hint: 'aliases · fzf · git · tools · history' },
+    { value: 'gmail', label: 'Gmail 5-Tier 分級', hint: 'clasp + Apps Script 自動過濾' },
   ]
-  const prevFeatures = prev?.features || ['claude', 'claudemd', 'ecc', 'slack', 'zsh']
+  // 首次安裝只預選核心 claude，避免誤覆蓋用戶現有 zsh/Slack 配置
+  const prevFeatures = prev?.features || ['claude']
   const features = handleCancel(await p.multiselect({
     message: '選擇安裝項目（Space 切換，Enter 確認）',
     options: featureChoices,
@@ -253,6 +298,16 @@ async function main() {
     }
   }
 
+  // Gmail 5-Tier 分級設定
+  if (has('gmail')) {
+    const { setupGmailFilters } = await import('../lib/gmail/gmail-setup.mjs')
+    const gmailResult = await setupGmailFilters(prev)
+    if (gmailResult) {
+      if (!prev) prev = {}
+      prev.gmail = gmailResult
+    }
+  }
+
   // ── Phase loop（支持 BACK）──
   let analyzeCache = null
 
@@ -262,7 +317,7 @@ async function main() {
     if (needsRepos) {
       phaseHeader('選擇倉庫', 1, 3)
       repos = await interactiveRepoSelect(prev)
-      if (repos === BACK) break
+      if (repos === BACK) { p.outro('已取消'); return }
     }
 
     // 角色分類（只有選了 repos 的功能才需要）

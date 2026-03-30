@@ -379,7 +379,8 @@ async function main() {
       prev.gmail = gmailResult
       const { patchSession } = await import('../lib/core/session.mjs')
       patchSession({ gmail: gmailResult })
-      setupResults.push(`Gmail ${pc.green('✔')} Script ID: ${gmailResult.scriptId.slice(0, 12)}...`)
+      const filterUrl = 'https://mail.google.com/mail/u/0/#settings/filters'
+      setupResults.push(`Gmail ${pc.green('✔')} ${pc.dim('filters →')} ${pc.cyan(filterUrl)}  ${pc.dim('script →')} ${pc.cyan(gmailResult.scriptUrl)}`)
     } else {
       setupResults.push(`Gmail ${pc.dim('跳過')}`)
     }

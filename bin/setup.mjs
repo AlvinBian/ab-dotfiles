@@ -13,7 +13,7 @@ import { getDirname } from '../lib/utils/paths.mjs'
 import { handleCancel, smartSelect, BACK } from '../lib/ui/prompts.mjs'
 import { phaseHeader } from '../lib/ui/task-runner.mjs'
 import { cleanOldBackups } from '../lib/backup.mjs'
-import { loadSession, checkIncompleteSession } from '../lib/session.mjs'
+import { loadSession } from '../lib/session.mjs'
 import { env } from '../lib/env.mjs'
 import { warmupCli } from '../lib/claude-cli.mjs'
 import { ensureEnvironment } from '../lib/doctor.mjs'
@@ -114,11 +114,11 @@ async function main() {
     phaseHeader('安裝中')
     const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
       repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
-      pipelineResult: null, fetchedSources: null,
+      pipelineResult: plan._pipelineResult || null, fetchedSources: plan._fetchedSources || null,
     })
 
     phaseHeader('完成', 3, 3)
-    await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: null, projectFolders })
+    await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders })
     return
   }
 
@@ -170,11 +170,11 @@ async function main() {
       phaseHeader('安裝中')
       const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
         repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
-        pipelineResult: null, fetchedSources: null,
+        pipelineResult: plan._pipelineResult || null, fetchedSources: plan._fetchedSources || null,
       })
 
       phaseHeader('完成', 3, 3)
-      await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: null, projectFolders })
+      await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders })
       return
     }
   }

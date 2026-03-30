@@ -115,14 +115,15 @@ pnpm run setup
   │   └─ 生成安裝計畫
   ├─ Step 2：確認安裝計畫
   │   └─ 全部安裝 / 逐項確認 / 精簡安裝
-  ├─ 安裝（listr2 7 步）
-  │   ├─ [1/7] 備份現有配置
-  │   ├─ [2/7] 全局配置（settings + keybindings）
-  │   ├─ [3/7] Claude 安裝（commands + agents + rules + hooks）
-  │   ├─ [4/7] ECC + Stacks
-  │   ├─ [5/7] Plugin 打包
-  │   ├─ [6/7] zsh 模組
-  │   └─ [7/7] 驗證安裝完整性
+  ├─ 安裝（listr2 8 步）
+  │   ├─ [1/8] 備份現有配置
+  │   ├─ [2/8] 全局配置（settings + keybindings）
+  │   ├─ [3/8] Claude 安裝（commands + agents + rules + hooks）
+  │   ├─ [4/8] ECC + Stacks
+  │   ├─ [5/8] Plugin 打包
+  │   ├─ [6/8] zsh 模組
+  │   ├─ [7/8] CLAUDE.md 生成
+  │   └─ [8/8] 驗證安裝完整性
   └─ Step 3：完成
       ├─ 安裝摘要 + 快速上手
       └─ HTML 報告（5 Tab + ECharts）

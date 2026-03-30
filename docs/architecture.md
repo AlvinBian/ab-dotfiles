@@ -23,13 +23,14 @@ bin/setup.mjs（Orchestrator）
 │  └─ 安裝全部 / 逐項確認 / 精簡安裝
 │
 ├─ 安裝  lib/phases/phase-execute.mjs（listr2）
-│  ├─ [1/7] 備份          ← lib/backup.mjs
-│  ├─ [2/7] 全局配置      ← lib/deploy/deploy-global.mjs
-│  ├─ [3/7] Claude 安裝   ← lib/install/index.mjs
-│  ├─ [4/7] ECC + Stacks  ← lib/source-sync.mjs + bin/scan.mjs
-│  ├─ [5/7] Plugin 打包
-│  ├─ [6/7] zsh 模組      ← lib/install/install-modules.mjs
-│  └─ [7/7] 驗證
+│  ├─ [1/8] 備份          ← lib/backup.mjs
+│  ├─ [2/8] 全局配置      ← lib/deploy/deploy-global.mjs
+│  ├─ [3/8] Claude 安裝   ← lib/install/index.mjs
+│  ├─ [4/8] ECC + Stacks  ← lib/source-sync.mjs + bin/scan.mjs
+│  ├─ [5/8] Plugin 打包
+│  ├─ [6/8] zsh 模組      ← lib/install/install-modules.mjs
+│  ├─ [7/8] CLAUDE.md 生成 ← lib/deploy/generate-claude-md.mjs
+│  └─ [8/8] 驗證
 │
 └─ Step 3：完成  lib/phases/phase-complete.mjs
    ├─ 安裝摘要（列出所有項目）

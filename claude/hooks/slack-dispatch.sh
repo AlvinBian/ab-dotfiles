@@ -13,14 +13,15 @@ set -uo pipefail
 
 # ── 配置 ──────────────────────────────────────────────────────
 
-SCRIPT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-for envfile in "$SCRIPT_DIR/.env" "$HOME/.env"; do
-  [ -f "$envfile" ] && . "$envfile" 2>/dev/null && break
+# 載入 .env
+for envfile in "$HOME/.env" "$HOME/.claude/.env"; do
+  [ -f "$envfile" ] && . "$envfile" 2>/dev/null
 done
 
 LEVEL="${CLAUDE_SLACK_LEVEL:-normal}"
 MIN_SESSION="${CLAUDE_SLACK_MIN_SESSION_SECS:-300}"
-SLACK_DM_ID="${SLACK_DM_CHANNEL:-U04B933M4G6}"
+SLACK_DM_ID="${SLACK_DM_CHANNEL:-}"
+[ -z "$SLACK_DM_ID" ] && exit 0
 STATE_DIR="/tmp/claude-slack"
 SESSION="${CLAUDE_SESSION_ID:-$$}"
 SESSION_SHORT="${SESSION:0:8}"
@@ -55,7 +56,7 @@ is_rate_limited() {
   local lock="$STATE_DIR/rl_${SESSION_SHORT}_${event}"
   if [ -f "$lock" ]; then
     local now=$(date +%s)
-    local mtime=$(stat -f %m "$lock" 2>/dev/null || echo 0)
+    local mtime=$(stat -f %m "$lock" 2>/dev/null || stat -c %Y "$lock" 2>/dev/null || echo 0)
     [ $(( now - mtime )) -lt "$cooldown" ] && return 0
   fi
   touch "$lock"

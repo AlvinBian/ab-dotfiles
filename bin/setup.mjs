@@ -79,16 +79,16 @@ async function main() {
     p.intro(` ab-dotfiles v${APP_VERSION} 安裝精靈 `)
   }
 
-  // 舊版安裝偵測
-  const legacyInfo = detectLegacyInstallation()
-  let justUpgraded = false
-  if (legacyInfo.hasLegacy) {
-    const upgradeResult = await runUpgrade(legacyInfo)
-    if (upgradeResult === 'cleaned') {
-      prev = null
-      projectFolders = [] // 清除後重新詢問文件夾
+  // 舊版安裝偵測（延後到用戶選擇安裝/調整後再執行）
+  async function runLegacyCheckIfNeeded() {
+    const legacyInfo = detectLegacyInstallation()
+    if (legacyInfo.hasLegacy) {
+      const upgradeResult = await runUpgrade(legacyInfo)
+      if (upgradeResult === 'cleaned') {
+        prev = null
+        projectFolders = []
+      }
     }
-    justUpgraded = true // 不論哪種升級結果，都跳過 reinstall 快速路徑
   }
 
   // --quick + --dry-run 衝突檢查
@@ -144,7 +144,7 @@ async function main() {
   }
 
   // 重入
-  if (prev && !flagAll && !flagQuick && !justUpgraded) {
+  if (prev && !flagAll && !flagQuick) {
     const action = handleCancel(await p.select({
       message: `上次安裝：${prev.repos?.length ?? 0} repos · ${prev.installMode || 'full'}`,
       options: [
@@ -209,9 +209,11 @@ async function main() {
     }
     // 「調整設定」：不自動跳過組織選擇，讓用戶重選一切
     if (action === 'adjust') {
+      await runLegacyCheckIfNeeded()
       prev = { ...prev, org: null } // 清除 org 讓 interactiveRepoSelect 重新問
     }
     if (action === 'reinstall') {
+      await runLegacyCheckIfNeeded()
       // 等同 --quick
       if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
       phaseHeader('環境檢查')
@@ -254,6 +256,9 @@ async function main() {
   }
 
   if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
+
+  // 舊配置偵測（新安裝流程入口）
+  await runLegacyCheckIfNeeded()
 
   // 環境檢查
   phaseHeader('環境檢查')

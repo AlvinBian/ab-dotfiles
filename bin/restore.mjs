@@ -91,11 +91,15 @@ async function main() {
     else if (item === 'claude') dest = path.join(HOME, '.claude')
     else dest = path.join(HOME, `.${item}`)
 
-    const stat = fs.statSync(src)
-    if (stat.isDirectory()) {
-      cpDir(src, dest)
-    } else {
-      fs.copyFileSync(src, dest)
+    try {
+      const stat = fs.statSync(src)
+      if (stat.isDirectory()) {
+        cpDir(src, dest)
+      } else {
+        fs.copyFileSync(src, dest)
+      }
+    } catch (err) {
+      p.log.warn(`還原 ${item} 失敗：${err.message}`)
     }
   }
 

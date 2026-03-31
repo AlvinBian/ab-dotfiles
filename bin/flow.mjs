@@ -74,7 +74,6 @@ function generateHTML(charts) {
       </div>
       <div class="chart-body">
         <div class="zoom-controls">
-          <button class="zoom-btn" onclick="popOut('${c.name}')" title="獨立視窗">⧉</button>
           <button class="zoom-btn" onclick="openModal('${c.name}')" title="全螢幕">⛶</button>
           <button class="zoom-btn" onclick="zoomIn('${c.name}')" title="放大">+</button>
           <button class="zoom-btn" onclick="zoomOut('${c.name}')" title="縮小">−</button>

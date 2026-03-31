@@ -374,14 +374,26 @@ async function main() {
       const tc = roleCounts.temp || 0
       const toolc = roleCounts.tool || 0
 
-      // 顯示當前分配（⭐主力 → 🔄臨時 → 🔧工具）
+      // 顯示當前分配 — 按組織分組（⭐主力 → 🔄臨時 → 🔧工具）
       const ROLE_ORDER = { main: 0, temp: 1, tool: 2 }
-      const sortedRepos = [...repos].sort((a, b) => (ROLE_ORDER[roles[a.fullName]] ?? 9) - (ROLE_ORDER[roles[b.fullName]] ?? 9))
-      const summary = sortedRepos.map(r => {
-        const icon = roles[r.fullName] === 'main' ? '⭐' : roles[r.fullName] === 'tool' ? '🔧' : '🔄'
-        return `  ${icon} ${r.fullName.split('/')[1]}`
-      }).join('\n')
-      p.log.info(`角色分配（${mc} ⭐主力 · ${tc} 🔄臨時${toolc ? ` · ${toolc} 🔧工具` : ''}）\n${summary}`)
+      const byOrg = {}
+      for (const r of repos) {
+        const org = r.fullName.split('/')[0]
+        if (!byOrg[org]) byOrg[org] = []
+        byOrg[org].push(r)
+      }
+      for (const org of Object.keys(byOrg)) {
+        byOrg[org].sort((a, b) => (ROLE_ORDER[roles[a.fullName]] ?? 9) - (ROLE_ORDER[roles[b.fullName]] ?? 9))
+      }
+      const summaryLines = []
+      for (const [org, orgRepos] of Object.entries(byOrg)) {
+        summaryLines.push(`  ${org}`)
+        for (const r of orgRepos) {
+          const icon = roles[r.fullName] === 'main' ? '⭐' : roles[r.fullName] === 'tool' ? '🔧' : '🔄'
+          summaryLines.push(`    ${icon} ${r.fullName.split('/')[1]}`)
+        }
+      }
+      p.log.info(`角色分配（${mc} ⭐主力 · ${tc} 🔄臨時${toolc ? ` · ${toolc} 🔧工具` : ''}）\n${summaryLines.join('\n')}`)
 
       const action = handleCancel(await p.select({
         message: '角色分配',

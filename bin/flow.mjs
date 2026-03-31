@@ -72,17 +72,9 @@ function generateHTML(charts) {
         <p class="chart-desc">${c.description}</p>
         ${linkHTML}
       </div>
-      <div class="chart-body">
-        <div class="zoom-controls">
-          <button class="zoom-btn" onclick="openModal('${c.name}')" title="全螢幕">⛶</button>
-          <button class="zoom-btn" onclick="zoomIn('${c.name}')" title="放大">+</button>
-          <button class="zoom-btn" onclick="zoomOut('${c.name}')" title="縮小">−</button>
-          <button class="zoom-btn" onclick="zoomReset('${c.name}')" title="重置">⟲</button>
-        </div>
-        <div class="panzoom-container" id="pz-${c.name}">
-          <div class="mermaid">
+      <div class="chart-body" onclick="openModal('${c.name}')" title="點擊放大">
+        <div class="mermaid" id="mmd-${c.name}">
 ${c.mermaid}
-          </div>
         </div>
       </div>
     </section>`
@@ -148,17 +140,15 @@ ${c.mermaid}
     }
     .mermaid { display: flex; justify-content: center; min-height: 200px; }
     .mermaid svg { max-width: 100%; height: auto; }
-    .zoom-controls {
-      position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 5;
+    .chart-body { position: relative; overflow: hidden; cursor: pointer; }
+    .chart-body:hover { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 0 0 12px 12px; }
+    .chart-body::after {
+      content: '點擊放大'; position: absolute; top: 8px; right: 12px;
+      font-size: 0.7rem; color: var(--dim); background: var(--card);
+      padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);
+      opacity: 0; transition: opacity 0.2s;
     }
-    .zoom-btn {
-      width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 4px;
-      background: var(--card); color: var(--text); cursor: pointer; font-size: 14px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .chart-body { position: relative; overflow: hidden; }
-    .panzoom-container { cursor: default; }
+    .chart-body:hover::after { opacity: 1; }
 
     footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
 
@@ -218,8 +208,8 @@ ${c.mermaid}
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"></script>
   <script>
     mermaid.initialize({
       startOnLoad: true, theme: 'dark',
@@ -231,7 +221,7 @@ ${c.mermaid}
       flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
     });
 
-    // Active nav highlight on scroll
+    // ── 導航 ──
     const sections = document.querySelectorAll('.chart-section');
     const navItems = document.querySelectorAll('.nav-item');
     const observer = new IntersectionObserver(entries => {
@@ -245,7 +235,6 @@ ${c.mermaid}
     }, { rootMargin: '-20% 0px -70% 0px' });
     sections.forEach(s => observer.observe(s));
 
-    // Smooth scroll for nav links
     document.querySelectorAll('a[href^="#"]').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault();
@@ -254,130 +243,63 @@ ${c.mermaid}
       });
     });
 
-    // @panzoom/panzoom — 拖動 + 滾輪縮放
-    const pzInstances = {};
-    function initPanzoom() {
-      document.querySelectorAll('.panzoom-container').forEach(el => {
-        const id = el.id.replace('pz-', '');
-        const instance = Panzoom(el, {
-          maxScale: 4, minScale: 0.25, step: 0.15,
-          contain: false, cursor: 'default',
-          disablePan: true,
-          excludeClass: 'link-btn',
-        });
-        // Ctrl/Cmd + 滾輪才縮放，普通滾輪正常滾動頁面
-        el.parentElement.addEventListener('wheel', e => {
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            instance.zoomWithWheel(e);
-          }
-        }, { passive: false });
-        pzInstances[id] = instance;
-      });
-    }
-
-    function zoomIn(id) { const p = pzInstances[id]; if (p) p.zoomIn(); }
-    function zoomOut(id) { const p = pzInstances[id]; if (p) p.zoomOut(); }
-    function zoomReset(id) { const p = pzInstances[id]; if (p) p.reset(); }
-
-    // 獨立視窗彈出
-    function popOut(id) {
-      const section = document.getElementById(id);
-      if (!section) return;
-      const title = section.querySelector('h2')?.textContent || id;
-      const mermaidEl = section.querySelector('.mermaid');
-      if (!mermaidEl) return;
-
-      const svg = mermaidEl.querySelector('svg');
-      const svgHtml = svg ? svg.outerHTML : '<p>SVG not rendered yet</p>';
-
-      const w = window.open('', id, 'width=1200,height=800,menubar=no,toolbar=no');
-      w.document.write(\`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>\${title}</title>
-<script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"><\\/script>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#0d1117; color:#e6edf3; font-family:-apple-system,sans-serif; overflow:hidden; }
-  header { padding:0.5rem 1rem; background:#161b22; border-bottom:1px solid #30363d; display:flex; justify-content:space-between; align-items:center; }
-  header h1 { font-size:1rem; color:#58a6ff; }
-  .controls { display:flex; gap:4px; }
-  .btn { width:28px; height:28px; border:1px solid #30363d; border-radius:4px; background:#161b22; color:#e6edf3; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; }
-  .btn:hover { border-color:#58a6ff; color:#58a6ff; }
-  #canvas { width:100vw; height:calc(100vh - 40px); display:flex; align-items:center; justify-content:center; cursor:grab; overflow:hidden; }
-  #canvas svg { max-width:95vw; max-height:90vh; }
-</style></head><body>
-<header>
-  <h1>\${title}</h1>
-  <div class="controls">
-    <button class="btn" onclick="pz.zoomIn()" title="放大">+</button>
-    <button class="btn" onclick="pz.zoomOut()" title="縮小">−</button>
-    <button class="btn" onclick="pz.reset()" title="重置">⟲</button>
-  </div>
-</header>
-<div id="canvas">\${svgHtml}</div>
-<script>
-  var pz = Panzoom(document.getElementById('canvas'), { maxScale:6, minScale:0.2, step:0.15, contain:false, cursor:'grab' });
-  document.getElementById('canvas').addEventListener('wheel', function(e) {
-    if (e.ctrlKey || e.metaKey) { e.preventDefault(); pz.zoomWithWheel(e); }
-  }, { passive:false });
-<\\/script></body></html>\`);
-      w.document.close();
-    }
-
-    function popOutAll() {
-      const ids = Array.from(document.querySelectorAll('.chart-section')).map(s => s.id);
-      let delay = 0;
-      ids.forEach(id => { setTimeout(() => popOut(id), delay); delay += 300; });
-    }
-
-    // Modal 全螢幕
+    // ── 全螢幕 Modal（唯一的互動入口）──
     let modalPz = null;
+    let modalWheelHandler = null;
+
     function openModal(id) {
-      const section = document.getElementById(id);
-      if (!section) return;
-      const svg = section.querySelector('.mermaid svg');
+      const svg = document.querySelector('#mmd-' + id + ' svg');
       if (!svg) return;
 
       const modal = document.getElementById('modal');
-      const container = document.getElementById('modal-panzoom');
-      document.getElementById('modal-title').textContent = section.querySelector('h2').textContent;
+      const viewport = document.getElementById('modal-panzoom');
+      document.getElementById('modal-title').textContent =
+        document.getElementById(id)?.querySelector('h2')?.textContent || id;
 
-      container.innerHTML = '';
+      // 清空 + 建立 wrapper
+      viewport.innerHTML = '';
+      if (modalWheelHandler) viewport.removeEventListener('wheel', modalWheelHandler);
+
       const wrapper = document.createElement('div');
-      wrapper.style.cssText = 'display:inline-block;';
+      wrapper.style.cssText = 'display:inline-block;transform-origin:center center;';
       const clone = svg.cloneNode(true);
-      clone.style.maxWidth = '95vw';
-      clone.style.maxHeight = '85vh';
+      clone.removeAttribute('style');
+      clone.style.maxWidth = '90vw';
+      clone.style.maxHeight = '80vh';
       wrapper.appendChild(clone);
-      container.appendChild(wrapper);
+      viewport.appendChild(wrapper);
 
       modal.classList.add('active');
       document.body.style.overflow = 'hidden';
 
+      // Panzoom：wrapper 可拖動+縮放，viewport 作為固定邊界
       if (modalPz) modalPz.destroy();
-      // Panzoom 綁在 wrapper 上，container 作為 viewport（固定尺寸）
-      modalPz = Panzoom(wrapper, { maxScale: 6, minScale: 0.2, step: 0.15, contain: false, cursor: 'grab' });
-      container.addEventListener('wheel', e => {
-        e.preventDefault();
-        modalPz.zoomWithWheel(e);
-      }, { passive: false });
+      modalPz = Panzoom(wrapper, {
+        maxScale: 5, minScale: 0.3, step: 0.12,
+        contain: false, cursor: 'grab',
+        panOnlyWhenZoomed: false,
+      });
+
+      // 滾輪直接縮放（全螢幕不需要 Ctrl）
+      modalWheelHandler = e => { e.preventDefault(); modalPz.zoomWithWheel(e); };
+      viewport.addEventListener('wheel', modalWheelHandler, { passive: false });
     }
+
     function closeModal() {
-      document.getElementById('modal').classList.remove('active');
+      const modal = document.getElementById('modal');
+      const viewport = document.getElementById('modal-panzoom');
+      modal.classList.remove('active');
       document.body.style.overflow = '';
+      if (modalWheelHandler) { viewport.removeEventListener('wheel', modalWheelHandler); modalWheelHandler = null; }
       if (modalPz) { modalPz.destroy(); modalPz = null; }
     }
+
     function modalZoomIn() { if (modalPz) modalPz.zoomIn(); }
     function modalZoomOut() { if (modalPz) modalPz.zoomOut(); }
     function modalZoomReset() { if (modalPz) modalPz.reset(); }
 
-    // ESC 關閉 modal
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-    // 點擊背景關閉
     document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
-
-    // Init after mermaid renders
-    setTimeout(initPanzoom, 1500);
   </script>
 </body>
 </html>`

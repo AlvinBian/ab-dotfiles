@@ -340,12 +340,13 @@ async function main() {
       const envPath = path.join(REPO, '.env')
       let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
       envContent = envContent
-        .replace(/^SLACK_[A-Z_]+=.*/gm, '')       // 清除所有 SLACK_ 開頭變數（含舊版）
-        .replace(/^CLAUDE_SLACK_[A-Z_]+=.*/gm, '') // 清除所有 CLAUDE_SLACK_ 開頭變數
+        .replace(/^SLACK_[A-Z_]+=.*/gm, '')               // 清除所有 SLACK_ 開頭變數（含舊版）
+        .replace(/^CLAUDE_SLACK_MIN_SESSION_SECS=.*/gm, '') // 清除 session 閾值（重寫）
         .trim()
       envContent += `\nSLACK_NOTIFY_CHANNEL=${slackResult.channelId}\nSLACK_NOTIFY_MODE=${slackResult.mode}`
       if (slackResult.channelName) envContent += `\nSLACK_NOTIFY_CHANNEL_NAME=${slackResult.channelName}`
       if (slackResult.userId) envContent += `\nSLACK_NOTIFY_USER_ID=${slackResult.userId}`
+      envContent += `\nCLAUDE_SLACK_MIN_SESSION_SECS=${env('CLAUDE_SLACK_MIN_SESSION_SECS', '300')}`
       envContent += '\n'
       fs.writeFileSync(envPath, envContent)
       if (!prev) prev = {}

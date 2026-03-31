@@ -494,9 +494,10 @@ AI_CONCURRENCY=Infinity
 # GitHub API 並發數（防止 403）
 GH_CONCURRENCY=8
 
-# Slack 通知
+# Slack 通知（channel | dm | off）
+SLACK_NOTIFY_MODE=off
 SLACK_NOTIFY_CHANNEL=
-SLACK_NOTIFY_MODE=dm
+CLAUDE_SLACK_MIN_SESSION_SECS=300
 ```
 
 ### config.json

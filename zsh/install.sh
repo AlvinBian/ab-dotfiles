@@ -164,9 +164,19 @@ step "部署 ~/.zshrc"
 if [[ -f ~/.zshrc ]]; then
   cp ~/.zshrc "$HOME/.zshrc.backup.$(date +%Y%m%d_%H%M%S)"
   info "原 .zshrc 已備份"
+
+  # 自動遷移：從舊 .zshrc 提取個人設定到 ~/.zshrc.local（不會被覆蓋）
+  if [[ ! -f ~/.zshrc.local ]]; then
+    grep -E '^\s*(export |alias |path\+|PATH=|eval |source )' ~/.zshrc \
+      | grep -v 'ab-dotfiles\|BREW_PREFIX\|PYENV_ROOT\|_zsh_module\|_safe_source\|_command_exists\|\.zsh/modules' \
+      > ~/.zshrc.local 2>/dev/null || true
+    if [[ -s ~/.zshrc.local ]]; then
+      info "個人設定已遷移到 ~/.zshrc.local（$(wc -l < ~/.zshrc.local | tr -d ' ') 行）"
+    fi
+  fi
 fi
 cp "$ZSH_DIR/zshrc" ~/.zshrc
-success "~/.zshrc 部署完成"
+success "~/.zshrc 部署完成（個人設定在 ~/.zshrc.local）"
 
 # ── ~/.ripgreprc ──────────────────────────────────────────────────
 if [[ " ${SELECTED_MODULES[*]} " == *" tools "* ]]; then

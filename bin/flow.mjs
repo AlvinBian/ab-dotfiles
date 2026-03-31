@@ -280,9 +280,12 @@ ${c.mermaid}
         panOnlyWhenZoomed: false,
       });
 
-      // Ctrl/Cmd + 滾輪縮放，普通雙指/滾輪不攔截
+      // pinch-to-zoom（觸控板雙指捏合）+ Ctrl/Cmd+滾輪 = 以光標為中心縮放
       modalWheelHandler = e => {
-        if (e.ctrlKey || e.metaKey) { e.preventDefault(); modalPz.zoomWithWheel(e); }
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          modalPz.zoomWithWheel(e, { animate: false });
+        }
       };
       viewport.addEventListener('wheel', modalWheelHandler, { passive: false });
     }
@@ -296,8 +299,18 @@ ${c.mermaid}
       if (modalPz) { modalPz.destroy(); modalPz = null; }
     }
 
-    function modalZoomIn() { if (modalPz) modalPz.zoomIn(); }
-    function modalZoomOut() { if (modalPz) modalPz.zoomOut(); }
+    function modalZoomIn() {
+      if (!modalPz) return;
+      const vp = document.getElementById('modal-panzoom');
+      const rect = vp.getBoundingClientRect();
+      modalPz.zoomIn({ focal: { x: rect.width / 2, y: rect.height / 2 }, animate: false });
+    }
+    function modalZoomOut() {
+      if (!modalPz) return;
+      const vp = document.getElementById('modal-panzoom');
+      const rect = vp.getBoundingClientRect();
+      modalPz.zoomOut({ focal: { x: rect.width / 2, y: rect.height / 2 }, animate: false });
+    }
     function modalZoomReset() { if (modalPz) modalPz.reset(); }
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });

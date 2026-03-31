@@ -12,6 +12,7 @@
   "scripts": {
     "setup": "node bin/setup.mjs",
     "status": "node bin/status.mjs",
+    "flow": "node bin/flow.mjs",
     "scan": "node bin/scan.mjs",
     "restore": "node bin/restore.mjs",
     "restore-original": "node bin/restore-original.mjs",

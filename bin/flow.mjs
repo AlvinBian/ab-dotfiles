@@ -73,12 +73,18 @@ function generateHTML(charts) {
           `<a href="#${l.target}" class="link-btn">${escHtml(l.label)} →</a>`
         ).join(' ')}</div>` : ''
 
-    // 嵌入 SVG（如果渲染成功）或 fallback 到 mermaid CDN
-    const svgFile = `flows/${c.name}.svg`
-    const hasSvg = fs.existsSync(path.join(OUTPUT_DIR, `${c.name}.svg`))
-    const chartContent = hasSvg
-      ? `<img src="${svgFile}" alt="${escHtml(c.title)}" style="max-width:100%;height:auto;" />`
-      : `<div class="mermaid">\n${c.body}\n</div>`
+    // 嵌入 SVG inline（如果渲染成功）或 fallback 到 mermaid CDN
+    const svgPath = path.join(OUTPUT_DIR, `${c.name}.svg`)
+    const hasSvg = fs.existsSync(svgPath)
+    let chartContent
+    if (hasSvg) {
+      let svgContent = fs.readFileSync(svgPath, 'utf8')
+      // 確保 SVG 響應式
+      svgContent = svgContent.replace(/<svg /, '<svg style="max-width:100%;height:auto;" ')
+      chartContent = `<div class="svg-wrap" id="svg-${c.name}">${svgContent}</div>`
+    } else {
+      chartContent = `<div class="mermaid" id="mmd-${c.name}">\n${c.body}\n</div>`
+    }
 
     return `
     <section class="chart-section" id="${c.name}">
@@ -93,9 +99,7 @@ function generateHTML(charts) {
     </section>`
   }).join('\n')
 
-  // Modal 用的 SVG data
-  const svgDataScript = charts.filter(c => fs.existsSync(path.join(OUTPUT_DIR, `${c.name}.svg`)))
-    .map(c => `'${c.name}': 'flows/${c.name}.svg'`).join(',\n      ')
+  // No svgMap needed — SVGs are inline
 
   return `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -159,7 +163,8 @@ function generateHTML(charts) {
       opacity: 0; transition: opacity 0.2s; position: relative; display: none;
     }
     .chart-body:hover::after { display: inline-block; opacity: 1; }
-    .chart-body img { max-width: 100%; height: auto; }
+    .svg-wrap { display: flex; justify-content: center; }
+    .svg-wrap svg { max-width: 100%; height: auto; }
 
     /* Modal */
     .modal-overlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.9); }
@@ -178,7 +183,6 @@ function generateHTML(charts) {
     .modal-body { flex: 1; overflow: hidden; cursor: grab; }
     .modal-body:active { cursor: grabbing; }
     #modal-inner { display: inline-block; transform-origin: 0 0; }
-    #modal-inner img { max-width: 90vw; max-height: 85vh; display: block; }
 
     footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
     @media (max-width: 768px) {
@@ -220,8 +224,6 @@ function generateHTML(charts) {
     ? '<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>\n  <script>mermaid.initialize({ startOnLoad:true, theme:"dark", securityLevel:"loose", themeVariables:{ primaryColor:"#1f6feb", primaryTextColor:"#e6edf3", lineColor:"#8b949e" } });</script>' : ''}
 
   <script>
-    const svgMap = { ${svgDataScript} };
-
     // Nav
     const secs = document.querySelectorAll('.chart-section');
     const navs = document.querySelectorAll('.nav-item');
@@ -258,15 +260,12 @@ function generateHTML(charts) {
       if (wheelH) { body.removeEventListener('wheel', wheelH); wheelH = null; }
       if (pz) { pz.destroy(); pz = null; }
 
-      if (svgMap[id]) {
-        const img = new Image();
-        img.src = svgMap[id];
-        img.style.cssText = 'max-width:90vw;max-height:85vh;display:block;';
-        inner.appendChild(img);
-      } else {
-        const svg = document.querySelector('#mmd-' + id + ' svg, #' + id + ' .mermaid svg');
-        if (svg) inner.appendChild(svg.cloneNode(true));
-      }
+      // 從 inline SVG 克隆
+      const source = document.querySelector('#svg-' + id + ' svg') || document.querySelector('#mmd-' + id + ' svg');
+      if (!source) return;
+      const clone = source.cloneNode(true);
+      clone.style.cssText = 'max-width:90vw;max-height:85vh;display:block;';
+      inner.appendChild(clone);
 
       document.getElementById('modal').classList.add('active');
       document.body.style.overflow = 'hidden';

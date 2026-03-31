@@ -152,9 +152,18 @@ fi
 # zshrc
 if [[ "$ZSHRC_CHANGED" -gt 0 ]]; then
   info "更新 ~/.zshrc"
-  [[ -f ~/.zshrc ]] && cp ~/.zshrc "$HOME/.zshrc.backup.$(date +%Y%m%d_%H%M%S)"
+  if [[ -f ~/.zshrc ]]; then
+    cp ~/.zshrc "$HOME/.zshrc.backup.$(date +%Y%m%d_%H%M%S)"
+    # 自動遷移個人設定到 ~/.zshrc.local（不會被覆蓋）
+    if [[ ! -f ~/.zshrc.local ]]; then
+      grep -E '^\s*(export |alias |path\+|PATH=|eval |source )' ~/.zshrc \
+        | grep -v 'ab-dotfiles\|BREW_PREFIX\|PYENV_ROOT\|_zsh_module\|_safe_source\|_command_exists\|\.zsh/modules' \
+        > ~/.zshrc.local 2>/dev/null || true
+      [[ -s ~/.zshrc.local ]] && info "個人設定已遷移到 ~/.zshrc.local"
+    fi
+  fi
   cp "$REPO_DIR/zsh/zshrc" ~/.zshrc
-  success "~/.zshrc 已更新"
+  success "~/.zshrc 已更新（個人設定在 ~/.zshrc.local）"
   DEPLOYED=$((DEPLOYED + 1))
 fi
 

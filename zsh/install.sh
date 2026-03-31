@@ -180,7 +180,11 @@ success "~/.zshrc 部署完成（個人設定在 ~/.zshrc.local）"
 
 # ── ~/.ripgreprc ──────────────────────────────────────────────────
 if [[ " ${SELECTED_MODULES[*]} " == *" tools "* ]]; then
-  cat > ~/.ripgreprc << 'RGEOF'
+  # 保留用戶已有的 ripgreprc，只在不存在時建立
+  if [[ -f ~/.ripgreprc ]]; then
+    info "~/.ripgreprc 已存在，保留不動"
+  else
+    cat > ~/.ripgreprc << 'RGEOF'
 --line-number
 --color=auto
 --hidden
@@ -190,7 +194,8 @@ if [[ " ${SELECTED_MODULES[*]} " == *" tools "* ]]; then
 --glob=!dist/*
 --glob=!build/*
 RGEOF
-  success "~/.ripgreprc 完成"
+    success "~/.ripgreprc 建立完成"
+  fi
 fi
 
 echo ""

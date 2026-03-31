@@ -162,7 +162,7 @@ async function main() {
       options: [
         { value: 'reinstall', label: '重新安裝（用上次設定）', hint: 'Enter 直接裝' },
         { value: 'adjust', label: '調整設定' },
-        { value: 'status', label: '查看/調整配置', hint: 'Claude / zsh / Slack 健康狀態' },
+        { value: 'status', label: '查看/調整配置', hint: 'Claude / ZSH / Slack 健康狀態' },
         { value: 'report', label: '查看上次報告' },
       ],
     }))

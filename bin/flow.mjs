@@ -145,8 +145,7 @@ ${c.mermaid}
       border-top: none; border-radius: 0 0 12px 12px;
       padding: 1.5rem; overflow-x: auto;
     }
-    .mermaid { display: flex; justify-content: center; min-height: 200px; cursor: grab; }
-    .mermaid:active { cursor: grabbing; }
+    .mermaid { display: flex; justify-content: center; min-height: 200px; }
     .mermaid svg { max-width: 100%; height: auto; }
     .zoom-controls {
       position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 5;
@@ -158,7 +157,7 @@ ${c.mermaid}
     }
     .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
     .chart-body { position: relative; overflow: hidden; }
-    .panzoom-container { cursor: grab; transform-origin: 0 0; }
+    .panzoom-container { cursor: grab; }
 
     footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
 
@@ -184,6 +183,7 @@ ${c.mermaid}
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <script>
     mermaid.initialize({
@@ -219,41 +219,29 @@ ${c.mermaid}
       });
     });
 
-    // Panzoom: 拖動 + 滾輪縮放
+    // @panzoom/panzoom — 拖動 + 滾輪縮放
     const pzInstances = {};
     function initPanzoom() {
       document.querySelectorAll('.panzoom-container').forEach(el => {
         const id = el.id.replace('pz-', '');
-        let scale = 1, tx = 0, ty = 0, dragging = false, sx = 0, sy = 0;
-
-        el.addEventListener('wheel', e => {
-          e.preventDefault();
-          const delta = e.deltaY > 0 ? 0.9 : 1.1;
-          scale = Math.min(Math.max(scale * delta, 0.3), 3);
-          el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+        const instance = Panzoom(el, {
+          maxScale: 4, minScale: 0.25, step: 0.15,
+          contain: false, cursor: 'grab',
+          excludeClass: 'link-btn',
+        });
+        // 滾輪縮放綁定到父容器
+        el.parentElement.addEventListener('wheel', e => {
+          instance.zoomWithWheel(e);
         }, { passive: false });
-
-        el.addEventListener('mousedown', e => {
-          if (e.target.closest('a')) return;
-          dragging = true; sx = e.clientX - tx; sy = e.clientY - ty;
-          el.style.cursor = 'grabbing';
-        });
-        window.addEventListener('mousemove', e => {
-          if (!dragging) return;
-          tx = e.clientX - sx; ty = e.clientY - sy;
-          el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
-        });
-        window.addEventListener('mouseup', () => { dragging = false; el.style.cursor = 'grab'; });
-
-        pzInstances[id] = { el, getScale: () => scale, setScale: s => { scale = s; el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')'; }, reset: () => { scale = 1; tx = 0; ty = 0; el.style.transform = ''; } };
+        pzInstances[id] = instance;
       });
     }
 
-    function zoomIn(id) { const p = pzInstances[id]; if (p) p.setScale(Math.min(p.getScale() * 1.2, 3)); }
-    function zoomOut(id) { const p = pzInstances[id]; if (p) p.setScale(Math.max(p.getScale() * 0.8, 0.3)); }
+    function zoomIn(id) { const p = pzInstances[id]; if (p) p.zoomIn(); }
+    function zoomOut(id) { const p = pzInstances[id]; if (p) p.zoomOut(); }
     function zoomReset(id) { const p = pzInstances[id]; if (p) p.reset(); }
 
-    // Init panzoom after mermaid renders
+    // Init after mermaid renders
     setTimeout(initPanzoom, 1500);
   </script>
 </body>

@@ -267,25 +267,24 @@ function generateHTML(charts) {
       const source = document.querySelector('#svg-' + id + ' svg') || document.querySelector('#mmd-' + id + ' svg');
       if (!source) return;
       const clone = source.cloneNode(true);
-      clone.style.cssText = 'display:block;';
       inner.appendChild(clone);
 
       document.getElementById('modal').classList.add('active');
       document.body.style.overflow = 'hidden';
 
-      // 自動縮放：讓 SVG 填滿視窗（fit to screen）
+      // fit-to-screen：直接設定 SVG 尺寸填滿，panzoom 從 1x 開始
       requestAnimationFrame(() => {
-        const bodyRect = body.getBoundingClientRect();
-        const svgW = clone.getBoundingClientRect().width || clone.viewBox?.baseVal?.width || 800;
-        const svgH = clone.getBoundingClientRect().height || clone.viewBox?.baseVal?.height || 600;
-        const scaleX = (bodyRect.width * 0.95) / svgW;
-        const scaleY = (bodyRect.height * 0.95) / svgH;
-        const fitScale = Math.min(scaleX, scaleY, 2);
-        clone.style.width = svgW + 'px';
-        clone.style.height = svgH + 'px';
-        inner.style.transformOrigin = 'center center';
+        const vw = body.clientWidth;
+        const vh = body.clientHeight;
+        const vb = clone.viewBox?.baseVal;
+        const natW = vb?.width || clone.getBoundingClientRect().width || 800;
+        const natH = vb?.height || clone.getBoundingClientRect().height || 600;
+        const fit = Math.min((vw * 0.92) / natW, (vh * 0.92) / natH);
+        clone.setAttribute('width', natW * fit);
+        clone.setAttribute('height', natH * fit);
+        clone.style.display = 'block';
 
-        pz = Panzoom(inner, { maxScale:8, minScale:0.2, step:0.12, startScale: fitScale, contain:false, cursor:'grab' });
+        pz = Panzoom(inner, { maxScale:8, minScale:0.2, step:0.12, contain:false, cursor:'grab' });
       });
       wheelH = e => { if (e.ctrlKey||e.metaKey) { e.preventDefault(); pz.zoomWithWheel(e,{animate:false}); } };
       body.addEventListener('wheel', wheelH, {passive:false});
@@ -301,8 +300,9 @@ function generateHTML(charts) {
       if (wheelH) { document.getElementById('modal-body').removeEventListener('wheel',wheelH); wheelH=null; }
       if (pz) { pz.destroy(); pz=null; }
     }
-    function mZoomIn() { if(pz){const r=document.getElementById('modal-body').getBoundingClientRect();pz.zoomIn({focal:{x:r.width/2,y:r.height/2},animate:false});} }
-    function mZoomOut() { if(pz){const r=document.getElementById('modal-body').getBoundingClientRect();pz.zoomOut({focal:{x:r.width/2,y:r.height/2},animate:false});} }
+    function mFocal() { const r=document.getElementById('modal-body'); return {x:r.clientWidth/2, y:r.clientHeight/2}; }
+    function mZoomIn() { if(pz) pz.zoomIn({focal:mFocal(),animate:false}); }
+    function mZoomOut() { if(pz) pz.zoomOut({focal:mFocal(),animate:false}); }
     function mReset() { if(pz) pz.reset(); }
 
     document.addEventListener('keydown', e => { if(e.key==='Escape') mClose(); });

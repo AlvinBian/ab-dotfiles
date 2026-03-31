@@ -2,83 +2,100 @@
 /**
  * pnpm run flow — 渲染並打開流程圖
  *
- * 掃描 docs/flows/*.mmd，解析 frontmatter，
- * 生成帶導航和跨圖跳轉的互動式 HTML 頁面。
+ * 用 @mermaid-js/mermaid-cli (mmdc) 預渲染 .mmd → SVG，
+ * 生成 HTML viewer 在瀏覽器中查看。
  */
 
 import fs from 'fs'
 import path from 'path'
-import { exec } from 'child_process'
+import { exec, execFileSync } from 'child_process'
 import { getDirname } from '../lib/core/paths.mjs'
 
 const __dirname = getDirname(import.meta)
 const REPO = path.resolve(__dirname, '..')
 const FLOWS_DIR = path.join(REPO, 'docs', 'flows')
+const OUTPUT_DIR = path.join(REPO, 'dist', 'flows')
 const OUTPUT_HTML = path.join(REPO, 'dist', 'flowcharts.html')
 
-// 解析 .mmd 檔案（frontmatter + mermaid body）
-function parseFlowFile(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8')
-  const name = path.basename(filePath, '.mmd')
-  const meta = { title: name, description: '', links: [] }
-
-  let body = content
-  if (content.startsWith('---')) {
-    const endIdx = content.indexOf('---', 3)
-    if (endIdx !== -1) {
-      const fm = content.slice(3, endIdx)
-      body = content.slice(endIdx + 3).trim()
-
-      const titleMatch = fm.match(/title:\s*(.+)/)
-      const descMatch = fm.match(/description:\s*(.+)/)
-      if (titleMatch) meta.title = titleMatch[1].trim()
-      if (descMatch) meta.description = descMatch[1].trim()
-
-      // 解析 links
-      const linksSection = fm.match(/links:\n([\s\S]*?)(?=\n\w|$)/)
-      if (linksSection) {
-        const linkLines = linksSection[1].match(/- (\S+):\s*(.+)/g) || []
-        for (const line of linkLines) {
-          const m = line.match(/- (\S+):\s*(.+)/)
-          if (m) meta.links.push({ target: m[1], label: m[2] })
-        }
-      }
+// 解析 .mmd frontmatter
+function parseFrontmatter(content) {
+  const meta = { title: '', description: '', links: [] }
+  if (!content.startsWith('---')) return { meta, body: content }
+  const endIdx = content.indexOf('---', 3)
+  if (endIdx === -1) return { meta, body: content }
+  const fm = content.slice(3, endIdx)
+  const body = content.slice(endIdx + 3).trim()
+  const t = fm.match(/title:\s*(.+)/); if (t) meta.title = t[1].trim()
+  const d = fm.match(/description:\s*(.+)/); if (d) meta.description = d[1].trim()
+  const ls = fm.match(/links:\n([\s\S]*?)(?=\n\w|$)/)
+  if (ls) {
+    for (const m of (ls[1].match(/- (\S+):\s*(.+)/g) || [])) {
+      const p = m.match(/- (\S+):\s*(.+)/)
+      if (p) meta.links.push({ target: p[1], label: p[2] })
     }
   }
-
-  return { name, ...meta, mermaid: body }
+  return { meta, body }
 }
 
-// 生成 HTML
+// 用 mmdc 渲染 .mmd → SVG（先去掉 frontmatter）
+function renderSvg(body, svgPath) {
+  const tmpPath = svgPath.replace('.svg', '.tmp.mmd')
+  try {
+    fs.writeFileSync(tmpPath, body)
+    execFileSync('npx', [
+      '@mermaid-js/mermaid-cli', '-i', tmpPath, '-o', svgPath,
+      '-t', 'dark', '-b', '#0d1117',
+    ], {
+      cwd: REPO, timeout: 30000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    try { fs.unlinkSync(tmpPath) } catch {}
+    return true
+  } catch {
+    try { fs.unlinkSync(tmpPath) } catch {}
+    return false
+  }
+}
+
+function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') }
+
 function generateHTML(charts) {
   const navItems = charts.map(c =>
     `<a href="#${c.name}" class="nav-item" data-target="${c.name}">
-      <span class="nav-title">${c.title}</span>
-      <span class="nav-desc">${c.description}</span>
+      <span class="nav-title">${escHtml(c.title)}</span>
+      <span class="nav-desc">${escHtml(c.description)}</span>
     </a>`
   ).join('\n    ')
 
   const sections = charts.map(c => {
     const linkHTML = c.links.length > 0
       ? `<div class="chart-links">${c.links.map(l =>
-          `<a href="#${l.target}" class="link-btn">${l.label} →</a>`
-        ).join(' ')}</div>`
-      : ''
+          `<a href="#${l.target}" class="link-btn">${escHtml(l.label)} →</a>`
+        ).join(' ')}</div>` : ''
+
+    // 嵌入 SVG（如果渲染成功）或 fallback 到 mermaid CDN
+    const svgFile = `flows/${c.name}.svg`
+    const hasSvg = fs.existsSync(path.join(OUTPUT_DIR, `${c.name}.svg`))
+    const chartContent = hasSvg
+      ? `<img src="${svgFile}" alt="${escHtml(c.title)}" style="max-width:100%;height:auto;" />`
+      : `<div class="mermaid">\n${c.body}\n</div>`
 
     return `
     <section class="chart-section" id="${c.name}">
       <div class="chart-header">
-        <h2>${c.title}</h2>
-        <p class="chart-desc">${c.description}</p>
+        <h2>${escHtml(c.title)}</h2>
+        <p class="chart-desc">${escHtml(c.description)}</p>
         ${linkHTML}
       </div>
       <div class="chart-body" onclick="openModal('${c.name}')" title="點擊放大">
-        <div class="mermaid" id="mmd-${c.name}">
-${c.mermaid}
-        </div>
+        ${chartContent}
       </div>
     </section>`
   }).join('\n')
+
+  // Modal 用的 SVG data
+  const svgDataScript = charts.filter(c => fs.existsSync(path.join(OUTPUT_DIR, `${c.name}.svg`)))
+    .map(c => `'${c.name}': 'flows/${c.name}.svg'`).join(',\n      ')
 
   return `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -86,19 +103,16 @@ ${c.mermaid}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ab-dotfiles — 流程圖</title>
+  <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"></script>
   <style>
     :root {
       --bg: #0d1117; --card: #161b22; --border: #30363d;
       --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
-      --green: #3fb950; --red: #f85149;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
-
-    /* Layout */
     .container { display: flex; min-height: 100vh; }
 
-    /* Sidebar */
     .sidebar {
       width: 280px; min-width: 280px; background: var(--card);
       border-right: 1px solid var(--border); padding: 1.5rem 0;
@@ -115,10 +129,8 @@ ${c.mermaid}
     .nav-title { display: block; color: var(--text); font-size: 0.9rem; font-weight: 500; }
     .nav-desc { display: block; color: var(--dim); font-size: 0.75rem; margin-top: 2px; }
 
-    /* Main */
     .main { flex: 1; padding: 2rem; max-width: calc(100vw - 280px); }
 
-    /* Chart sections */
     .chart-section { margin-bottom: 2.5rem; scroll-margin-top: 1rem; }
     .chart-header {
       background: var(--card); border: 1px solid var(--border);
@@ -133,48 +145,45 @@ ${c.mermaid}
       border-radius: 4px; transition: all 0.15s;
     }
     .link-btn:hover { background: rgba(88,166,255,0.1); border-color: var(--accent); }
+
     .chart-body {
       background: var(--card); border: 1px solid var(--border);
       border-top: none; border-radius: 0 0 12px 12px;
-      padding: 1.5rem; overflow-x: auto;
+      padding: 1.5rem; overflow: hidden; cursor: pointer; text-align: center;
     }
-    .mermaid { display: flex; justify-content: center; min-height: 200px; transform-origin: center top; transition: transform 0.1s; }
-    .mermaid svg { max-width: 100%; height: auto; }
-    .chart-body { position: relative; overflow: hidden; cursor: pointer; }
     .chart-body:hover { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 0 0 12px 12px; }
     .chart-body::after {
       content: '點擊放大'; position: absolute; top: 8px; right: 12px;
       font-size: 0.7rem; color: var(--dim); background: var(--card);
       padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);
-      opacity: 0; transition: opacity 0.2s;
+      opacity: 0; transition: opacity 0.2s; position: relative; display: none;
     }
-    .chart-body:hover::after { opacity: 1; }
+    .chart-body:hover::after { display: inline-block; opacity: 1; }
+    .chart-body img { max-width: 100%; height: auto; }
 
-    footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
-
-    /* Modal 全螢幕彈窗 */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0; z-index: 100;
-      background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
-    }
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.9); }
     .modal-overlay.active { display: flex; flex-direction: column; }
     .modal-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0.8rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 0.6rem 1.2rem; background: var(--card); border-bottom: 1px solid var(--border);
     }
     .modal-header h3 { font-size: 1rem; color: var(--text); }
     .modal-controls { display: flex; gap: 6px; }
-    .modal-body {
-      flex: 1; overflow: hidden; position: relative; cursor: grab;
+    .modal-controls button {
+      width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 4px;
+      background: var(--card); color: var(--text); cursor: pointer; font-size: 16px;
     }
-    .modal-panzoom { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    .modal-panzoom svg { max-width: 95vw; max-height: 85vh; }
+    .modal-controls button:hover { border-color: var(--accent); color: var(--accent); }
+    .modal-body { flex: 1; overflow: hidden; cursor: grab; }
+    .modal-body:active { cursor: grabbing; }
+    #modal-inner { display: inline-block; transform-origin: 0 0; }
+    #modal-inner img { max-width: 90vw; max-height: 85vh; display: block; }
 
+    footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
     @media (max-width: 768px) {
       .container { flex-direction: column; }
-      .sidebar { width: 100%; min-width: 100%; height: auto; position: static; display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem; }
-      .sidebar h1 { width: 100%; }
-      .nav-item { flex: 1; min-width: 120px; border-left: none; border-bottom: 2px solid transparent; }
+      .sidebar { width: 100%; min-width: 100%; height: auto; position: static; }
       .main { max-width: 100%; }
     }
   </style>
@@ -183,210 +192,153 @@ ${c.mermaid}
   <div class="container">
     <nav class="sidebar">
       <h1>ab-dotfiles v2.1</h1>
-      <div class="subtitle">${charts.length} 張流程圖 · 所有流程和分支</div>
+      <div class="subtitle">${charts.length} 張流程圖</div>
       ${navItems}
     </nav>
     <main class="main">
       ${sections}
-      <footer>Generated from docs/flows/*.mmd · ${new Date().toISOString().slice(0, 19)}</footer>
+      <footer>Generated ${new Date().toISOString().slice(0, 19)}</footer>
     </main>
   </div>
 
-  <!-- Modal 全螢幕彈窗 -->
   <div class="modal-overlay" id="modal">
     <div class="modal-header">
       <h3 id="modal-title"></h3>
       <div class="modal-controls">
-        <button class="zoom-btn" onclick="modalZoomIn()" title="放大">+</button>
-        <button class="zoom-btn" onclick="modalZoomOut()" title="縮小">−</button>
-        <button class="zoom-btn" onclick="modalZoomReset()" title="重置">⟲</button>
-        <button class="zoom-btn" onclick="closeModal()" title="關閉 (ESC)">✕</button>
+        <button onclick="mZoomIn()" title="放大">+</button>
+        <button onclick="mZoomOut()" title="縮小">−</button>
+        <button onclick="mReset()" title="重置">⟲</button>
+        <button onclick="mClose()" title="關閉 ESC">✕</button>
       </div>
     </div>
-    <div class="modal-body">
-      <div class="modal-panzoom" id="modal-panzoom"></div>
+    <div class="modal-body" id="modal-body">
+      <div id="modal-inner"></div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"></script>
-  <script>
-    mermaid.initialize({
-      startOnLoad: true, theme: 'dark',
-      securityLevel: 'loose',  // 允許 click 跳轉
-      themeVariables: {
-        primaryColor: '#1f6feb', primaryTextColor: '#e6edf3', primaryBorderColor: '#388bfd',
-        lineColor: '#8b949e', secondaryColor: '#161b22', tertiaryColor: '#21262d', fontSize: '14px',
-      },
-      flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
-    });
+  ${charts.some(c => !fs.existsSync(path.join(OUTPUT_DIR, c.name + '.svg')))
+    ? '<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>\n  <script>mermaid.initialize({ startOnLoad:true, theme:"dark", securityLevel:"loose", themeVariables:{ primaryColor:"#1f6feb", primaryTextColor:"#e6edf3", lineColor:"#8b949e" } });</script>' : ''}
 
-    // ── 導航 ──
-    const sections = document.querySelectorAll('.chart-section');
-    const navItems = document.querySelectorAll('.nav-item');
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          navItems.forEach(n => n.classList.remove('active'));
-          const active = document.querySelector('.nav-item[data-target="' + e.target.id + '"]');
-          if (active) active.classList.add('active');
-        }
-      });
-    }, { rootMargin: '-20% 0px -70% 0px' });
-    sections.forEach(s => observer.observe(s));
+  <script>
+    const svgMap = { ${svgDataScript} };
+
+    // Nav
+    const secs = document.querySelectorAll('.chart-section');
+    const navs = document.querySelectorAll('.nav-item');
+    new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) {
+        navs.forEach(n => n.classList.remove('active'));
+        const a = document.querySelector('.nav-item[data-target="'+e.target.id+'"]');
+        if (a) a.classList.add('active');
+      }});
+    }, { rootMargin: '-20% 0px -70% 0px' }).observe && secs.forEach(s => new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) {
+        navs.forEach(n => n.classList.remove('active'));
+        const a = document.querySelector('.nav-item[data-target="'+e.target.id+'"]');
+        if (a) a.classList.add('active');
+      }});
+    }, { rootMargin: '-20% 0px -70% 0px' }).observe(s));
 
     document.querySelectorAll('a[href^="#"]').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault();
-        const target = document.querySelector(a.getAttribute('href'));
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior:'smooth', block:'start' });
       });
     });
 
-    // ── 嵌入式：Ctrl+滾輪 / 觸控板捏合 縮放 ──
-    document.querySelectorAll('.chart-body').forEach(el => {
-      let scale = 1;
-      const applyScale = () => {
-        const mmd = el.querySelector('.mermaid');
-        if (mmd) mmd.style.transform = 'scale(' + scale + ')';
-      };
-      // Ctrl+滾輪（滑鼠）+ 觸控板 pinch（macOS 觸發 ctrlKey wheel）
-      el.addEventListener('wheel', e => {
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          scale *= e.deltaY > 0 ? 0.92 : 1.08;
-          scale = Math.min(Math.max(scale, 0.3), 3);
-          applyScale();
-        }
-      }, { passive: false });
-      // Safari/macOS gesturechange（原生捏合手勢）
-      el.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
-      el.addEventListener('gesturechange', e => {
-        e.preventDefault();
-        scale *= e.scale > 1 ? 1.04 : 0.96;
-        scale = Math.min(Math.max(scale, 0.3), 3);
-        applyScale();
-      }, { passive: false });
-    });
-
-    // ── 全螢幕 Modal ──
-    let modalPz = null;
-    let modalWheelHandler = null;
-
+    // Modal
+    let pz = null, wheelH = null;
     function openModal(id) {
-      const svg = document.querySelector('#mmd-' + id + ' svg');
-      if (!svg) return;
-
-      const modal = document.getElementById('modal');
-      const viewport = document.getElementById('modal-panzoom');
+      const inner = document.getElementById('modal-inner');
+      const body = document.getElementById('modal-body');
       document.getElementById('modal-title').textContent =
         document.getElementById(id)?.querySelector('h2')?.textContent || id;
 
-      // 清空 + 建立 wrapper
-      viewport.innerHTML = '';
-      if (modalWheelHandler) viewport.removeEventListener('wheel', modalWheelHandler);
+      inner.innerHTML = '';
+      if (wheelH) { body.removeEventListener('wheel', wheelH); wheelH = null; }
+      if (pz) { pz.destroy(); pz = null; }
 
-      const wrapper = document.createElement('div');
-      wrapper.style.cssText = 'display:inline-block;transform-origin:center center;';
-      const clone = svg.cloneNode(true);
-      clone.removeAttribute('style');
-      clone.style.maxWidth = '90vw';
-      clone.style.maxHeight = '80vh';
-      wrapper.appendChild(clone);
-      viewport.appendChild(wrapper);
+      if (svgMap[id]) {
+        const img = new Image();
+        img.src = svgMap[id];
+        img.style.cssText = 'max-width:90vw;max-height:85vh;display:block;';
+        inner.appendChild(img);
+      } else {
+        const svg = document.querySelector('#mmd-' + id + ' svg, #' + id + ' .mermaid svg');
+        if (svg) inner.appendChild(svg.cloneNode(true));
+      }
 
-      modal.classList.add('active');
+      document.getElementById('modal').classList.add('active');
       document.body.style.overflow = 'hidden';
 
-      // Panzoom：wrapper 可拖動+縮放，viewport 作為固定邊界
-      if (modalPz) modalPz.destroy();
-      modalPz = Panzoom(wrapper, {
-        maxScale: 5, minScale: 0.3, step: 0.12,
-        contain: false, cursor: 'grab',
-        panOnlyWhenZoomed: false,
-      });
-
-      // Ctrl+滾輪 / 觸控板捏合 = 以光標為中心縮放
-      modalWheelHandler = e => {
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          modalPz.zoomWithWheel(e, { animate: false });
-        }
-      };
-      viewport.addEventListener('wheel', modalWheelHandler, { passive: false });
-      // Safari/macOS 原生捏合手勢
-      viewport.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
-      viewport.addEventListener('gesturechange', e => {
+      pz = Panzoom(inner, { maxScale:5, minScale:0.3, step:0.12, contain:false, cursor:'grab' });
+      wheelH = e => { if (e.ctrlKey||e.metaKey) { e.preventDefault(); pz.zoomWithWheel(e,{animate:false}); } };
+      body.addEventListener('wheel', wheelH, {passive:false});
+      body.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
+      body.addEventListener('gesturechange', e=>{
         e.preventDefault();
-        const scale = modalPz.getScale() * (e.scale > 1 ? 1.04 : 0.96);
-        modalPz.zoom(Math.min(Math.max(scale, 0.3), 5), { animate: false });
-      }, { passive: false });
+        pz.zoom(Math.min(Math.max(pz.getScale()*(e.scale>1?1.04:0.96),0.3),5),{animate:false});
+      }, {passive:false});
     }
-
-    function closeModal() {
-      const modal = document.getElementById('modal');
-      const viewport = document.getElementById('modal-panzoom');
-      modal.classList.remove('active');
+    function mClose() {
+      document.getElementById('modal').classList.remove('active');
       document.body.style.overflow = '';
-      if (modalWheelHandler) { viewport.removeEventListener('wheel', modalWheelHandler); modalWheelHandler = null; }
-      if (modalPz) { modalPz.destroy(); modalPz = null; }
+      if (wheelH) { document.getElementById('modal-body').removeEventListener('wheel',wheelH); wheelH=null; }
+      if (pz) { pz.destroy(); pz=null; }
     }
+    function mZoomIn() { if(pz){const r=document.getElementById('modal-body').getBoundingClientRect();pz.zoomIn({focal:{x:r.width/2,y:r.height/2},animate:false});} }
+    function mZoomOut() { if(pz){const r=document.getElementById('modal-body').getBoundingClientRect();pz.zoomOut({focal:{x:r.width/2,y:r.height/2},animate:false});} }
+    function mReset() { if(pz) pz.reset(); }
 
-    function modalZoomIn() {
-      if (!modalPz) return;
-      const vp = document.getElementById('modal-panzoom');
-      const rect = vp.getBoundingClientRect();
-      modalPz.zoomIn({ focal: { x: rect.width / 2, y: rect.height / 2 }, animate: false });
-    }
-    function modalZoomOut() {
-      if (!modalPz) return;
-      const vp = document.getElementById('modal-panzoom');
-      const rect = vp.getBoundingClientRect();
-      modalPz.zoomOut({ focal: { x: rect.width / 2, y: rect.height / 2 }, animate: false });
-    }
-    function modalZoomReset() { if (modalPz) modalPz.reset(); }
-
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-    document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+    document.addEventListener('keydown', e => { if(e.key==='Escape') mClose(); });
+    document.getElementById('modal').addEventListener('click', e => { if(e.target===e.currentTarget) mClose(); });
   </script>
 </body>
 </html>`
 }
 
-// Main
-if (!fs.existsSync(FLOWS_DIR)) {
-  console.error('找不到 docs/flows/ 目錄')
-  process.exit(1)
-}
+// ── Main ──
+if (!fs.existsSync(FLOWS_DIR)) { console.error('找不到 docs/flows/'); process.exit(1) }
 
-const files = fs.readdirSync(FLOWS_DIR)
-  .filter(f => f.endsWith('.mmd'))
-  .sort()
-
-if (files.length === 0) {
-  console.error('docs/flows/ 中沒有找到 .mmd 檔案')
-  process.exit(1)
-}
-
-// 按固定順序排列（主流程在前）
 const order = [
   'setup-main', 'setup-status', 'env-check', 'upgrade-legacy',
   'phase-plan', 'phase-execute', 'config-protection',
   'repo-select', 'role-system', 'feature-map',
   'slack-setup', 'gmail-setup', 'ecc-pipeline', 'session-lifecycle',
 ]
-const sorted = files.sort((a, b) => {
+
+const files = fs.readdirSync(FLOWS_DIR).filter(f => f.endsWith('.mmd')).sort((a, b) => {
   const ia = order.indexOf(a.replace('.mmd', ''))
   const ib = order.indexOf(b.replace('.mmd', ''))
   return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
 })
 
-const charts = sorted.map(f => parseFlowFile(path.join(FLOWS_DIR, f)))
+if (files.length === 0) { console.error('docs/flows/ 中沒有 .mmd 檔案'); process.exit(1) }
 
-fs.mkdirSync(path.dirname(OUTPUT_HTML), { recursive: true })
+// 渲染 SVG
+fs.mkdirSync(OUTPUT_DIR, { recursive: true })
+console.log(`渲染 ${files.length} 張流程圖...`)
+let rendered = 0, fallback = 0
+
+const charts = files.map(f => {
+  const filePath = path.join(FLOWS_DIR, f)
+  const name = f.replace('.mmd', '')
+  const content = fs.readFileSync(filePath, 'utf8')
+  const { meta, body } = parseFrontmatter(content)
+
+  const svgPath = path.join(OUTPUT_DIR, `${name}.svg`)
+  if (renderSvg(body, svgPath)) {
+    rendered++
+    console.log(`  ✔ ${name}`)
+  } else {
+    fallback++
+    console.log(`  ⚠ ${name}（fallback 到 CDN 渲染）`)
+  }
+
+  return { name, title: meta.title || name, description: meta.description || '', links: meta.links, body }
+})
+
 fs.writeFileSync(OUTPUT_HTML, generateHTML(charts))
-
-console.log(`✔ 已生成 ${charts.length} 張流程圖 → dist/flowcharts.html`)
-charts.forEach(c => console.log(`  ${c.name}: ${c.title}`))
+console.log(`\n✔ ${rendered} 張 SVG 預渲染 + ${fallback} 張 CDN fallback → dist/flowcharts.html`)
 
 exec(`open "${OUTPUT_HTML}"`)

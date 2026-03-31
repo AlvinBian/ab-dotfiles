@@ -280,8 +280,10 @@ ${c.mermaid}
         panOnlyWhenZoomed: false,
       });
 
-      // 滾輪直接縮放（全螢幕不需要 Ctrl）
-      modalWheelHandler = e => { e.preventDefault(); modalPz.zoomWithWheel(e); };
+      // Ctrl/Cmd + 滾輪縮放，普通雙指/滾輪不攔截
+      modalWheelHandler = e => {
+        if (e.ctrlKey || e.metaKey) { e.preventDefault(); modalPz.zoomWithWheel(e); }
+      };
       viewport.addEventListener('wheel', modalWheelHandler, { passive: false });
     }
 

@@ -220,8 +220,8 @@ async function main() {
         lines.push(pc.dim(`  額外 ${claude.extra.length} 個（非 ab-dotfiles 管理）`))
       }
 
-      // ── zsh 模組 ──
-      lines.push('', pc.bold('zsh 模組'))
+      // ── ZSH 環境模組 ──
+      lines.push('', pc.bold('ZSH 環境模組'))
       lines.push(`  已安裝  ${pc.green(zsh.installed.length)}/${zsh.expected.length}  ${pc.dim(zsh.installed.join(', ') || '無')}`)
       if (zsh.missing.length > 0) {
         lines.push(pc.red(`  缺少：${zsh.missing.join(', ')}`))
@@ -250,7 +250,7 @@ async function main() {
           { value: 'claude',    label: '重新安裝 Claude 配置', hint: `commands ${claude.installedCommands.length} · agents ${claude.installedAgents.length} · rules ${claude.installedRules.length}` },
           { value: 'settings',  label: '重新套用全局設定', hint: `settings ${hasSettings ? '✔' : '✘'}` },
           { value: 'claudemd',  label: '重新生成 CLAUDE.md', hint: `${claudeMd.count} 個 repo · 需 AI` },
-          { value: 'zsh',       label: '重新安裝 zsh 模組', hint: `${zsh.installed.length}/${zsh.expected.length} 已安裝` },
+          { value: 'zsh',       label: '重新安裝 ZSH 環境模組', hint: `${zsh.installed.length}/${zsh.expected.length} 已安裝` },
           { value: 'slack',     label: '重新設定 Slack 通知', hint: slack.mode ? `${slack.mode}` : '未設定' },
           { value: 'back',      label: '← 返回' },
         ],
@@ -300,10 +300,9 @@ async function main() {
   // ── 功能選擇 ──
   const featureChoices = [
     { value: 'claude', label: 'Claude Code 開發配置', hint: 'commands · agents · rules · hooks · settings' },
-    { value: 'claudemd', label: '專案 CLAUDE.md', hint: '按 repo 角色 AI 生成到 ~/.claude/projects/' },
-    { value: 'ecc', label: 'ECC 外部資源', hint: '社群 commands/agents/rules 融合' },
+    { value: 'project', label: '專案配置（repos + AI）', hint: 'CLAUDE.md + ECC + 技術棧 · 需選 repos' },
+    { value: 'zsh', label: 'ZSH 環境模組', hint: 'aliases · fzf · git · tools · history' },
     { value: 'slack', label: 'Slack 通知', hint: 'P0/P1/P2 分級 + Channel/DM' },
-    { value: 'zsh', label: 'zsh 環境模組', hint: 'aliases · fzf · git · tools · history' },
   ]
   // 首次安裝只預選核心 claude，避免誤覆蓋用戶現有 zsh/Slack 配置
   const prevFeatures = prev?.features || ['claude']
@@ -316,7 +315,9 @@ async function main() {
   if (features === BACK) { p.outro('已取消'); return }
 
   const has = (f) => features.includes(f)
-  const needsRepos = has('claudemd') || has('ecc') // 需要選 repos 的功能
+  // project = claudemd + ecc 合併，向下兼容
+  const hasProject = has('project') || has('claudemd') || has('ecc')
+  const needsRepos = hasProject
 
   // ── 外部服務設定 ──
   const setupResults = []
@@ -479,10 +480,13 @@ async function main() {
     let planForReview = analyzeCache?.plan
     if (planForReview) {
       planForReview = cloneDeep(planForReview)
-      if (!has('ecc')) planForReview.ecc = []
-      if (!has('claudemd')) planForReview.projects = []
+      if (!hasProject) { planForReview.ecc = []; planForReview.projects = [] }
       if (!has('zsh')) planForReview.zshModules = []
-      planForReview.features = features // 傳給下游
+      // 展開 project → claudemd + ecc 給下游
+      const expandedFeatures = [...features]
+      if (hasProject && !expandedFeatures.includes('claudemd')) expandedFeatures.push('claudemd')
+      if (hasProject && !expandedFeatures.includes('ecc')) expandedFeatures.push('ecc')
+      planForReview.features = expandedFeatures
     }
 
     // Step 2：確認計畫

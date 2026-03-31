@@ -468,31 +468,26 @@ brew install fzf zoxide bat eza fd git-delta lazygit tldr ripgrep \
 首次執行時自動從 `.env.template` 建立。主要配置：
 
 ```bash
-# AI 模型（per-repo 分類）
+# AI（Claude）
+ANTHROPIC_API_KEY=
+AI_MODEL=haiku
+AI_EFFORT=low
+AI_TIMEOUT=60000
+AI_CONCURRENCY=5
+
+# Per-repo AI 分類
 AI_REPO_MODEL=sonnet
 AI_REPO_EFFORT=low
 AI_REPO_TIMEOUT=60000
 AI_REPO_CACHE=true
 
-# ECC 翻譯（背景，haiku 足夠）
-AI_ECC_MODEL=haiku
-AI_ECC_TIMEOUT=90000
-
-# 開發者畫像
-AI_PROFILE_MODEL=haiku
-
 # GitHub
 GITHUB_ORG=
 GH_API_TIMEOUT=15000
+GH_PER_PAGE=100
 
 # ECC 外部來源
 ECC_SOURCES=everything-claude-code|affaan-m/everything-claude-code|10
-
-# AI 並發數（Claude CLI 自動處理 rate limiting）
-AI_CONCURRENCY=Infinity
-
-# GitHub API 並發數（防止 403）
-GH_CONCURRENCY=8
 
 # Slack 通知（channel | dm | off）
 SLACK_NOTIFY_MODE=off

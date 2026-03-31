@@ -8,7 +8,7 @@
 
 import fs from 'fs'
 import path from 'path'
-import { exec, execFileSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import { getDirname } from '../lib/core/paths.mjs'
 
 const __dirname = getDirname(import.meta)
@@ -443,4 +443,4 @@ const charts = files.map(f => {
 fs.writeFileSync(OUTPUT_HTML, generateHTML(charts))
 console.log(`\n✔ ${rendered} 張 SVG 預渲染 + ${fallback} 張 CDN fallback → dist/flowcharts.html`)
 
-exec(`open "${OUTPUT_HTML}"`)
+execFileSync('open', [OUTPUT_HTML])

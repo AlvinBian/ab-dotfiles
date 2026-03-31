@@ -343,29 +343,23 @@ async function main() {
         .replace(/^SLACK_NOTIFY_CHANNEL=.*/m, '')
         .replace(/^SLACK_NOTIFY_MODE=.*/m, '')
         .replace(/^SLACK_NOTIFY_CHANNEL_NAME=.*/m, '')
-        .replace(/^SLACK_WORKSPACE_URL=.*/m, '')
-        .replace(/^SLACK_WEBHOOK_URL=.*/m, '')
+        .replace(/^SLACK_WORKSPACE_URL=.*/m, '')  // 清理舊版
+        .replace(/^SLACK_WEBHOOK_URL=.*/m, '')    // 清理舊版
         .replace(/^SLACK_NOTIFY_USER_ID=.*/m, '')
         .trim()
       envContent += `\nSLACK_NOTIFY_CHANNEL=${slackResult.channelId}\nSLACK_NOTIFY_MODE=${slackResult.mode}`
       if (slackResult.channelName) envContent += `\nSLACK_NOTIFY_CHANNEL_NAME=${slackResult.channelName}`
-      if (slackResult.channelUrl) {
-        const wsUrl = slackResult.channelUrl.match(/^(https:\/\/[^/]+)/)?.[1] || ''
-        if (wsUrl) envContent += `\nSLACK_WORKSPACE_URL=${wsUrl}`
-      }
       if (slackResult.userId) envContent += `\nSLACK_NOTIFY_USER_ID=${slackResult.userId}`
       envContent += '\n'
       fs.writeFileSync(envPath, envContent)
       if (!prev) prev = {}
       prev.slackChannel = slackResult.channelId
       prev.slackChannelName = slackResult.channelName || ''
-      prev.slackWorkspaceUrl = slackResult.channelUrl?.match(/^(https:\/\/[^/]+)/)?.[1] || ''
       prev.slackMode = slackResult.mode
       prev.slackUserId = slackResult.userId || ''
-      const hyperlink = (text, url) => url ? `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\` : text
       const slackDisplay = slackResult.mode === 'dm'
         ? 'DM'
-        : `${hyperlink(`#${slackResult.channelName || slackResult.channelId}`, slackResult.channelUrl)} (${slackResult.channelId})`
+        : `#${slackResult.channelName || slackResult.channelId} (${slackResult.channelId})`
       setupResults.push(`Slack ${pc.green('✔')} ${slackDisplay}`)
     } else {
       setupResults.push(`Slack ${pc.dim('跳過')}`)

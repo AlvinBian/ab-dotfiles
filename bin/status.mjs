@@ -26,8 +26,8 @@ if (claude.missing.length > 0) {
   p.log.warn(`缺少 ${claude.missing.length} 個配置：${claude.missing.slice(0, 5).join(', ')}${claude.missing.length > 5 ? `… +${claude.missing.length - 5}` : ''}`)
 }
 
-// ── zsh 模組 ──
-p.log.step(pc.bold('zsh 模組'))
+// ── ZSH 模組 ──
+p.log.step(pc.bold('ZSH 模組'))
 console.log(`  已安裝  ${pc.green(zsh.installed.length)}/${zsh.expected.length}  ${pc.dim(zsh.installed.join(', '))}`)
 if (zsh.missing.length > 0) {
   p.log.warn(`缺少：${zsh.missing.join(', ')}`)

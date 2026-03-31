@@ -1,6 +1,6 @@
 # ab-dotfiles v2.1.0
 
-開發環境統一管理工具 — AI 驅動的技術棧偵測、Claude Code 技能庫生成、zsh 環境模組。
+開發環境統一管理工具 — AI 驅動的技術棧偵測、Claude Code 技能庫生成、ZSH 環境模組。
 
 ## 零基礎安裝
 
@@ -82,7 +82,7 @@ setup 會修改以下檔案/目錄，**每次安裝前自動備份**：
 | `~/.claude/projects/`        | 寫入 CLAUDE.md               | 不備份（可重生）                                  |
 | `~/.zshrc`                   | 替換為模組化版本             | `dist/backup/{timestamp}/zshrc`                   |
 | `~/.zshrc.local`             | 個人設定自動遷移（不覆蓋）   | `dist/backup/{timestamp}/zshrc.local`             |
-| `~/.zsh/modules/`            | 寫入 zsh 模組（diff 跳過）   | `dist/backup/{timestamp}/zsh/modules`             |
+| `~/.zsh/modules/`            | 寫入 ZSH 模組（diff 跳過）   | `dist/backup/{timestamp}/zsh/modules`             |
 | `~/.ripgreprc`               | 首次建立（已有跳過）         | `dist/backup/{timestamp}/ripgreprc`               |
 
 **三層保護機制：**
@@ -132,7 +132,7 @@ pnpm run setup
   │   ├─ [4/8] ECC 融合 + Stacks 生成
   │   ├─ [5/8] CLAUDE.md 並行生成（~/.claude/projects/）
   │   ├─ [6/8] Plugin 打包
-  │   ├─ [7/8] zsh 模組（含 .zshrc.local 個人設定遷移）
+  │   ├─ [7/8] ZSH 模組（含 .zshrc.local 個人設定遷移）
   │   └─ [8/8] 驗證安裝完整性
   └─ Step 3：完成
       ├─ 安裝摘要 + 快速上手引導
@@ -250,7 +250,7 @@ ab-dotfiles/
 │   ├── install/                 # 安裝處理器
 │   │   ├── index.mjs            # runTarget() dispatcher
 │   │   ├── install-claude.mjs   # commands / agents / rules / hooks 安裝
-│   │   ├── install-modules.mjs  # zsh 模組安裝
+│   │   ├── install-modules.mjs  # ZSH 模組安裝
 │   │   ├── build-plugin.mjs     # .plugin 打包
 │   │   ├── common.mjs           # selectItems / buildCmdArgs
 │   │   ├── hooks-merge.mjs      # hooks 衝突偵測與合併
@@ -285,7 +285,7 @@ ab-dotfiles/
 │   ├── build-slack-plugin.sh
 │   └── generate-workspace.sh
 │
-├── zsh/                         # zsh 環境模組
+├── zsh/                         # ZSH 環境模組
 │   ├── zshrc                    # ~/.zshrc 模板
 │   ├── modules/                 # 10 個獨立模組
 │   └── install.sh               # 安裝腳本
@@ -435,7 +435,7 @@ setup 時可選擇啟用 Slack 通知，安裝完成後自動發送 DM 或頻道
 
 ---
 
-## zsh 環境模組
+## ZSH 環境模組
 
 ### 模組清單
 

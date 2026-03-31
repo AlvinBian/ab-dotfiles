@@ -14,7 +14,7 @@ flowchart TD
         D2 --> D3["全局安裝項目<br/>Commands · Agents · Rules<br/>Hooks · Permissions · Model"]
         D3 --> D4["技術棧 Stacks N 個<br/>react · typescript · vue..."]
         D4 --> D5["ECC 外部資源 N 個"]
-        D5 --> D6["zsh 模組 N 個"]
+        D5 --> D6["ZSH 模組 N 個"]
         D6 --> D7["AI 費用估算 ~$X.XX"]
     end
 
@@ -40,7 +40,7 @@ flowchart TD
         DC5 -->|No| DC7
         DC6 -->|ESC| Back
         DC6 --> DC7{"有 zsh?"}
-        DC7 -->|Yes| DC8["6. zsh 模組選擇<br/>smartSelect"]
+        DC7 -->|Yes| DC8["6. ZSH 模組選擇<br/>smartSelect"]
         DC7 -->|No| DC9
         DC8 -->|ESC| Back
         DC8 --> DC9["返回調整後 plan"]

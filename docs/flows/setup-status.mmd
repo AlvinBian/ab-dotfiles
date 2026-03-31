@@ -10,7 +10,7 @@ flowchart TD
 
     Health --> Claude["Claude 配置<br/>Commands 12 個 code-review, pr-workflow...<br/>Agents 14 個 coder, debugger, reviewer...<br/>Rules 8 個 code-style, git-workflow...<br/>Hooks 已啟用 / Settings 已配置<br/>CLAUDE.md 4 個 repo"]
 
-    Claude --> ZshInfo["zsh 模組<br/>已安裝 10/10 aliases, fzf, git, tools..."]
+    Claude --> ZshInfo["ZSH 模組<br/>已安裝 10/10 aliases, fzf, git, tools..."]
 
     ZshInfo --> SlackInfo["Slack 通知<br/>模式：Channel #xxx"]
 
@@ -23,7 +23,7 @@ flowchart TD
     Select -->|"Claude 配置 commands 12 agents 14 rules 8"| AClaude
     Select -->|"全局設定 settings"| ASettings
     Select -->|"CLAUDE.md 4 個 repo 需 AI"| AClaudeMd
-    Select -->|"zsh 模組 10/10 已安裝"| AZsh
+    Select -->|"ZSH 模組 10/10 已安裝"| AZsh
     Select -->|"Slack 通知 channel"| ASlack
     Select -->|"Gmail 分級 已設定"| AGmail
     Select -->|"返回"| Exit([已取消])

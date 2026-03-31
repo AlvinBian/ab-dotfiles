@@ -82,13 +82,13 @@
       ]
     },
     "zsh": {
-      "label": "zsh 環境模組",
+      "label": "ZSH 環境模組",
       "hint": "modules → ~/.zsh/modules/ + ~/.zshrc",
       "flag": "--zsh",
       "steps": [
         {
           "type": "install-modules",
-          "label": "安裝 zsh 模組 → ~/.zsh/modules/",
+          "label": "安裝 ZSH 模組 → ~/.zsh/modules/",
           "script": "zsh zsh/install.sh",
           "selectable": {
             "modules": {

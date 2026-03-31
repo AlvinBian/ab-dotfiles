@@ -17,7 +17,7 @@ import { cleanOldBackups } from '../lib/core/backup.mjs'
 import { APP_VERSION } from '../lib/core/constants.mjs'
 import { env } from '../lib/core/env.mjs'
 import { getDirname } from '../lib/core/paths.mjs'
-import { loadSession } from '../lib/core/session.mjs'
+import { checkIncompleteSession, loadSession } from '../lib/core/session.mjs'
 import { ensureEnvironment } from '../lib/detect/doctor.mjs'
 import { interactiveRepoSelect } from '../lib/detect/repo-select.mjs'
 import { warmupCli } from '../lib/external/claude-cli.mjs'
@@ -69,6 +69,13 @@ async function main() {
   const origBackup = ensureOriginalBackup()
   if (origBackup && origBackup.length > 0) {
     p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
+  }
+
+  // 斷點續裝偵測
+  const incomplete = checkIncompleteSession()
+  if (incomplete.hasIncomplete && prev) {
+    const pending = incomplete.pendingTargets?.join(', ') || ''
+    p.log.warn(`上次安裝未完成（剩餘：${pending}）`)
   }
 
   // Splash
@@ -370,7 +377,7 @@ async function main() {
   }
 
   // Gmail 5-Tier 分級設定
-  if (has('gmail')) {
+  if (has('gmail') && !prev?.gmail?.scriptId) {
     p.log.step(pc.bold('Gmail 5-Tier 分級設定'))
     const { setupGmailFilters } = await import('../lib/gmail/gmail-setup.mjs')
     const gmailResult = await setupGmailFilters(prev)

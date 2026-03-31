@@ -115,13 +115,6 @@ ${c.mermaid}
     }
     .sidebar h1 { font-size: 1.1rem; padding: 0 1.2rem 1rem; color: var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
     .sidebar .subtitle { font-size: 0.75rem; color: var(--dim); padding: 0 1.2rem 1rem; }
-    .open-all-btn {
-      display: block; width: calc(100% - 2.4rem); margin: 0.5rem 1.2rem;
-      padding: 0.5rem; background: rgba(88,166,255,0.1); color: var(--accent);
-      border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
-      font-size: 0.8rem; transition: all 0.15s;
-    }
-    .open-all-btn:hover { background: rgba(88,166,255,0.2); border-color: var(--accent); }
     .nav-item {
       display: block; padding: 0.6rem 1.2rem; text-decoration: none;
       border-left: 3px solid transparent; transition: all 0.15s;
@@ -202,7 +195,6 @@ ${c.mermaid}
     <nav class="sidebar">
       <h1>ab-dotfiles v2.1</h1>
       <div class="subtitle">${charts.length} 張流程圖 · 所有流程和分支</div>
-      <button class="open-all-btn" onclick="popOutAll()">全部獨立視窗打開</button>
       ${navItems}
     </nav>
     <main class="main">

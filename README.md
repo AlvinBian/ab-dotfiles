@@ -263,7 +263,6 @@ ab-dotfiles/
 │   │   └── phase-complete.mjs   # 完成（報告 + 引導 + session + Slack）
 │   │
 │   ├── slack/                   # Slack 整合
-│   │   ├── slack-notify.mjs     # DM 通知（透過 Claude CLI MCP）
 │   │   └── slack-setup.mjs      # 互動式 Slack 通知設定精靈
 │   │
 │   └── report.mjs               # HTML 安裝報告（ECharts + 5 Tab）

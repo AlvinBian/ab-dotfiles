@@ -53,8 +53,14 @@ matchWhen:
 
 若完全合規：`✅ 格式審查通過，可直接發送。`
 
-## Step 4 — 後續選項
+## Step 4 — 後續
 
-1. 使用修正版
-2. 進一步調整語氣 / 內容
-3. 透過 Slack MCP 發送
+詢問用戶：
+
+> 1. 發送修正版到設定頻道
+> 2. 指定其他頻道發送
+> 3. 只複製，不發送
+
+若選 1 或 2：讀取 `~/.claude/.env` 的 `SLACK_NOTIFY_CHANNEL` 作為預設 `channel_id`（未設定則請用戶提供）。
+
+使用 `mcp__claude_ai_Slack__slack_send_message` 發送修正後訊息，成功後回報：`✅ 已發送`

@@ -302,7 +302,7 @@ async function main() {
     { value: 'claude', label: 'Claude Code 開發配置', hint: 'commands · agents · rules · hooks · settings' },
     { value: 'project', label: '專案配置（repos + AI）', hint: 'CLAUDE.md + ECC + 技術棧 · 需選 repos' },
     { value: 'zsh', label: 'ZSH 環境模組', hint: 'aliases · fzf · git · tools · history' },
-    { value: 'slack', label: 'Slack 通知', hint: 'P0/P1/P2 分級 + Channel/DM' },
+    { value: 'slack', label: 'Slack 通知', hint: 'Channel / DM' },
   ]
   // 首次安裝只預選核心 claude，避免誤覆蓋用戶現有 zsh/Slack 配置
   const prevFeatures = prev?.features || ['claude']
@@ -317,7 +317,7 @@ async function main() {
   // 對可能修改系統配置的選項給出簡短提示
   const riskySelected = features.filter(f => ['zsh', 'slack'].includes(f))
   if (riskySelected.length > 0) {
-    const hints = { zsh: '修改 ~/.zshrc 和 ~/.zsh/', slack: '寫入 Slack webhook 設定' }
+    const hints = { zsh: '修改 ~/.zshrc 和 ~/.zsh/', slack: '設定 Slack 通知頻道' }
     p.log.info(`選擇了：${riskySelected.map(f => `${f}（${hints[f]}）`).join('、')}`)
     const ok = handleCancel(await p.confirm({ message: '確認繼續？', initialValue: true }))
     if (ok === BACK || !ok) { p.outro('已取消'); return }
@@ -332,20 +332,41 @@ async function main() {
   const setupResults = []
 
   // Slack 通知設定
-  if (has('slack') && !prev?.slackChannel) {
+  if (has('slack')) {
     p.log.step(pc.bold('Slack 通知設定'))
     const { setupSlackNotify } = await import('../lib/slack/slack-setup.mjs')
     const slackResult = await setupSlackNotify(prev)
     if (slackResult) {
       const envPath = path.join(REPO, '.env')
       let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
-      envContent = envContent.replace(/^SLACK_NOTIFY_CHANNEL=.*/m, '').replace(/^SLACK_NOTIFY_MODE=.*/m, '').trim()
-      envContent += `\nSLACK_NOTIFY_CHANNEL=${slackResult.channelId}\nSLACK_NOTIFY_MODE=${slackResult.mode}\n`
+      envContent = envContent
+        .replace(/^SLACK_NOTIFY_CHANNEL=.*/m, '')
+        .replace(/^SLACK_NOTIFY_MODE=.*/m, '')
+        .replace(/^SLACK_NOTIFY_CHANNEL_NAME=.*/m, '')
+        .replace(/^SLACK_WORKSPACE_URL=.*/m, '')
+        .replace(/^SLACK_WEBHOOK_URL=.*/m, '')
+        .replace(/^SLACK_NOTIFY_USER_ID=.*/m, '')
+        .trim()
+      envContent += `\nSLACK_NOTIFY_CHANNEL=${slackResult.channelId}\nSLACK_NOTIFY_MODE=${slackResult.mode}`
+      if (slackResult.channelName) envContent += `\nSLACK_NOTIFY_CHANNEL_NAME=${slackResult.channelName}`
+      if (slackResult.channelUrl) {
+        const wsUrl = slackResult.channelUrl.match(/^(https:\/\/[^/]+)/)?.[1] || ''
+        if (wsUrl) envContent += `\nSLACK_WORKSPACE_URL=${wsUrl}`
+      }
+      if (slackResult.userId) envContent += `\nSLACK_NOTIFY_USER_ID=${slackResult.userId}`
+      envContent += '\n'
       fs.writeFileSync(envPath, envContent)
       if (!prev) prev = {}
       prev.slackChannel = slackResult.channelId
+      prev.slackChannelName = slackResult.channelName || ''
+      prev.slackWorkspaceUrl = slackResult.channelUrl?.match(/^(https:\/\/[^/]+)/)?.[1] || ''
       prev.slackMode = slackResult.mode
-      setupResults.push(`Slack ${pc.green('✔')} ${slackResult.mode === 'dm' ? 'DM' : `#${slackResult.channelId}`}`)
+      prev.slackUserId = slackResult.userId || ''
+      const hyperlink = (text, url) => url ? `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\` : text
+      const slackDisplay = slackResult.mode === 'dm'
+        ? 'DM'
+        : `${hyperlink(`#${slackResult.channelName || slackResult.channelId}`, slackResult.channelUrl)} (${slackResult.channelId})`
+      setupResults.push(`Slack ${pc.green('✔')} ${slackDisplay}`)
     } else {
       setupResults.push(`Slack ${pc.dim('跳過')}`)
     }

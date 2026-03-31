@@ -177,10 +177,29 @@ cc <@U12345678> <@U87654321>
 - [ ] 提及用 `<@USERID>` 或 `<!here>`
 - [ ] 第一行就是結論/重點
 
-## Step 4 — 後續
+## Step 4 — 發送
 
-1. 直接複製使用
-2. 修改後再發
-3. 透過 Slack MCP 發送（`slack_send_message`）
+詢問用戶：
 
-> ⚠️ 發送時用 `channel_id`（不是 `channel`）
+> 要發送嗎？
+> 1. 發送到設定頻道（預設）
+> 2. 指定其他頻道
+> 3. 只複製，不發送
+
+### 取得頻道 ID
+
+讀取 `~/.claude/.env`：
+
+1. `SLACK_NOTIFY_CHANNEL` — channel 模式（C 開頭）或 DM 模式（U 開頭）皆可直接使用
+2. 若 `SLACK_NOTIFY_MODE=off` 或變數不存在 → 請用戶貼上頻道 ID 或 Channel Link
+
+> Channel Link 格式：`https://xxx.slack.com/archives/C07XXXXXX`
+> 從中擷取 `C07XXXXXX` 作為 `channel_id`
+
+### 發送
+
+使用 `mcp__claude_ai_Slack__slack_send_message`：
+- `channel_id`：上方取得的 ID
+- `text`：Step 2 組裝的訊息內容
+
+發送成功後回報：`✅ 已發送到 <頻道名或 ID>`

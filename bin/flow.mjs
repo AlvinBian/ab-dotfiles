@@ -99,7 +99,64 @@ function generateHTML(charts) {
     </section>`
   }).join('\n')
 
-  // No svgMap needed — SVGs are inline
+  const scriptBlock = `
+  <script>
+    // 導航
+    var secs = document.querySelectorAll('.chart-section');
+    var navs = document.querySelectorAll('.nav-item');
+    var obs = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) { if (e.isIntersecting) {
+        navs.forEach(function(n) { n.classList.remove('active'); });
+        var a = document.querySelector('.nav-item[data-target="'+e.target.id+'"]');
+        if (a) a.classList.add('active');
+      }});
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    secs.forEach(function(s) { obs.observe(s); });
+    document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        var t = document.querySelector(a.getAttribute('href'));
+        if (t) t.scrollIntoView({ behavior:'smooth', block:'start' });
+      });
+    });
+
+    // 全螢幕 Modal — svg-pan-zoom
+    var spz = null;
+    function openModal(id) {
+      var source = document.querySelector('#svg-' + id + ' svg') || document.querySelector('#mmd-' + id + ' svg');
+      if (!source) return;
+      document.getElementById('modal-title').textContent =
+        (document.getElementById(id) && document.getElementById(id).querySelector('h2'))
+        ? document.getElementById(id).querySelector('h2').textContent : id;
+      var container = document.getElementById('modal-svg-container');
+      container.innerHTML = '';
+      if (spz) { spz.destroy(); spz = null; }
+      var clone = source.cloneNode(true);
+      clone.removeAttribute('style');
+      clone.setAttribute('width', '100%');
+      clone.setAttribute('height', '100%');
+      container.appendChild(clone);
+      document.getElementById('modal').classList.add('active');
+      document.body.style.overflow = 'hidden';
+      setTimeout(function() {
+        spz = svgPanZoom(clone, {
+          zoomEnabled: true, panEnabled: true, controlIconsEnabled: false,
+          mouseWheelZoomEnabled: true, preventMouseEventsDefault: true,
+          zoomScaleSensitivity: 0.3, minZoom: 0.2, maxZoom: 10, fit: true, center: true,
+        });
+      }, 50);
+    }
+    function mClose() {
+      document.getElementById('modal').classList.remove('active');
+      document.body.style.overflow = '';
+      if (spz) { spz.destroy(); spz = null; }
+    }
+    function mZoomIn() { if (spz) spz.zoomIn(); }
+    function mZoomOut() { if (spz) spz.zoomOut(); }
+    function mReset() { if (spz) { spz.resetZoom(); spz.resetPan(); spz.fit(); spz.center(); } }
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') mClose(); });
+    document.getElementById('modal').addEventListener('click', function(e) { if (e.target === e.currentTarget) mClose(); });
+  <\/script>`
 
   return `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -107,7 +164,7 @@ function generateHTML(charts) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ab-dotfiles — 流程圖</title>
-  <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
   <style>
     :root {
       --bg: #0d1117; --card: #161b22; --border: #30363d;
@@ -180,12 +237,9 @@ function generateHTML(charts) {
       background: var(--card); color: var(--text); cursor: pointer; font-size: 16px;
     }
     .modal-controls button:hover { border-color: var(--accent); color: var(--accent); }
-    .modal-body {
-      flex: 1; overflow: hidden; cursor: grab;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .modal-body:active { cursor: grabbing; }
-    #modal-inner { transform-origin: center center; }
+    .modal-body { flex: 1; overflow: hidden; }
+    #modal-svg-container { width: 100%; height: 100%; }
+    #modal-svg-container svg { width: 100%; height: 100%; }
 
     footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
     @media (max-width: 768px) {
@@ -219,15 +273,20 @@ function generateHTML(charts) {
       </div>
     </div>
     <div class="modal-body" id="modal-body">
-      <div id="modal-inner"></div>
+      <div id="modal-svg-container"></div>
     </div>
   </div>
 
   ${charts.some(c => !fs.existsSync(path.join(OUTPUT_DIR, c.name + '.svg')))
-    ? '<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>\n  <script>mermaid.initialize({ startOnLoad:true, theme:"dark", securityLevel:"loose", themeVariables:{ primaryColor:"#1f6feb", primaryTextColor:"#e6edf3", lineColor:"#8b949e" } });</script>' : ''}
+    ? '<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>\n  <script>mermaid.initialize({ startOnLoad:true, theme:"dark", securityLevel:"loose", themeVariables:{ primaryColor:"#1f6feb", primaryTextColor:"#e6edf3", lineColor:"#8b949e" } });<\/script>' : ''}
 
-  <script>
-    // Nav
+  ${scriptBlock}
+</body>
+</html>`
+}
+
+/*
+  // Nav
     const secs = document.querySelectorAll('.chart-section');
     const navs = document.querySelectorAll('.nav-item');
     new IntersectionObserver(entries => {
@@ -338,11 +397,7 @@ function generateHTML(charts) {
     function mReset() { if(pz) pz.reset(); }
 
     document.addEventListener('keydown', e => { if(e.key==='Escape') mClose(); });
-    document.getElementById('modal').addEventListener('click', e => { if(e.target===e.currentTarget) mClose(); });
-  </script>
-</body>
-</html>`
-}
+*/
 
 // ── Main ──
 if (!fs.existsSync(FLOWS_DIR)) { console.error('找不到 docs/flows/'); process.exit(1) }

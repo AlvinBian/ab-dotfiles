@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns='http://www.w3.org/2005/Atom' xmlns:apps='http://schemas.google.com/apps/2006'>
+  <title>Mail Filters</title>
+
+  <!-- ── Tier 0: github/noise — GitHub 官方通知 ── -->
+  <entry>
+    <category term='filter'/>
+    <apps:property name='from' value='notifications@github.com OR noreply@github.com'/>
+    <apps:property name='label' value='github/noise'/>
+    <apps:property name='shouldArchive' value='false'/>
+    <apps:property name='shouldNeverSpam' value='true'/>
+    <apps:property name='shouldNeverMarkAsImportant' value='true'/>
+  </entry>
+
+  <!-- ── Tier 0: github/noise — Bot / CI / 其他 DevOps 平台 ── -->
+  <entry>
+    <category term='filter'/>
+    <apps:property name='from' value='dependabot[bot] OR renovate[bot] OR noreply@renovateapp.com OR noreply@gitlab.com OR noreply@bitbucket.org OR noreply@circleci.com OR noreply@travis-ci.com OR noreply@buildkite.com'/>
+    <apps:property name='label' value='github/noise'/>
+    <apps:property name='shouldArchive' value='false'/>
+    <apps:property name='shouldNeverSpam' value='true'/>
+    <apps:property name='shouldNeverMarkAsImportant' value='true'/>
+  </entry>
+
+  <!-- ── Tier 1: auto/skip — SaaS 工具通知 ── -->
+  <entry>
+    <category term='filter'/>
+    <apps:property name='from' value='noreply@jira.com OR noreply@confluence.com OR noreply@atlassian.net OR noreply@slack.com OR noreply@notion.so OR noreply@linear.app OR noreply@sentry.io OR noreply@datadoghq.com OR noreply@pagerduty.com OR noreply@npmjs.com'/>
+    <apps:property name='label' value='auto/skip'/>
+    <apps:property name='shouldArchive' value='false'/>
+    <apps:property name='shouldNeverSpam' value='true'/>
+    <apps:property name='shouldNeverMarkAsImportant' value='true'/>
+  </entry>
+
+  <!-- ── Tier 2: auto/info — 公告 / 收據 / 發票 ── -->
+  <entry>
+    <category term='filter'/>
+    <apps:property name='subject' value='[全員公告] OR [All Staff] OR receipt OR invoice'/>
+    <apps:property name='label' value='auto/info'/>
+    <apps:property name='shouldArchive' value='false'/>
+    <apps:property name='shouldNeverSpam' value='true'/>
+  </entry>
+
+  <!-- ── Tier 3: auto/meeting — 行事曆邀請（.ics 附件）── -->
+  <entry>
+    <category term='filter'/>
+    <apps:property name='hasAttachment' value='true'/>
+    <apps:property name='subject' value='invite.ics'/>
+    <apps:property name='label' value='auto/meeting'/>
+    <apps:property name='shouldArchive' value='false'/>
+    <apps:property name='shouldNeverSpam' value='true'/>
+  </entry>
+
+  <!-- ── Tier 4: action/required — HR / 財務 / 緊急 ── -->
+  <entry>
+    <category term='filter'/>
+    <apps:property name='subject' value='薪資 OR 考績 OR offer OR salary OR expense'/>
+    <apps:property name='label' value='action/required'/>
+    <apps:property name='shouldArchive' value='false'/>
+    <apps:property name='shouldNeverSpam' value='true'/>
+    <apps:property name='shouldStar' value='true'/>
+    <apps:property name='shouldMarkAsImportant' value='true'/>
+  </entry>
+
+</feed>

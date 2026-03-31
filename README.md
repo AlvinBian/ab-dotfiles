@@ -113,7 +113,7 @@ pnpm run setup
   │
   ├─ 舊配置偵測（自動清理殘留）
   ├─ 環境檢查 + CLI 預熱
-  ├─ 功能選擇（claude / claudemd / ecc / slack / zsh / gmail）
+  ├─ 功能選擇（claude / claudemd / ecc / slack / zsh）
   ├─ Step 1：選擇倉庫
   │   ├─ GitHub 帳號 → 多組織/個人同時選取 → 選 repos
   │   └─ 角色分配（⭐主力 / 🔄臨時 / 🔧工具）
@@ -402,21 +402,20 @@ repos fetch + ECC fetch（並行）
 
 ## Gmail 5-Tier 分級
 
-選擇 `gmail` 功能時，setup 會透過 clasp + Google Apps Script 建立自動化郵件分級系統。
-所有郵件留在收件匣，用 label 分類 + 重要郵件突出顯示。
+透過 XML 匯入方式，一次建立 5 組 Gmail 篩選規則，讓收件匣自動分類。
+所有郵件留在收件匣，重要郵件（Tier 4）自動標星 + 標記重要。
 
-| Tier | 匹配對象 | Gmail Label | 動作 |
-|------|---------|-------------|------|
-| 0 | GitHub PR/CI/bot、Dependabot、GitLab、CI/CD | `github/noise` | 加標籤 + 移除 IMPORTANT |
-| 1 | Jira/Confluence、Slack、Notion/Sentry、Datadog | `auto/skip` | 加標籤 + 移除 IMPORTANT |
-| 2 | 公司公告、收據/發票、Figma | `auto/info` | 加標籤 |
-| 3 | 行事曆邀請（.ics 附件） | `auto/meeting` | 加標籤 |
-| 4 | HR/薪資/晉升、財務/報帳、法務/合約、緊急 | `action/required` | **IMPORTANT + STARRED** |
+| Tier | Gmail Label | 匹配對象 |
+|------|-------------|----------|
+| 0 | `github/noise` | GitHub、GitLab、Dependabot、CI/CD bot |
+| 1 | `auto/skip` | Jira、Slack、Notion、Sentry、Datadog |
+| 2 | `auto/info` | 全員公告、收據、發票 |
+| 3 | `auto/meeting` | 行事曆邀請（.ics 附件） |
+| 4 | `action/required` | 薪資、考績、offer、expense（**標星 + 重要**） |
 
-- `setupAndApply()` — 建立 filter + 追溯分類已有郵件
-- `deleteAllFilters()` — 重跑前自動清除舊 filter
-- Gmail 左側欄點 `action/required` 可獨立查看所有重要郵件
-- 需求：`clasp` CLI + Google Apps Script API 已啟用
+**匯入方式：** Gmail → ⚙️ → 設定 → 篩選器和封鎖的地址 → 匯入篩選器 → 選擇 `scripts/gmail-filters/gmail-filters.xml`
+
+詳細說明、自訂規則範例、還原步驟請參考 [docs/gmail-filters.md](docs/gmail-filters.md)。
 
 ---
 

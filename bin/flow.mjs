@@ -406,7 +406,7 @@ const order = [
   'setup-main', 'setup-status', 'env-check', 'upgrade-legacy',
   'phase-plan', 'phase-execute', 'config-protection',
   'repo-select', 'role-system', 'feature-map',
-  'slack-setup', 'gmail-setup', 'ecc-pipeline', 'session-lifecycle',
+  'slack-setup', 'ecc-pipeline', 'session-lifecycle',
 ]
 
 const files = fs.readdirSync(FLOWS_DIR).filter(f => f.endsWith('.mmd')).sort((a, b) => {

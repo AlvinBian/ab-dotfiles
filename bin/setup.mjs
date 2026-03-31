@@ -182,7 +182,7 @@ async function main() {
       // 展示完整配置狀態，並提供快速調整選項
       const { getConfigStatus } = await import('../lib/core/config-status.mjs')
       const {
-        adjustClaude, adjustGlobalSettings, adjustSlack, adjustClaudeMd, adjustZsh, adjustGmail,
+        adjustClaude, adjustGlobalSettings, adjustSlack, adjustClaudeMd, adjustZsh,
       } = await import('../lib/phases/phase-adjust.mjs')
 
       const status = getConfigStatus()
@@ -236,15 +236,6 @@ async function main() {
         lines.push(`  ${pc.dim('未設定')}`)
       }
 
-      // ── Gmail ──
-      lines.push('', pc.bold('Gmail 分級'))
-      if (prev?.gmail?.scriptId) {
-        lines.push(`  Script ID  ${pc.cyan(prev.gmail.scriptId)}`)
-        lines.push(`  設定時間   ${pc.dim(prev.gmail.setupAt?.slice(0, 10) || '')}`)
-      } else {
-        lines.push(`  ${pc.dim('未設定')}`)
-      }
-
       // ── AI ──
       if (envStatus.aiModel) {
         lines.push('', pc.bold('AI 設定'))
@@ -261,7 +252,6 @@ async function main() {
           { value: 'claudemd',  label: '重新生成 CLAUDE.md', hint: `${claudeMd.count} 個 repo · 需 AI` },
           { value: 'zsh',       label: '重新安裝 zsh 模組', hint: `${zsh.installed.length}/${zsh.expected.length} 已安裝` },
           { value: 'slack',     label: '重新設定 Slack 通知', hint: slack.mode ? `${slack.mode}` : '未設定' },
-          { value: 'gmail',     label: '重新設定 Gmail 分級', hint: prev?.gmail?.scriptId ? '已設定' : '未設定' },
           { value: 'back',      label: '← 返回' },
         ],
       }))
@@ -272,7 +262,6 @@ async function main() {
         claudemd: () => adjustClaudeMd(),
         zsh:      () => adjustZsh({ flagAll }),
         slack:    () => adjustSlack(),
-        gmail:    () => adjustGmail(),
       }
       if (adjustMap[adjustAction]) await adjustMap[adjustAction]()
       p.outro('調整完成')
@@ -315,7 +304,6 @@ async function main() {
     { value: 'ecc', label: 'ECC 外部資源', hint: '社群 commands/agents/rules 融合' },
     { value: 'slack', label: 'Slack 通知', hint: 'P0/P1/P2 分級 + Channel/DM' },
     { value: 'zsh', label: 'zsh 環境模組', hint: 'aliases · fzf · git · tools · history' },
-    { value: 'gmail', label: 'Gmail 5-Tier 分級', hint: 'clasp + Apps Script 自動過濾' },
   ]
   // 首次安裝只預選核心 claude，避免誤覆蓋用戶現有 zsh/Slack 配置
   const prevFeatures = prev?.features || ['claude']
@@ -350,32 +338,6 @@ async function main() {
       setupResults.push(`Slack ${pc.green('✔')} ${slackResult.mode === 'dm' ? 'DM' : `#${slackResult.channelId}`}`)
     } else {
       setupResults.push(`Slack ${pc.dim('跳過')}`)
-    }
-  }
-
-  // Gmail 5-Tier 分級設定
-  if (has('gmail') && !prev?.gmail?.scriptId) {
-    p.log.step(pc.bold('Gmail 5-Tier 分級設定'))
-    const { setupGmailFilters } = await import('../lib/gmail/gmail-setup.mjs')
-    const gmailResult = await setupGmailFilters(prev)
-    if (gmailResult) {
-      if (!prev) prev = {}
-      prev.gmail = gmailResult
-      const { patchSession } = await import('../lib/core/session.mjs')
-      patchSession({ gmail: gmailResult })
-      const filterUrl = 'https://mail.google.com/mail/u/0/#settings/filters'
-      setupResults.push([
-        `Gmail ${pc.green('✔')} 5-Tier 分級已啟用 — 所有郵件留收件匣，重要郵件突出顯示`,
-        `    Tier 0  ${pc.dim('GitHub/CI noise → github/noise 標籤')}`,
-        `    Tier 1  ${pc.dim('Jira/Slack/SaaS bot → auto/skip 標籤')}`,
-        `    Tier 2  ${pc.dim('公司公告/收據 → auto/info 標籤')}`,
-        `    Tier 3  ${pc.dim('行事曆邀請 → auto/meeting 標籤')}`,
-        `    Tier 4  ${pc.dim('HR/財務/緊急 → ⭐ STARRED + IMPORTANT + action/required 紅色標籤')}`,
-        `    ${pc.dim('查看 filters →')} ${pc.cyan(filterUrl)}`,
-        `    ${pc.dim('編輯 script →')} ${pc.cyan(gmailResult.scriptUrl)}`,
-      ].join('\n'))
-    } else {
-      setupResults.push(`Gmail ${pc.dim('跳過')}`)
     }
   }
 

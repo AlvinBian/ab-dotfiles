@@ -229,9 +229,12 @@ ${c.mermaid}
           contain: false, cursor: 'grab',
           excludeClass: 'link-btn',
         });
-        // 滾輪縮放綁定到父容器
+        // Ctrl/Cmd + 滾輪才縮放，普通滾輪正常滾動頁面
         el.parentElement.addEventListener('wheel', e => {
-          instance.zoomWithWheel(e);
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            instance.zoomWithWheel(e);
+          }
         }, { passive: false });
         pzInstances[id] = instance;
       });

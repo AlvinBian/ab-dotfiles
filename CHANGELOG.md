@@ -1,5 +1,45 @@
 # ab-dotfiles
 
+## 2.1.0
+
+### New Features
+
+- **Gmail 5-Tier 分級系統** — clasp + Google Apps Script 自動建立郵件分級 filter，5 個等級含顏色標籤、星號、封存動作，支援追溯分類已有郵件
+- **`pnpm run status`** — 配置健康狀態 CLI，顯示所有已安裝項目的完整度
+- **`pnpm run flow`** — 9 張互動式流程圖，瀏覽器開啟，支援 panzoom 縮放拖動
+- **多組織同時選取** — repo 選擇支援跨多個 GitHub 組織 / 個人帳號同時操作
+- **`@chief-of-staff` agent** — 跨 agent 任務協調與排程，目前共 14 個 agents
+- **版本號動態化** — APP_VERSION 從 package.json 讀取，不再硬編碼
+- **未完成 session 偵測** — crash 後重入自動提示恢復上次 session
+- **CLAUDE.md 並行生成** — Promise.all 並行，加速多 repo 場景
+
+### Config Protection
+
+- **~/.zshrc 個人設定自動遷移** — 覆蓋前自動提取個人設定到 `~/.zshrc.local`，永不覆蓋
+- **~/.ripgreprc skip-if-exists** — 已有設定不覆蓋
+- **auto-update.sh 同步** — 更新腳本加入 `.zshrc.local` 遷移邏輯
+- **備份範圍擴充** — 新增 `keybindings.json`、`.zshrc.local`、`.ripgreprc`
+- **三層保護** — 原始備份 → 增量備份 → smart deploy（skip / never-overwrite）
+
+### Bug Fixes
+
+- 80+ bugs fixed across 5 rounds of 10-agent review
+- BACK symbol 在 install pipeline 中正確傳播
+- shell injection 修復（ghSync、doctor.mjs、slack-setup）
+- Gmail：標籤顏色、重複 filter 去重、batchModify、V8 runtime、ICS 語法
+- phase-execute / phase-complete null guards
+- env.mjs `_loaded` flag、`parseInt('0')`、quote matching
+- session `saveSession` try/catch、`updateSessionProgress` 首次執行
+- keybindings 移除不部署（避免衝突）
+
+### Performance
+
+- `AI_CONCURRENCY = Infinity`（Claude CLI 自行處理 rate limiting）
+- `GH_CONCURRENCY = 8`（防止 GitHub API 403）
+- CLAUDE.md Promise.all 並行生成
+
+---
+
 ## 2.0.0
 
 ### Major Changes

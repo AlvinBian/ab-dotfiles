@@ -1,4 +1,4 @@
-# ab-dotfiles
+# ab-dotfiles v2.1.0
 
 開發環境統一管理工具 — AI 驅動的技術棧偵測、Claude Code 技能庫生成、zsh 環境模組。
 
@@ -85,6 +85,12 @@ setup 會修改以下檔案/目錄，**每次安裝前自動備份**：
 | `~/.zsh/modules/`            | 寫入 zsh 模組（diff 跳過）   | `dist/backup/{timestamp}/zsh/modules`             |
 | `~/.ripgreprc`               | 首次建立（已有跳過）         | `dist/backup/{timestamp}/ripgreprc`               |
 
+**三層保護機制：**
+
+1. `dist/backup/original/` — 首次安裝前的原始備份（一次性）
+2. `dist/backup/{timestamp}/` — 每次 setup 前的增量備份
+3. Smart deploy — `.zshrc.local` 永不覆蓋；`.ripgreprc` 已有則跳過
+
 不想直接部署？用 `--manual` 模式：
 
 ```bash
@@ -109,7 +115,7 @@ pnpm run setup
   ├─ 環境檢查 + CLI 預熱
   ├─ 功能選擇（claude / claudemd / ecc / slack / zsh / gmail）
   ├─ Step 1：選擇倉庫
-  │   ├─ GitHub 帳號 → 組織/個人（可多選）→ 選 repos
+  │   ├─ GitHub 帳號 → 多組織/個人同時選取 → 選 repos
   │   └─ 角色分配（⭐主力 / 🔄臨時 / 🔧工具）
   ├─ 自動分析（Listr2 並行）
   │   ├─ Per-repo AI 技術棧分析（並行，各自快取）
@@ -124,9 +130,9 @@ pnpm run setup
   │   ├─ [2/8] 全局配置（settings + slack-dispatch）
   │   ├─ [3/8] Claude 安裝（commands + agents + rules + hooks）
   │   ├─ [4/8] ECC 融合 + Stacks 生成
-  │   ├─ [5/8] CLAUDE.md 生成（~/.claude/projects/）
+  │   ├─ [5/8] CLAUDE.md 並行生成（~/.claude/projects/）
   │   ├─ [6/8] Plugin 打包
-  │   ├─ [7/8] zsh 模組
+  │   ├─ [7/8] zsh 模組（含 .zshrc.local 個人設定遷移）
   │   └─ [8/8] 驗證安裝完整性
   └─ Step 3：完成
       ├─ 安裝摘要 + 快速上手引導
@@ -174,6 +180,8 @@ pnpm run setup
 ab-dotfiles/
 ├── bin/
 │   ├── setup.mjs                # 安裝精靈入口
+│   ├── status.mjs               # 配置健康狀態檢查
+│   ├── flow.mjs                 # 9 張流程圖瀏覽器檢視
 │   ├── scan.mjs                 # 技術棧掃描 & stacks/ 生成
 │   ├── restore.mjs              # 備份還原
 │   ├── restore-original.mjs     # 還原到首次安裝前
@@ -267,7 +275,7 @@ ab-dotfiles/
 │   ├── hooks/                   # slack-dispatch.sh
 │   ├── hooks.json               # 8 個 hooks 定義
 │   ├── settings-template.json   # settings 模板
-│   └── keybindings-template.json # 快捷鍵模板
+│   └── keybindings-template.json # 快捷鍵模板（保留備用，不主動部署）
 │
 ├── ecc/                         # ECC 外部資源（GitHub Actions 自動同步）
 │   └── everything-claude-code/  # 97 個檔案（60 cmd + 28 agent + 9 rule）
@@ -320,23 +328,24 @@ ab-dotfiles/
 | `/multi-frontend`   | 多前端專案協調                    |
 | `/changeset`        | 生成 changeset / CHANGELOG        |
 
-### Agents（13 個）
+### Agents（14 個）
 
-| Agent            | 模型   | 讀/寫 | 用途               |
-| ---------------- | ------ | ----- | ------------------ |
-| `@explorer`      | haiku  | 唯讀  | 快速搜索 codebase  |
-| `@planner`       | sonnet | 唯讀  | 設計方案、拆解任務 |
-| `@coder`         | sonnet | 讀寫  | 實作功能           |
-| `@tester`        | sonnet | 讀寫  | 生成測試、跑測試   |
-| `@reviewer`      | sonnet | 唯讀  | 深度 code review   |
-| `@refactor`      | sonnet | 讀寫  | 重構優化           |
-| `@debugger`      | sonnet | 讀寫  | 定位修復 bug       |
-| `@documenter`    | sonnet | 讀寫  | 生成文件           |
-| `@deployer`      | sonnet | 讀寫  | PR + Release       |
-| `@monitor`       | haiku  | 唯讀  | 日誌分析、效能檢查 |
-| `@security`      | sonnet | 唯讀  | 安全掃描           |
-| `@migrator`      | sonnet | 讀寫  | 版本遷移           |
-| `@perf-analyzer` | sonnet | 唯讀  | 效能分析           |
+| Agent              | 模型   | 讀/寫 | 用途                      |
+| ------------------ | ------ | ----- | ------------------------- |
+| `@explorer`        | haiku  | 唯讀  | 快速搜索 codebase         |
+| `@planner`         | sonnet | 唯讀  | 設計方案、拆解任務        |
+| `@coder`           | sonnet | 讀寫  | 實作功能                  |
+| `@tester`          | sonnet | 讀寫  | 生成測試、跑測試          |
+| `@reviewer`        | sonnet | 唯讀  | 深度 code review          |
+| `@refactor`        | sonnet | 讀寫  | 重構優化                  |
+| `@debugger`        | sonnet | 讀寫  | 定位修復 bug              |
+| `@documenter`      | sonnet | 讀寫  | 生成文件                  |
+| `@deployer`        | sonnet | 讀寫  | PR + Release              |
+| `@monitor`         | haiku  | 唯讀  | 日誌分析、效能檢查        |
+| `@security`        | sonnet | 唯讀  | 安全掃描                  |
+| `@migrator`        | sonnet | 讀寫  | 版本遷移                  |
+| `@perf-analyzer`   | sonnet | 唯讀  | 效能分析                  |
+| `@chief-of-staff`  | sonnet | 讀寫  | 跨 agent 任務協調與排程   |
 
 ### Rules（6 個）
 
@@ -388,6 +397,26 @@ repos fetch + ECC fetch（並行）
 | 審計鏈        | `.cache/audit/`            | 保留最近 10 次            |
 | Session       | `.cache/last-session.json` | 手動清除                  |
 | Stacks        | `.cache/stacks/`           | 每次 setup 重新生成       |
+
+---
+
+## Gmail 5-Tier 分級
+
+選擇 `gmail` 功能時，setup 會透過 clasp + Google Apps Script 建立自動化郵件分級系統。
+所有郵件留在收件匣，用 label 分類 + 重要郵件突出顯示。
+
+| Tier | 匹配對象 | Gmail Label | 動作 |
+|------|---------|-------------|------|
+| 0 | GitHub PR/CI/bot、Dependabot、GitLab、CI/CD | `github/noise` | 加標籤 + 移除 IMPORTANT |
+| 1 | Jira/Confluence、Slack、Notion/Sentry、Datadog | `auto/skip` | 加標籤 + 移除 IMPORTANT |
+| 2 | 公司公告、收據/發票、Figma | `auto/info` | 加標籤 |
+| 3 | 行事曆邀請（.ics 附件） | `auto/meeting` | 加標籤 |
+| 4 | HR/薪資/晉升、財務/報帳、法務/合約、緊急 | `action/required` | **IMPORTANT + STARRED** |
+
+- `setupAndApply()` — 建立 filter + 追溯分類已有郵件
+- `deleteAllFilters()` — 重跑前自動清除舊 filter
+- Gmail 左側欄點 `action/required` 可獨立查看所有重要郵件
+- 需求：`clasp` CLI + Google Apps Script API 已啟用
 
 ---
 
@@ -461,8 +490,11 @@ GH_API_TIMEOUT=15000
 # ECC 外部來源
 ECC_SOURCES=everything-claude-code|affaan-m/everything-claude-code|10
 
-# AI 並發數
-AI_CONCURRENCY=5
+# AI 並發數（Claude CLI 自動處理 rate limiting）
+AI_CONCURRENCY=Infinity
+
+# GitHub API 並發數（防止 403）
+GH_CONCURRENCY=8
 
 # Slack 通知
 SLACK_NOTIFY_CHANNEL=
@@ -483,7 +515,7 @@ SLACK_NOTIFY_MODE=dm
 dist/preview/
 ├── claude/
 │   ├── commands/          # 15 個
-│   ├── agents/            # 13 個
+│   ├── agents/            # 14 個
 │   ├── rules/             # 6 個
 │   └── hooks.json
 └── zsh/

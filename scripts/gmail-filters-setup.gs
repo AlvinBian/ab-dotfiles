@@ -76,7 +76,7 @@ function applyToExisting() {
       var modifyRequest = { ids: ids };
 
       var addLabels = (rule.action.addLabelIds || []).filter(function(id) {
-        return id && id !== "IMPORTANT" && id !== "STARRED";
+        return id && id !== "STARRED";  // STARRED 需要單獨處理，IMPORTANT 可以 batchModify
       });
       var removeLabels = (rule.action.removeLabelIds || []).filter(Boolean);
 
@@ -155,7 +155,7 @@ function buildRules(labelIds) {
     // ══════════════════════════════════════════════════
     // TIER 3 — meeting（行事曆邀請、會議變更）
     // ══════════════════════════════════════════════════
-    { desc: "Calendar invites", criteria: { query: "filename:invite.ics OR filename:*.ics" },
+    { desc: "Calendar invites", criteria: { query: "filename:invite.ics OR filename:.ics" },
       action: { addLabelIds: [labelIds["auto/meeting"]], removeLabelIds: [] } },
 
     // ══════════════════════════════════════════════════

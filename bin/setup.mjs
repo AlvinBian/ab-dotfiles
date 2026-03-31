@@ -50,9 +50,8 @@ function loadSources(configSources) {
   }).filter(Boolean)
 }
 
-cleanOldBackups()
-
 async function main() {
+  try { cleanOldBackups() } catch { /* best-effort */ }
   const config = loadConfig()
   const targets = config.targets || {}
   const sources = loadSources(config.sources)
@@ -91,45 +90,36 @@ async function main() {
     }
   }
 
-  // --quick + --dry-run 衝突檢查
-  if (flagQuick && flagDryRun) {
-    p.log.warn('--quick 和 --dry-run 不能同時使用，已忽略 --dry-run')
-  }
-
-  // --quick：直接用上次 session 重裝，跳過所有互動
-  if (flagQuick) {
-    if (!prev) { p.log.error('無歷史記錄，無法 --quick。請先執行 pnpm setup。'); process.exit(1) }
-    p.log.info(`Quick 模式：重放上次安裝（${prev.repos?.length} repos）`)
-
+  // 共用：用上次 session 快速重裝（--quick 和 reinstall 共享邏輯）
+  async function runQuickInstall({ prev: sessionPrev, flagManual: isManual, sources: srcs, targets: tgts, projectFolders: folders }) {
     if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
 
     // 首次使用：備份原始配置（~/.zshrc、~/.claude/ 等）
-    const { ensureOriginalBackup: ensureOriginalBackupQuick } = await import('./backup-original.mjs')
-    const origBackupQuick = ensureOriginalBackupQuick()
-    if (origBackupQuick && origBackupQuick.length > 0) {
-      p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackupQuick.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
+    const { ensureOriginalBackup } = await import('./backup-original.mjs')
+    const origBackup = ensureOriginalBackup()
+    if (origBackup && origBackup.length > 0) {
+      p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
     }
 
     phaseHeader('環境檢查')
     await ensureEnvironment()
     warmupCli()
 
-    // 用 session 重建 plan
-    if (!prev.roles) p.log.warn('上次 session 無角色資訊，全部預設為🔄臨時')
-    const repoObjects = (prev.repos || []).map(r => ({
+    // 用 session 重建 repo 物件
+    if (!sessionPrev.roles) p.log.warn('上次 session 無角色資訊，全部預設為🔄臨時')
+    const repoObjects = (sessionPrev.repos || []).map(r => ({
       fullName: r,
       commits: 10, // quick 模式假設都是主力
       pct: 0,
-      _roleOverride: prev.roles?.[r] || 'temp',
+      _roleOverride: sessionPrev.roles?.[r] || 'temp',
     }))
     phaseHeader('快速分析')
-    const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
-    if (flagManual) plan.mode = 'manual'
+    const plan = await phaseAnalyze({ repos: repoObjects, sources: srcs, baseDir: REPO, projectFolders: folders })
 
     // 應用 session 保存的角色
     const { getClaudeMdType } = await import('../lib/config/config-classifier.mjs')
     for (const r of plan.repos) {
-      if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
+      if (sessionPrev.roles?.[r.fullName]) r.role = sessionPrev.roles[r.fullName]
     }
     const rc = countBy(plan.repos, 'role')
     plan.mainCount = rc.main || 0
@@ -139,15 +129,29 @@ async function main() {
       repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
     }))
 
+    if (isManual) plan.mode = 'manual'
+
     phaseHeader('安裝中')
     const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
-      repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
+      repoDir: REPO, previewDir: PREVIEW_DIR, targets: tgts, prev: sessionPrev,
       pipelineResult: plan._pipelineResult || null, fetchedSources: plan._fetchedSources || null,
     })
 
     phaseHeader('完成', 3, 3)
-    await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders })
+    await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders: folders })
     p.outro('設定完成')
+  }
+
+  // --quick + --dry-run 衝突檢查
+  if (flagQuick && flagDryRun) {
+    p.log.warn('--quick 和 --dry-run 不能同時使用，已忽略 --dry-run')
+  }
+
+  // --quick：直接用上次 session 重裝，跳過所有互動
+  if (flagQuick) {
+    if (!prev) { p.log.error('無歷史記錄，無法 --quick。請先執行 pnpm setup。'); process.exit(1) }
+    p.log.info(`Quick 模式：重放上次安裝（${prev.repos?.length} repos）`)
+    await runQuickInstall({ prev, flagManual, sources, targets, projectFolders })
     return
   }
 
@@ -282,50 +286,7 @@ async function main() {
     if (action === 'reinstall') {
       await runLegacyCheckIfNeeded()
       // 等同 --quick
-      if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
-
-      // 首次使用：備份原始配置（~/.zshrc、~/.claude/ 等）
-      const { ensureOriginalBackup: ensureOriginalBackupReinstall } = await import('./backup-original.mjs')
-      const origBackupReinstall = ensureOriginalBackupReinstall()
-      if (origBackupReinstall && origBackupReinstall.length > 0) {
-        p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackupReinstall.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
-      }
-
-      phaseHeader('環境檢查')
-      await ensureEnvironment()
-      warmupCli()
-
-      if (!prev.roles) p.log.warn('上次 session 無角色資訊，全部預設為🔄臨時')
-      const repoObjects = (prev.repos || []).map(r => ({
-        fullName: r, commits: 10, pct: 0, _roleOverride: prev.roles?.[r] || 'temp',
-      }))
-      phaseHeader('快速分析')
-      const plan = await phaseAnalyze({ repos: repoObjects, sources, baseDir: REPO, projectFolders })
-
-      // 應用 session 保存的角色
-      const { getClaudeMdType } = await import('../lib/config/config-classifier.mjs')
-      for (const r of plan.repos) {
-        if (prev.roles?.[r.fullName]) r.role = prev.roles[r.fullName]
-      }
-      const roleCounts1 = countBy(plan.repos, 'role')
-      plan.mainCount = roleCounts1.main || 0
-      plan.tempCount = roleCounts1.temp || 0
-      plan.toolCount = roleCounts1.tool || 0
-      plan.projects = plan.repos.filter(r => r.localPath).map(r => ({
-        repo: r.fullName, role: r.role, localPath: r.localPath, claudeMdType: getClaudeMdType(r.role),
-      }))
-
-      if (flagManual) plan.mode = 'manual'
-
-      phaseHeader('安裝中')
-      const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
-        repoDir: REPO, previewDir: PREVIEW_DIR, targets, prev,
-        pipelineResult: plan._pipelineResult || null, fetchedSources: plan._fetchedSources || null,
-      })
-
-      phaseHeader('完成', 3, 3)
-      await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders })
-      p.outro('設定完成')
+      await runQuickInstall({ prev, flagManual, sources, targets, projectFolders })
       return
     }
   }
@@ -606,4 +567,4 @@ async function main() {
   p.outro('設定完成')
 }
 
-main().catch(e => { p.log.error(e.message); process.exit(1) })
+main().catch(e => { p.log.error(e?.message ?? String(e)); process.exit(1) })

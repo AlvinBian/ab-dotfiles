@@ -167,10 +167,12 @@ if [[ -f ~/.zshrc ]]; then
 
   # 自動遷移：從舊 .zshrc 提取個人設定到 ~/.zshrc.local（不會被覆蓋）
   if [[ ! -f ~/.zshrc.local ]]; then
-    grep -E '^\s*(export |alias |path\+|PATH=|eval |source )' ~/.zshrc \
+    # 提取個人設定（export/alias/PATH/eval/source/setopt/bindkey/function/變數賦值）
+    grep -E '^\s*(export |alias |path\+|PATH=|eval |source |setopt |bindkey |function |[A-Z_]+=)' ~/.zshrc \
       | grep -v 'ab-dotfiles\|BREW_PREFIX\|PYENV_ROOT\|_zsh_module\|_safe_source\|_command_exists\|\.zsh/modules' \
       > ~/.zshrc.local 2>/dev/null || true
     if [[ -s ~/.zshrc.local ]]; then
+      echo "# 未遷移的設定請查看備份：ls ~/.zshrc.backup.*" >> ~/.zshrc.local
       info "個人設定已遷移到 ~/.zshrc.local（$(wc -l < ~/.zshrc.local | tr -d ' ') 行）"
     fi
   fi

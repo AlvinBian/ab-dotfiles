@@ -243,17 +243,29 @@ ${c.mermaid}
       });
     });
 
-    // ── 嵌入式：Ctrl+滾輪縮放 ──
+    // ── 嵌入式：Ctrl+滾輪 / 觸控板捏合 縮放 ──
     document.querySelectorAll('.chart-body').forEach(el => {
       let scale = 1;
+      const applyScale = () => {
+        const mmd = el.querySelector('.mermaid');
+        if (mmd) mmd.style.transform = 'scale(' + scale + ')';
+      };
+      // Ctrl+滾輪（滑鼠）+ 觸控板 pinch（macOS 觸發 ctrlKey wheel）
       el.addEventListener('wheel', e => {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           scale *= e.deltaY > 0 ? 0.92 : 1.08;
           scale = Math.min(Math.max(scale, 0.3), 3);
-          const mmd = el.querySelector('.mermaid');
-          if (mmd) mmd.style.transform = 'scale(' + scale + ')';
+          applyScale();
         }
+      }, { passive: false });
+      // Safari/macOS gesturechange（原生捏合手勢）
+      el.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+      el.addEventListener('gesturechange', e => {
+        e.preventDefault();
+        scale *= e.scale > 1 ? 1.04 : 0.96;
+        scale = Math.min(Math.max(scale, 0.3), 3);
+        applyScale();
       }, { passive: false });
     });
 
@@ -294,7 +306,7 @@ ${c.mermaid}
         panOnlyWhenZoomed: false,
       });
 
-      // pinch-to-zoom（觸控板雙指捏合）+ Ctrl/Cmd+滾輪 = 以光標為中心縮放
+      // Ctrl+滾輪 / 觸控板捏合 = 以光標為中心縮放
       modalWheelHandler = e => {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
@@ -302,6 +314,13 @@ ${c.mermaid}
         }
       };
       viewport.addEventListener('wheel', modalWheelHandler, { passive: false });
+      // Safari/macOS 原生捏合手勢
+      viewport.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+      viewport.addEventListener('gesturechange', e => {
+        e.preventDefault();
+        const scale = modalPz.getScale() * (e.scale > 1 ? 1.04 : 0.96);
+        modalPz.zoom(Math.min(Math.max(scale, 0.3), 5), { animate: false });
+      }, { passive: false });
     }
 
     function closeModal() {

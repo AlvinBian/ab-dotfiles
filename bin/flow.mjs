@@ -138,7 +138,7 @@ ${c.mermaid}
       border-top: none; border-radius: 0 0 12px 12px;
       padding: 1.5rem; overflow-x: auto;
     }
-    .mermaid { display: flex; justify-content: center; min-height: 200px; }
+    .mermaid { display: flex; justify-content: center; min-height: 200px; transform-origin: center top; transition: transform 0.1s; }
     .mermaid svg { max-width: 100%; height: auto; }
     .chart-body { position: relative; overflow: hidden; cursor: pointer; }
     .chart-body:hover { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 0 0 12px 12px; }
@@ -243,7 +243,21 @@ ${c.mermaid}
       });
     });
 
-    // ── 全螢幕 Modal（唯一的互動入口）──
+    // ── 嵌入式：Ctrl+滾輪縮放 ──
+    document.querySelectorAll('.chart-body').forEach(el => {
+      let scale = 1;
+      el.addEventListener('wheel', e => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          scale *= e.deltaY > 0 ? 0.92 : 1.08;
+          scale = Math.min(Math.max(scale, 0.3), 3);
+          const mmd = el.querySelector('.mermaid');
+          if (mmd) mmd.style.transform = 'scale(' + scale + ')';
+        }
+      }, { passive: false });
+    });
+
+    // ── 全螢幕 Modal ──
     let modalPz = null;
     let modalWheelHandler = null;
 

@@ -314,6 +314,15 @@ async function main() {
   }))
   if (features === BACK) { p.outro('已取消'); return }
 
+  // 對可能修改系統配置的選項給出簡短提示
+  const riskySelected = features.filter(f => ['zsh', 'slack'].includes(f))
+  if (riskySelected.length > 0) {
+    const hints = { zsh: '修改 ~/.zshrc 和 ~/.zsh/', slack: '寫入 Slack webhook 設定' }
+    p.log.info(`選擇了：${riskySelected.map(f => `${f}（${hints[f]}）`).join('、')}`)
+    const ok = handleCancel(await p.confirm({ message: '確認繼續？', initialValue: true }))
+    if (ok === BACK || !ok) { p.outro('已取消'); return }
+  }
+
   const has = (f) => features.includes(f)
   // project = claudemd + ecc 合併，向下兼容
   const hasProject = has('project') || has('claudemd') || has('ecc')
@@ -457,10 +466,37 @@ async function main() {
     const reposKey = repos.map(r => `${r.fullName}:${r._roleOverride}`).sort().join(',')
     if (!analyzeCache || analyzeCache.key !== reposKey) {
       phaseHeader('自動分析')
-      analyzeCache = {
-        key: reposKey,
-        plan: await phaseAnalyze({ repos, sources, baseDir: REPO, projectFolders }),
+      let analyzeSuccess = false
+      while (!analyzeSuccess) {
+        try {
+          analyzeCache = {
+            key: reposKey,
+            plan: await phaseAnalyze({ repos, sources, baseDir: REPO, projectFolders }),
+          }
+          analyzeSuccess = true
+        } catch (err) {
+          p.log.error(`分析失敗：${err.message}`)
+          const action = handleCancel(await p.select({
+            message: '如何繼續？',
+            options: [
+              { value: 'retry', label: '重試', hint: '重新執行分析' },
+              { value: 'skip', label: '跳過', hint: '跳過 AI 分析，使用基礎配置' },
+              { value: 'back', label: '← 上一步', hint: '返回選擇倉庫' },
+            ],
+          }))
+          if (action === 'back' || action === BACK) break  // break inner, continue outer while
+          if (action === 'skip') {
+            const { generateInstallPlan } = await import('../lib/config/auto-plan.mjs')
+            analyzeCache = {
+              key: reposKey,
+              plan: generateInstallPlan({ repos, pipelineResult: null, eccResult: { recommended: [] }, localPaths: {}, roleOverrides: {}, profile: null }),
+            }
+            analyzeSuccess = true
+          }
+          // 'retry' — loop again
+        }
       }
+      if (!analyzeSuccess) continue  // BACK — restart outer while loop
       // 應用用戶角色覆蓋
       for (const r of analyzeCache.plan.repos) {
         const src = repos.find(s => s.fullName === r.fullName)
@@ -518,7 +554,7 @@ async function main() {
     if (flagManual) confirmedPlan.mode = 'manual'
 
     // 安裝
-    phaseHeader('安裝中')
+    phaseHeader('安裝中', 3, 3)
     const { installSelections, syncResult, startTime } = await phaseExecute(confirmedPlan, {
       repoDir: REPO,
       previewDir: PREVIEW_DIR,

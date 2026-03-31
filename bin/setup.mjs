@@ -340,11 +340,8 @@ async function main() {
       const envPath = path.join(REPO, '.env')
       let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
       envContent = envContent
-        .replace(/^SLACK_NOTIFY_CHANNEL=.*/m, '')
-        .replace(/^SLACK_NOTIFY_MODE=.*/m, '')
-        .replace(/^SLACK_NOTIFY_CHANNEL_NAME=.*/m, '')
-        .replace(/^SLACK_NOTIFY_USER_ID=.*/m, '')
-        .replace(/^SLACK_DM_CHANNEL=.*/m, '')     // v2.0.x 舊版清理
+        .replace(/^SLACK_[A-Z_]+=.*/gm, '')       // 清除所有 SLACK_ 開頭變數（含舊版）
+        .replace(/^CLAUDE_SLACK_[A-Z_]+=.*/gm, '') // 清除所有 CLAUDE_SLACK_ 開頭變數
         .trim()
       envContent += `\nSLACK_NOTIFY_CHANNEL=${slackResult.channelId}\nSLACK_NOTIFY_MODE=${slackResult.mode}`
       if (slackResult.channelName) envContent += `\nSLACK_NOTIFY_CHANNEL_NAME=${slackResult.channelName}`

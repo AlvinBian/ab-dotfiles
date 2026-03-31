@@ -1,0 +1,42 @@
+---
+title: 角色分類系統
+description: repo 自動分析 → 角色判定 → CLAUDE.md 策略
+links:
+  - setup-main: 返回主流程
+  - phase-plan: 計畫確認（可調整角色）
+---
+flowchart TD
+    Repos["GitHub repos (interactiveRepoSelect)"] --> Contrib["貢獻分析
+    gh api → commits + pct"]
+
+    Contrib --> Auto{自動角色判定}
+
+    Auto -->|"commits ≥ 50 且 pct ≥ 10%"| Main["⭐ 主力 (main)"]
+    Auto -->|"commits < 50 或 pct < 10%"| Temp["🔄 臨時 (temp)"]
+    Auto -->|"工具/腳本類 repo"| Tool["🔧 工具 (tool)"]
+
+    Main --> MainEffect["完整 CLAUDE.md（AI 生成）
+    技術棧 + 架構要點 + 開發規範 + 常用指令
+    所有技術棧規則注入"]
+
+    Temp --> TempEffect["精簡 CLAUDE.md
+    快速上手 + 技術棧列表 + 注意事項"]
+
+    Tool --> ToolEffect["最小 CLAUDE.md
+    一句描述 + 使用方式"]
+
+    MainEffect --> Deploy["deployProjectClaudeMd
+    → ~/.claude/projects/{encoded}/CLAUDE.md"]
+    TempEffect --> Deploy
+    ToolEffect --> Deploy
+
+    subgraph UserAdjust [用戶可手動調整]
+        UA1["角色分配確認選單"]
+        UA1 --> UA2["全部 → 主力"]
+        UA1 --> UA3["全部 → 臨時"]
+        UA1 --> UA4["逐一選擇主力 repos"]
+        UA1 --> UA5["← 上一步 (重選 repos)"]
+    end
+
+    Auto --> UserAdjust
+    UserAdjust -->|確認| Deploy

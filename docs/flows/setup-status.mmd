@@ -1,0 +1,52 @@
+---
+title: 查看/調整配置
+description: 配置健康度展示 + 6 項快速調整
+links:
+  - setup-main: 返回主流程
+  - gmail-setup: Gmail 分級設定
+---
+flowchart TD
+    Entry([從主流程進入]) --> Health[顯示配置健康度]
+
+    Health --> Details["完整展開：
+    Claude commands/agents/rules/hooks/settings
+    CLAUDE.md repo 數量
+    zsh 模組安裝狀態
+    Slack 模式及頻道
+    Gmail Script ID
+    AI 模型設定"]
+
+    Details --> Select{選擇調整項目}
+
+    Select -->|Claude 配置| Claude[adjustClaude]
+    Claude --> B1[備份 commands/agents/rules]
+    B1 --> I1[handleInstallClaude 重新選擇安裝]
+    I1 --> Done([調整完成])
+
+    Select -->|全局設定| Settings[adjustGlobalSettings]
+    Settings --> S1[deploySettings smart merge]
+    S1 --> Done
+
+    Select -->|CLAUDE.md| ClaudeMd[adjustClaudeMd]
+    ClaudeMd --> CM1{session 有 repos?}
+    CM1 -->|No| CMWarn[提示重新 setup]
+    CM1 -->|Yes| CM2[AI 確認？]
+    CM2 -->|Yes| CM3[generateClaudeMd × N repos]
+    CM3 --> CM4[deployAllProjectClaudeMd]
+    CM4 --> Done
+    CM2 -->|No| Done
+
+    Select -->|zsh 模組| Zsh[adjustZsh]
+    Zsh --> Z1[備份 ~/.zsh/modules]
+    Z1 --> Z2[handleInstallModules 重新選擇]
+    Z2 --> Done
+
+    Select -->|Slack 通知| Slack[adjustSlack]
+    Slack --> SK1[setupSlackNotify 互動設定]
+    SK1 --> Done
+
+    Select -->|Gmail 分級| Gmail[adjustGmail]
+    Gmail --> G1["setupGmailFilters 互動設定 →"]
+    G1 --> Done
+
+    Select -->|← 返回| Exit([已取消])

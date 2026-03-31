@@ -1,0 +1,60 @@
+---
+title: 配置保護鏈
+description: 備份策略 → 覆蓋策略 → 還原機制
+links:
+  - phase-execute: 安裝執行流程
+  - setup-main: 返回主流程
+---
+flowchart LR
+    subgraph Tier1 ["Tier 1: 首次備份 (一次性)"]
+        O1["pnpm run setup 首次執行"]
+        O1 --> OB["~/.ab-dotfiles-original/
+        ├── zshrc
+        ├── zshrc.local
+        ├── zsh/
+        ├── claude/
+        ├── zsh_history
+        └── ripgreprc"]
+    end
+
+    subgraph Tier2 ["Tier 2: 增量備份 (每次 setup)"]
+        S1["phaseExecute [1/8]"]
+        S1 --> SB["dist/backup/YYYY-MM-DD/
+        ├── claude/commands,agents,rules
+        ├── hooks.json
+        ├── settings.json
+        ├── keybindings.json
+        ├── zshrc
+        ├── zshrc.local
+        ├── ripgreprc
+        └── zsh/modules/"]
+    end
+
+    subgraph Deploy ["覆蓋策略 (無痛遷移)"]
+        D1[".zshrc
+        個人設定 → .zshrc.local"]
+        D2["settings.json
+        smart merge (只加不刪)"]
+        D3["hooks.json
+        smart merge (只添加新 hook)"]
+        D4["commands/agents/rules
+        manifest MD5 追蹤
+        用戶修改 → 跳過"]
+        D5[".ripgreprc
+        已有 → 跳過不動"]
+        D6["modules/*.zsh
+        diff 比較 → 無變更跳過"]
+    end
+
+    subgraph Restore ["還原機制"]
+        R1["pnpm run restore
+        ──────────
+        列出所有增量備份
+        選擇版本 → 還原"]
+        R2["pnpm run restore-original
+        ──────────
+        完全回滾到安裝前狀態"]
+    end
+
+    SB --> R1
+    OB --> R2

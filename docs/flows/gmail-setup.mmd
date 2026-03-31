@@ -1,0 +1,63 @@
+---
+title: Gmail 5-Tier Filter 設定
+description: clasp 安裝 → 登入 → 建專案 → 推送 → 引導執行
+links:
+  - setup-main: 返回主流程
+  - setup-status: 調整配置
+---
+flowchart TD
+    Start([setupGmailFilters]) --> HasPrev{session 有 scriptId?}
+    HasPrev -->|Yes| KeepQ[保持不變？]
+    KeepQ -->|Yes| ReturnPrev([返回現有設定])
+    KeepQ -->|No/ESC| Continue
+
+    HasPrev -->|No| Continue[Step 1: 檢查 clasp]
+    Continue --> ClaspCheck{clasp 已安裝?}
+    ClaspCheck -->|No| InstallQ[安裝 clasp？]
+    InstallQ -->|Yes| NpmInstall[npm install -g @google/clasp]
+    InstallQ -->|No| Manual([顯示手動步驟])
+    NpmInstall -->|失敗| Manual
+    NpmInstall -->|成功| LoginCheck
+
+    ClaspCheck -->|Yes| LoginCheck{Step 2: clasp 已登入?}
+    LoginCheck -->|No| Login[clasp login → 開啟瀏覽器]
+    Login -->|失敗| Manual
+    Login -->|成功| Prepare
+    LoginCheck -->|Yes| Prepare
+
+    Prepare[Step 3: 準備暫存目錄] --> CopyFiles[複製 .gs + appsscript.json]
+    CopyFiles --> AutoDetect{session 有 scriptId?}
+
+    AutoDetect -->|Yes| Reuse["Step 4: 複用現有專案
+    寫入 .clasp.json"]
+    AutoDetect -->|No| Create[Step 4: clasp create]
+
+    Create --> CreateResult{成功?}
+    CreateResult -->|API 未啟用| OpenAPI["自動開啟設定頁面
+    https://script.google.com/home/usersettings"]
+    OpenAPI --> WaitUser[等用戶開啟 API]
+    WaitUser --> RetryCreate[重試 clasp create]
+    RetryCreate --> CreateResult
+    CreateResult -->|成功| Push
+    CreateResult -->|失敗 ×3| Manual
+
+    Reuse --> Push
+
+    Push["Step 5: clasp push --force
+    (async spinner)"] --> PushResult{成功?}
+    PushResult -->|失敗| Manual
+    PushResult -->|成功| Done
+
+    Done[Step 6: 部署完成] --> OpenEditor["自動開啟 Apps Script 編輯器"]
+    OpenEditor --> Guide["引導用戶：
+    1. 選函式 setupAndApply
+    2. 點擊 ▶ 執行
+    3. 授權 Gmail API
+    ─────────────
+    效果：
+    Tier 0 GitHub/CI → github/noise 標籤
+    Tier 1 SaaS bot → auto/skip 標籤
+    Tier 2 公告/收據 → auto/info 標籤
+    Tier 3 行事曆 → auto/meeting 標籤
+    Tier 4 HR/財務/緊急 → ⭐ STARRED + action/required"]
+    Guide --> Return(["返回 { scriptId, scriptUrl }"])

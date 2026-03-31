@@ -1,0 +1,49 @@
+---
+title: 計畫確認 — phasePlan
+description: 安裝計畫展示 + 全部/逐項/精簡三種模式
+links:
+  - setup-main: 返回主流程
+  - phase-execute: 進入安裝執行
+---
+flowchart TD
+    Entry([從 phaseAnalyze 進入]) --> Display["展示安裝計畫：
+    現有配置狀態
+    Repos（主力/臨時/工具）
+    Commands / Agents / Rules
+    Hooks / Permissions / Keybindings
+    技術棧 Stacks
+    ECC 外部資源
+    zsh 模組"]
+
+    Display --> Choice{安裝方式}
+
+    Choice -->|安裝全部| Full[返回完整 plan]
+    Choice -->|精簡安裝| Minimal[generateMinimalPlan]
+    Choice -->|逐項確認| Detail[detailConfirm]
+    Choice -->|← 上一步| Back([BACK → 回 Step 1])
+
+    subgraph Detail [detailConfirm 細項調整]
+        D1[角色調整：main ↔ temp]
+        D1 --> D2[Commands 選擇]
+        D2 --> D3[Agents 選擇]
+        D3 --> D4[Rules 選擇]
+        D4 --> D5{有 ECC?}
+        D5 -->|Yes| D6[ECC 資源選擇]
+        D5 -->|No| D7
+        D6 --> D7{有 zsh?}
+        D7 -->|Yes| D8[zsh 模組選擇]
+        D7 -->|No| D9[返回調整後的 plan]
+        D8 --> D9
+
+        D2 -->|ESC| Back
+        D3 -->|ESC| Back
+        D4 -->|ESC| Back
+        D6 -->|ESC| Back
+        D8 -->|ESC| Back
+    end
+
+    Minimal --> Return([返回 plan])
+    Full --> Return
+    D9 --> Return
+
+    Return --> Execute["phaseExecute →"]

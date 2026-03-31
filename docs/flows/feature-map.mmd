@@ -1,0 +1,78 @@
+---
+title: 功能選擇結構
+description: 6 大功能模組及其子項和依賴關係
+links:
+  - setup-main: 返回主流程
+  - phase-execute: 安裝執行
+---
+flowchart TD
+    MS["功能選擇 (multiselect)
+    ━━━━━━━━━━━
+    首次安裝預選：Claude
+    重裝預選：上次選擇"] --> C1
+
+    MS --> C2
+    MS --> C3
+    MS --> C4
+    MS --> C5
+    MS --> C6
+
+    subgraph Claude ["Claude Code 開發配置"]
+        C1[Claude Code] --> CC1["commands (smartSelect)
+        code-review, pr-workflow, tdd,
+        build-fix, test-gen, plan..."]
+        C1 --> CC2["agents (smartSelect)
+        coder, debugger, reviewer,
+        architect, tdd-guide..."]
+        C1 --> CC3["rules (smartSelect)
+        code-style, git-workflow,
+        testing, performance..."]
+        C1 --> CC4["hooks
+        PostToolUse, PreToolUse..."]
+        C1 --> CC5["settings.json
+        permissions + model + autoMemory"]
+    end
+
+    subgraph ClaudeMd ["專案 CLAUDE.md"]
+        C2["CLAUDE.md (需要 repos)"] --> CM1["per-repo AI 生成"]
+        CM1 --> CM2["main → 完整版"]
+        CM1 --> CM3["temp → 精簡版"]
+        CM1 --> CM4["tool → 最小版"]
+    end
+
+    subgraph ECC ["ECC 外部資源"]
+        C3["ECC (需要 repos)"] --> EC1["社群 commands/agents/rules"]
+        EC1 --> EC2["AI 推薦匹配"]
+        EC2 --> EC3["融合到 ~/.claude/"]
+    end
+
+    subgraph Slack ["Slack 通知"]
+        C4[Slack] --> S1["Channel 模式
+        搜尋/建立專屬頻道"]
+        C4 --> S2["DM 模式
+        私發給自己"]
+        C4 --> S3["關閉"]
+    end
+
+    subgraph Zsh ["zsh 環境模組"]
+        C5[zsh] --> Z1["modules (smartSelect)
+        aliases, completion, fzf,
+        git, history, keybindings,
+        nvm, plugins, pnpm, tools"]
+        C5 --> Z2["~/.zshrc 部署
+        個人設定 → .zshrc.local"]
+        C5 --> Z3["~/.ripgreprc
+        已有則跳過"]
+    end
+
+    subgraph Gmail ["Gmail 5-Tier 分級"]
+        C6[Gmail] --> G1["clasp + Apps Script"]
+        G1 --> G2["Tier 0: github/noise"]
+        G1 --> G3["Tier 1: auto/skip"]
+        G1 --> G4["Tier 2: auto/info"]
+        G1 --> G5["Tier 3: auto/meeting"]
+        G1 --> G6["Tier 4: action/required ⭐"]
+    end
+
+    C2 -.->|依賴| Repos["需要選擇 repos"]
+    C3 -.->|依賴| Repos

@@ -1,0 +1,64 @@
+---
+title: 安裝執行 — phaseExecute 8 步
+description: 備份 → 設定 → 安裝 → 生成 → 打包 → 驗證
+links:
+  - setup-main: 返回主流程
+  - config-protection: 配置保護鏈
+---
+flowchart TD
+    E1["[1/8] 完整備份現有配置
+    ─────────────────
+    ~/.claude/commands, agents, rules
+    ~/.claude/hooks.json, settings.json, keybindings.json
+    ~/.zshrc, ~/.zshrc.local, ~/.ripgreprc
+    ~/.zsh/modules/
+    → dist/backup/YYYY-MM-DD/"]
+    E1 --> E2
+
+    E2["[2/8] 全局配置 → ~/.claude/
+    ─────────────────
+    settings.json — smart merge permissions
+    hooks/slack-dispatch.sh — Slack 分發器"]
+    E2 --> E3
+
+    E3["[3/8] Claude 安裝 → ~/.claude/
+    ─────────────────
+    commands (smartSelect 選擇)
+    agents (smartSelect 選擇)
+    rules (smartSelect 或 fixed)
+    hooks (smartSelect 選擇)
+    manifest MD5 追蹤"]
+    E3 --> E4
+
+    E4["[4/8] ECC + Stacks (並行)
+    ─────────────────
+    ECC: 外部 commands/agents/rules 融合
+    Stacks: 技術棧規則生成 (scan.mjs)"]
+    E4 --> E5
+
+    E5["[5/8] CLAUDE.md 生成
+    ─────────────────
+    per-repo AI 生成 (role → 模板)
+    main: 完整版 / temp: 精簡版 / tool: 最小版
+    → ~/.claude/projects/{encoded}/CLAUDE.md"]
+    E5 --> E6
+
+    E6["[6/8] Plugin 打包
+    ─────────────────
+    ab-claude-dev.plugin → dist/release/
+    ab-slack-message.plugin → dist/release/"]
+    E6 --> E7
+
+    E7["[7/8] zsh 模組安裝
+    ─────────────────
+    modules/*.zsh → ~/.zsh/modules/
+    zshrc → ~/.zshrc (個人設定 → .zshrc.local)
+    ripgreprc (已有則跳過)"]
+    E7 --> E8
+
+    E8["[8/8] 驗證安裝完整性
+    ─────────────────
+    檢查所有已安裝檔案是否就位
+    驗證 settings.json / hooks.json
+    驗證 CLAUDE.md (per-repo)
+    缺失 → Slack 警告通知"]

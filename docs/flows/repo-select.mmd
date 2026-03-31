@@ -1,0 +1,42 @@
+---
+title: 倉庫選擇流程
+description: GitHub 帳號 → 倉庫列表 → 貢獻分析 → 多選
+links:
+  - setup-main: 返回主流程
+  - role-system: 角色分類
+---
+flowchart TD
+    Entry([interactiveRepoSelect]) --> AuthCheck{gh auth status}
+    AuthCheck -->|失敗| AuthFail["提示登入
+    gh auth login"]
+    AuthFail --> Exit([退出])
+
+    AuthCheck -->|成功| HasSession{session 有 org?}
+    HasSession -->|Yes| AutoOrg["自動選擇上次 org
+    (顯示：GitHub 帳號：xxx)"]
+    HasSession -->|No| FetchOrgs[取得帳號列表]
+
+    FetchOrgs --> OrgSelect{選擇帳號/組織}
+    OrgSelect -->|選擇| SelectedOrg[已選擇 org]
+    OrgSelect -->|ESC| Back([BACK])
+
+    AutoOrg --> FetchRepos
+    SelectedOrg --> FetchRepos["取得倉庫列表
+    (spinner: 找到 N 個倉庫)"]
+
+    FetchRepos --> ContribAnalysis["貢獻分析
+    (spinner: N 個有貢獻)
+    commits 數 + 百分比"]
+
+    ContribAnalysis --> RepoSelect["多選倉庫
+    (有貢獻的預選)
+    ━━━━━━━━━━
+    顯示：commits · pct · stars · desc"]
+
+    RepoSelect -->|確認預選| Return
+    RepoSelect -->|調整選擇| MultiSelect[smartSelect 自由選擇]
+    MultiSelect --> Return
+    RepoSelect -->|ESC| Back
+
+    Return(["返回 repo 物件陣列
+    { fullName, commits, pct, stars }"])

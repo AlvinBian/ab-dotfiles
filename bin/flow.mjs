@@ -159,7 +159,7 @@ ${c.mermaid}
     }
     .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
     .chart-body { position: relative; overflow: hidden; }
-    .panzoom-container { cursor: grab; }
+    .panzoom-container { cursor: default; }
 
     footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
 
@@ -262,7 +262,8 @@ ${c.mermaid}
         const id = el.id.replace('pz-', '');
         const instance = Panzoom(el, {
           maxScale: 4, minScale: 0.25, step: 0.15,
-          contain: false, cursor: 'grab',
+          contain: false, cursor: 'default',
+          disablePan: true,
           excludeClass: 'link-btn',
         });
         // Ctrl/Cmd + 滾輪才縮放，普通滾輪正常滾動頁面

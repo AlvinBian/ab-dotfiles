@@ -1,0 +1,100 @@
+---
+title: 環境檢查 — ensureEnvironment
+description: 7 工具依序檢查與自動安裝：brew → nvm → node → pnpm → gh → gh auth → claude，含依賴鏈與失敗回退
+links:
+  - setup-main: 返回主流程
+  - upgrade-legacy: 舊配置偵測（環境就緒後執行）
+---
+flowchart TD
+    Start(["ensureEnvironment()"]) --> RunChecks
+
+    subgraph RunChecks ["平行建立 checks 陣列"]
+        direction LR
+        CK1["Homebrew<br/>which brew"]
+        CK2["nvm<br/>source nvm.sh && nvm --version"]
+        CK3["Node.js<br/>which node"]
+        CK4["pnpm<br/>which pnpm"]
+        CK5["gh CLI<br/>which gh"]
+        CK6["gh 登入<br/>gh auth status"]
+        CK7["claude CLI<br/>which claude"]
+    end
+
+    RunChecks --> AllPass{"missing.length === 0?"}
+
+    AllPass -->|Yes| ShowVersions["顯示版本資訊<br/>brew · nvm · node · pnpm · gh · claude"]
+    ShowVersions --> ReturnTrue(["return true"])
+
+    AllPass -->|No| ShowStatus["顯示 checkLines<br/>✔ / ✘ 每工具狀態"]
+    ShowStatus --> Confirm{"p.confirm 繼續安裝?"}
+    Confirm -->|"ESC 或 No"| AbortEnv["log.warn 請手動安裝<br/>process.exit(1)"]
+    Confirm -->|Yes| InstallLoop
+
+    subgraph InstallLoop ["for...of missing 依序安裝"]
+        direction TB
+        IB{"missing tool name?"}
+
+        IB -->|Homebrew| IBrew["curl install.sh<br/>eval brew shellenv<br/>justInstalled.add('brew')"]
+        IBrew --> IBrewOk{"成功?"}
+        IBrewOk -->|No| EBrew["log.warn 手動安裝<br/>return false"]
+        IBrewOk -->|Yes| NextTool
+
+        IB -->|nvm| INvm["curl nvm v0.40.0<br/>set NVM_DIR env<br/>justInstalled.add('nvm')"]
+        INvm --> INvmOk{"成功?"}
+        INvmOk -->|No| ENvm["log.warn 手動安裝<br/>return false"]
+        INvmOk -->|Yes| NextTool
+
+        IB -->|Node.js| INodeCheck{"nvmOk OR<br/>justInstalled.has('nvm')?"}
+        INodeCheck -->|Yes| INodeNvm["runNvm install --lts"]
+        INodeCheck -->|No| INodeBrew{"has brew?"}
+        INodeBrew -->|Yes| INodeBrewCmd["brew install node"]
+        INodeBrew -->|No| INodeFail["Node 安裝失敗<br/>return false"]
+        INodeNvm --> INodeOk{"成功?"}
+        INodeBrewCmd --> INodeOk
+        INodeOk -->|No| INodeFail
+        INodeOk -->|Yes| NextTool
+
+        IB -->|pnpm| IPnpm{"has corepack?"}
+        IPnpm -->|Yes| ICorepack["corepack enable<br/>corepack prepare pnpm@latest"]
+        IPnpm -->|No| INpm["npm install -g pnpm"]
+        ICorepack --> IPnpmOk{"has pnpm?"}
+        INpm --> IPnpmOk
+        IPnpmOk -->|No| EPnpm["log.warn 手動安裝<br/>return false"]
+        IPnpmOk -->|Yes| NextTool
+
+        IB -->|"gh CLI"| IGh{"has brew?"}
+        IGh -->|Yes| IGhCmd["brew install gh"]
+        IGh -->|No| EGh["process.exit(1)<br/>https://cli.github.com"]
+        IGhCmd --> IGhOk{"成功?"}
+        IGhOk -->|No| EGh
+        IGhOk -->|Yes| NextTool
+
+        IB -->|"gh 登入"| IGhAuth["gh auth login --web<br/>瀏覽器授權"]
+        IGhAuth --> IGhAuthOk{"成功?"}
+        IGhAuthOk -->|No| EGhAuth["process.exit(1)<br/>gh auth login --with-token"]
+        IGhAuthOk -->|Yes| NextTool
+
+        IB -->|"claude CLI"| IClaude["npm install -g<br/>@anthropic-ai/claude-code"]
+        IClaude --> IClaudeOk{"has claude?"}
+        IClaudeOk -->|No| EClaude["process.exit(1)"]
+        IClaudeOk -->|Yes| NextTool
+
+        NextTool["繼續下一個 missing"]
+    end
+
+    InstallLoop --> Done["log.success 環境就緒"]
+    Done --> ReturnTrue2(["return true"])
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef success fill:#238636,color:#fff,stroke:#238636
+    classDef error fill:#da3633,color:#fff,stroke:#da3633
+    classDef check fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef tool fill:#3b3b3b,color:#ddd,stroke:#555
+
+    class AllPass,Confirm,IBrewOk,INvmOk,INodeCheck,INodeBrew,INodeOk,IPnpm,IPnpmOk,IGh,IGhOk,IGhAuthOk,IClaudeOk,IB decision
+    class ReturnTrue,ReturnTrue2,Done,ShowVersions success
+    class AbortEnv,EBrew,ENvm,INodeFail,EPnpm,EGh,EGhAuth,EClaude error
+    class CK1,CK2,CK3,CK4,CK5,CK6,CK7 check
+    class IBrew,INvm,INodeNvm,INodeBrewCmd,ICorepack,INpm,IGhCmd,IGhAuth,IClaude tool
+
+    click Start "#setup-main"
+    click Done "#upgrade-legacy"

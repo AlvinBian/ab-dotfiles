@@ -1,0 +1,109 @@
+---
+title: 舊配置偵測與升級
+description: detectLegacyInstallation 四項檢查 → 顯示清單 → 三選項（upgrade/keep/clean）→ 各選項備份與遷移動作
+links:
+  - setup-main: 返回主流程
+  - env-check: 環境檢查（upgrade 完成後繼續）
+---
+flowchart TD
+    Start(["detectLegacyInstallation()"]) --> CheckDirs{"~/.claude/commands<br/>agents rules 均不存在?"}
+    CheckDirs -->|"Yes（全新安裝）"| ReturnFalse(["return { hasLegacy: false }"])
+    CheckDirs -->|No| ReadFiles
+
+    subgraph ReadFiles ["讀取現有配置清單"]
+        RF1["readdirSync commands/*.md"]
+        RF2["readdirSync agents/*.md"]
+        RF3["readdirSync rules/*.md"]
+        RF1 --> RF2 --> RF3
+    end
+
+    ReadFiles --> Check4
+
+    subgraph Check4 ["四項舊版痕跡檢查"]
+        direction LR
+        C1["專案級 commands<br/>在全局目錄<br/>LEGACY_PROJECT_COMMANDS"]
+        C2["專案級 agents<br/>在全局目錄<br/>LEGACY_PROJECT_AGENTS"]
+        C3["kkday-conventions<br/>舊名稱 rule"]
+        C4["settings.json<br/>缺 permissions.deny<br/>或 autoMemoryEnabled"]
+        C5["hooks.json<br/>hookCount < 8<br/>（舊版 5 個）"]
+    end
+
+    Check4 --> NeedsUpgrade{"totalProjectItems > 0<br/>OR hasOldKkday<br/>OR settingsNeedsUpgrade<br/>OR hooksNeedsUpgrade?"}
+
+    NeedsUpgrade -->|No| ReturnFalse
+    NeedsUpgrade -->|Yes| ReturnLegacy(["return { hasLegacy: true, ...findings }"])
+
+    ReturnLegacy --> RunUpgrade(["runUpgrade(legacyInfo)"])
+
+    subgraph BuildReport ["組裝顯示清單"]
+        R1["1. 清理全局中的專案級配置<br/>  Commands (n) / Agents (n) / Rules (n)"]
+        R2["2. 重命名 kkday-conventions<br/>   → project-conventions"]
+        R3["3. 更新 settings.json<br/>   補充權限規則"]
+        R4["4. 更新 hooks.json<br/>   舊版 5 個 → 新版 10 個"]
+        R5["  非 ab-dotfiles 自訂配置<br/>  Commands/Agents/Rules（不會刪除）"]
+        R1 --> R2 --> R3 --> R4 --> R5
+    end
+
+    RunUpgrade --> BuildReport
+    BuildReport --> ShowReport["p.log.info 偵測到舊配置"]
+    ShowReport --> SelectAction
+
+    subgraph SelectAction ["p.select 舊配置處理"]
+        A1["upgrade — 清除殘留配置（推薦）<br/>備份 → 清理 → 更新 settings/hooks"]
+        A2["keep — 保留不動<br/>跳過，可能有重複配置"]
+        A3["clean — 全部清除，重新安裝<br/>備份 → 清空 ~/.claude/ → 從零開始"]
+    end
+
+    SelectAction -->|"ESC / BACK"| SkipReturn(["return 'skip'<br/>略過舊配置處理"])
+    SelectAction -->|"keep"| SkipReturn
+    SelectAction -->|"upgrade"| DoUpgrade
+    SelectAction -->|"clean"| DoClean
+
+    subgraph DoUpgrade ["doUpgrade(legacyInfo)"]
+        direction TB
+        U1["Promise.all 備份<br/>upgrade/commands<br/>upgrade/agents<br/>upgrade/rules<br/>upgrade/hooks.json<br/>upgrade/settings.json<br/>upgrade/keybindings.json"]
+        U2["移除全局專案級 commands<br/>（只刪 ab-dotfiles 管理的）"]
+        U3["移除全局專案級 agents"]
+        U4["移除全局專案級 rules"]
+        U5{"hasOldKkday?"}
+        U6["unlinkSync kkday-conventions.md"]
+        U7{"hooksNeedsUpgrade?"}
+        U8["unlinkSync hooks.json<br/>（安裝程序重新生成）"]
+        U9["settings.json 保留<br/>deploySettings 智能合併"]
+        U1 --> U2 --> U3 --> U4 --> U5
+        U5 -->|Yes| U6 --> U7
+        U5 -->|No| U7
+        U7 -->|Yes| U8 --> U9
+        U7 -->|No| U9
+    end
+
+    DoUpgrade --> UpgradeDone(["return 'upgraded'"])
+
+    subgraph DoClean ["doClean()"]
+        direction TB
+        CL1["Promise.all 備份<br/>clean/commands<br/>clean/agents<br/>clean/rules<br/>clean/hooks.json<br/>clean/settings.json<br/>clean/keybindings.json"]
+        CL2["清除 commands/*.md<br/>agents/*.md<br/>rules/*.md"]
+        CL3["清除 hooks.json<br/>settings.json<br/>keybindings.json"]
+        CL4["log.success 移除 N 個檔案<br/>已備份到 dist/backup/"]
+        CL1 --> CL2 --> CL3 --> CL4
+    end
+
+    DoClean --> CleanDone(["return 'cleaned'"])
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef success fill:#238636,color:#fff,stroke:#238636
+    classDef error fill:#da3633,color:#fff,stroke:#da3633
+    classDef action fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef check fill:#3b3b3b,color:#ddd,stroke:#555
+    classDef backup fill:#6e40c9,color:#fff,stroke:#6e40c9
+
+    class CheckDirs,NeedsUpgrade,U5,U7 decision
+    class ReturnFalse,UpgradeDone,CleanDone success
+    class SkipReturn error
+    class U2,U3,U4,U6,U8,CL2,CL3 action
+    class C1,C2,C3,C4,C5 check
+    class U1,CL1 backup
+
+    click Start "#setup-main"
+    click UpgradeDone "#env-check"
+    click CleanDone "#env-check"

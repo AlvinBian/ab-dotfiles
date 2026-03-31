@@ -1,0 +1,106 @@
+---
+title: Slack 通知設定精靈
+description: 既有設定保留確認 → 三模式選擇（channel/DM/off）→ channel 模式含 gh api 取用戶名、pbcopy 和 Slack 開啟，每步支援 ESC 取消
+links:
+  - setup-main: 返回主流程
+  - session-lifecycle: session patch 儲存結果
+---
+flowchart TD
+    Start(["setupSlackNotify(prev)"]) --> LoadEnv
+
+    subgraph LoadEnv ["讀取現有設定"]
+        E1["currentChannel = env(SLACK_NOTIFY_CHANNEL) || prev.slackChannel"]
+        E2["currentMode = env(SLACK_NOTIFY_MODE) || prev.slackMode"]
+        E1 --> E2
+    end
+
+    LoadEnv --> HasPrev{"currentChannel<br/>&& currentMode?"}
+
+    HasPrev -->|Yes| ShowCurrent["顯示現有模式<br/>#channel(id) / DM 私發 / 已關閉"]
+    ShowCurrent --> KeepConfirm{"p.confirm<br/>保持不變？"}
+    KeepConfirm -->|"ESC"| ReturnNull(["return null"])
+    KeepConfirm -->|"Yes"| ReturnExisting(["return { channelId, mode }"])
+    KeepConfirm -->|"No"| SelectMode
+
+    HasPrev -->|No| SelectMode
+
+    subgraph SelectMode ["p.select 選擇模式"]
+        M1["channel — 專屬 Channel（推薦）"]
+        M2["dm — DM 私發給自己"]
+        M3["off — 關閉通知"]
+    end
+
+    SelectMode -->|"ESC / BACK"| ReturnNull
+    SelectMode -->|"off"| ReturnOff(["return { channelId: '', mode: 'off' }"])
+    SelectMode -->|"dm"| DmFlow
+    SelectMode -->|"channel"| ChannelFlow
+
+    subgraph DmFlow ["DM 模式"]
+        DM1["log.info DM 模式說明"]
+        DM2{"env SLACK_NOTIFY_CHANNEL<br/>或 SLACK_DM_CHANNEL 存在?"}
+        DM1 --> DM2
+        DM2 -->|"Yes（已有 userId）"| DmDone
+        DM2 -->|No| DM3["p.text 輸入 Slack User ID<br/>placeholder: U04B933M4G6"]
+        DM3 -->|"ESC / BACK / empty"| ReturnNull
+        DM3 -->|"輸入 userId"| DmDone["log.success 已設定 DM (userId)"]
+    end
+
+    DmDone --> ReturnDm(["return { channelId: userId, mode: 'dm' }"])
+
+    subgraph ChannelFlow ["Channel 模式"]
+        direction TB
+        CH1["gh api user --jq .login<br/>gh api user --jq .name"]
+        CH1 --> CH2{"gh api 成功?"}
+        CH2 -->|"Yes → 有 name"| CH3["username = name<br/>alvin-bian → alvin-bian-notify"]
+        CH2 -->|"Yes → 只有 login"| CH4["username = login<br/>fallback"]
+        CH2 -->|"No（gh 不可用）"| CH5["channelName = claude-code-notify"]
+        CH3 --> CH5b["channelName = username-notify"]
+        CH4 --> CH5b
+
+        CH5 --> ChannelSelect
+        CH5b --> ChannelSelect
+
+        subgraph ChannelSelect ["p.select 頻道狀態"]
+            CS1["exists — 已有此頻道，貼上 Link"]
+            CS2["create — 建立新頻道"]
+        end
+
+        ChannelSelect -->|"ESC / BACK"| ReturnNull
+
+        ChannelSelect -->|"create"| CreateFlow
+        subgraph CreateFlow ["建立新頻道引導"]
+            CR1["pbcopy channelName<br/>（複製到剪貼板）"]
+            CR2["exec open slack://channel?team=&id=new"]
+            CR3["log.info 1.貼上名稱 2.設私人 3.建立後回來貼 Link"]
+            CR1 --> CR2 --> CR3
+        end
+
+        ChannelSelect -->|"exists"| PasteLink
+        CreateFlow --> PasteLink
+
+        PasteLink["p.text 貼上 Channel Link 或 ID<br/>placeholder: https://xxx.slack.com/archives/C07XXXXXX"]
+        PasteLink -->|"ESC / BACK / empty"| ReturnNull
+
+        PasteLink --> ExtractId["regex /\\b(C[A-Z0-9]{8,})\\b/<br/>從 URL 提取 channelId"]
+        ExtractId --> ValidId{"channelId<br/>startsWith('C')?"}
+        ValidId -->|No| FallbackDm["log.warn 無效 ID<br/>fallback 到 DM 模式"]
+        ValidId -->|Yes| ChannelDone["log.success 已設定 #channel(channelId)"]
+    end
+
+    FallbackDm --> ReturnFallback(["return { channelId: dmId, mode: 'dm' }"])
+    ChannelDone --> ReturnChannel(["return { channelId, mode: 'channel' }"])
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef success fill:#238636,color:#fff,stroke:#238636
+    classDef error fill:#da3633,color:#fff,stroke:#da3633
+    classDef action fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef terminal fill:#238636,color:#fff,stroke:#238636
+
+    class HasPrev,KeepConfirm,DM2,CH2,ChannelSelect,ValidId decision
+    class ReturnExisting,ReturnOff,ReturnDm,ReturnChannel terminal
+    class ReturnNull,FallbackDm,ReturnFallback error
+    class CH1,CR1,CR2,PasteLink,ExtractId action
+
+    click Start "#setup-main"
+    click ReturnDm "#session-lifecycle"
+    click ReturnChannel "#session-lifecycle"

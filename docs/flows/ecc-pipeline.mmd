@@ -1,0 +1,133 @@
+---
+title: ECC 外部資源融合流程
+description: config.json sources → fetchAllSources（per-source 快取策略）→ AI match 推薦 → buildSyncResult → writeSyncedFiles → 寫入 ~/.claude/
+links:
+  - setup-main: 返回主流程
+  - phase-execute: 安裝執行（呼叫此流程）
+  - session-lifecycle: eccSelections 存入 session
+---
+flowchart TD
+    Start(["ECC 融合入口<br/>pipeline-runner phaseAnalyze"]) --> SourcesCfg
+
+    subgraph SourcesCfg ["config.json sources 配置"]
+        SC1["name: everything-claude-code<br/>repo: affaan-m/everything-claude-code<br/>priority: 10"]
+        SC2["paths.commands / agents<br/>paths.rules/{lang}<br/>paths.rulesCommon<br/>paths.hooks"]
+        SC1 --> SC2
+    end
+
+    SourcesCfg --> ParallelFetch
+
+    subgraph ParallelFetch ["Promise.all — repos + ECC 並行"]
+        PF1["analyzeRepo x N<br/>（GH_CONCURRENCY=8）"]
+        PF2["fetchAllSources(sources,<br/>techStacks, baseDir)"]
+        PF1 -.->|"並行"| PF2
+    end
+
+    ParallelFetch --> FetchAll
+
+    subgraph FetchAll ["fetchAllSources — per-source 依序處理"]
+        FA1["sources.sort by priority DESC"]
+        FA1 --> PerSource
+
+        subgraph PerSource ["每個 source 的快取策略"]
+            direction TB
+            LocalEcc{"ecc/{source-name}/<br/>本地目錄存在?"}
+            LocalEcc -->|"Yes（GitHub Actions 同步）"| LoadLocal["loadFromCache(localEccDir)<br/>零 API 請求<br/>read .version.json SHA"]
+            LocalEcc -->|No| CheckCacheStatus
+
+            subgraph CheckCacheStatus ["checkCache(cacheDir, repo)"]
+                direction LR
+                CM1{"readManifest<br/>存在?"}
+                CM1 -->|No| Miss["miss<br/>無快取"]
+                CM1 -->|Yes| CM2{"age < CACHE_TTL<br/>（1 小時）?"}
+                CM2 -->|Yes| Hit["hit<br/>TTL 內直接用"]
+                CM2 -->|No| CM3["gh api repos/{repo}/commits<br/>取最新 SHA（1 次 API）"]
+                CM3 --> CM4{"SHA 相同?"}
+                CM4 -->|Yes| Stale["stale<br/>更新 timestamp 視為命中"]
+                CM4 -->|No| Miss
+            end
+
+            Hit --> LoadCache["loadFromCache(cacheDir)"]
+            Stale --> LoadCache
+
+            Miss --> FetchIndex
+
+            subgraph FetchIndex ["fetchIndex — 掃描目錄索引"]
+                FI1["techStacks → TECH_TO_LANG → matchedLangs"]
+                FI2["Promise.allSettled<br/>listRepoDir commands/<br/>listRepoDir agents/<br/>listRepoDir rules/common/<br/>listRepoDir rules/{lang}/ × matchedLangs"]
+                FI1 --> FI2
+            end
+
+            FetchIndex --> BatchDL
+
+            subgraph BatchDL ["batchDownload — 批次下載（BATCH_SIZE=10）"]
+                BD1["Promise.all commands/*.md"]
+                BD2["Promise.all agents/*.md"]
+                BD3["Promise.all rules/**/*.md"]
+                BD4["downloadFile hooks.json"]
+                BD1 -.->|"並行"| BD2
+                BD2 -.->|"並行"| BD3
+                BD3 -.->|"並行"| BD4
+            end
+
+            BatchDL --> SaveCache["saveToCache<br/>清除舊快取<br/>寫 commands/ agents/ rules/<br/>writeManifest { sha, timestamp }"]
+            SaveCache --> Collected["allFiles = { commands, agents, rules, hooks }"]
+            LoadCache --> Collected
+            LoadLocal --> Collected
+        end
+
+        Collected --> PushResult["results.push({ name, repo, version, cached, allFiles })"]
+    end
+
+    FetchAll --> AiMatch
+
+    subgraph AiMatch ["AI 推薦精選（pipeline-runner classifyRepo）"]
+        AM1["buildRepoSummary → summary text"]
+        AM2["classifyRepo (Claude Haiku)<br/>effort: low<br/>timeout: 30s<br/>maxCategories: 10"]
+        AM3["eccTypeMap: name → commands/agents/rules"]
+        AM1 --> AM2 --> AM3
+    end
+
+    AiMatch --> BuildSync
+
+    subgraph BuildSync ["buildSyncResult(fetched, selectedNames)"]
+        BS1["per source：<br/>filter commands by selectedNames.commands<br/>filter agents by selectedNames.agents<br/>filter rules by selectedNames.rules"]
+        BS2{"localNames.has('hooks.json')?"}
+        BS2 -->|No| BS3["finalHooks = src.allFiles.hooks"]
+        BS2 -->|Yes| BS4["finalHooks = null（跳過）"]
+        BS1 --> BS2
+        BS3 --> BS5
+        BS4 --> BS5
+        BS5["return { results, downloaded, eccTypeMap, timestamp }"]
+    end
+
+    BuildSync --> WriteFiles
+
+    subgraph WriteFiles ["writeSyncedFiles(downloaded, targetDir)"]
+        WF1["mkdirSync commands/ agents/ rules/"]
+        WF2["writeFileSync commands/*.md"]
+        WF3["writeFileSync agents/*.md"]
+        WF4["writeFileSync rules/*.md"]
+        WF5{"src.hooks?"}
+        WF5 -->|Yes| WF6["writeFileSync hooks.json"]
+        WF5 -->|No| WF7["略過 hooks"]
+        WF1 --> WF2 --> WF3 --> WF4 --> WF5
+    end
+
+    WriteFiles --> MergeTarget["寫入 ~/.claude/<br/>commands/ agents/ rules/ hooks.json"]
+    MergeTarget --> Done(["ECC 融合完成<br/>eccTypeMap 存入 session"])
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef success fill:#238636,color:#fff,stroke:#238636
+    classDef cache fill:#6e40c9,color:#fff,stroke:#6e40c9
+    classDef api fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef parallel fill:#0d6efd,color:#fff,stroke:#0d6efd,stroke-dasharray:4
+
+    class LocalEcc,CM1,CM2,CM4,BS2,WF5 decision
+    class Done,MergeTarget success
+    class Hit,Stale,LoadCache,LoadLocal,SaveCache cache
+    class FI2,BD1,BD2,BD3,BD4 api
+    class PF1,PF2 parallel
+
+    click Start "#phase-execute"
+    click Done "#session-lifecycle"

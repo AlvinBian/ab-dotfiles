@@ -343,7 +343,12 @@ if (files.length === 0) {
 }
 
 // 按固定順序排列（主流程在前）
-const order = ['setup-main', 'setup-status', 'phase-plan', 'phase-execute', 'config-protection', 'gmail-setup', 'repo-select', 'role-system', 'feature-map']
+const order = [
+  'setup-main', 'setup-status', 'env-check', 'upgrade-legacy',
+  'phase-plan', 'phase-execute', 'config-protection',
+  'repo-select', 'role-system', 'feature-map',
+  'slack-setup', 'gmail-setup', 'ecc-pipeline', 'session-lifecycle',
+]
 const sorted = files.sort((a, b) => {
   const ia = order.indexOf(a.replace('.mmd', ''))
   const ib = order.indexOf(b.replace('.mmd', ''))

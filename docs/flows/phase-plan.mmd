@@ -1,49 +1,77 @@
 ---
 title: 計畫確認 — phasePlan
-description: 安裝計畫展示 + 全部/逐項/精簡三種模式
+description: 展示安裝計畫 + 安裝全部/逐項確認/精簡安裝 三種模式
 links:
   - setup-main: 返回主流程
-  - phase-execute: 進入安裝執行
+  - phase-execute: 進入安裝
 ---
 flowchart TD
-    Entry([從 phaseAnalyze 進入]) --> Display["展示安裝計畫：
-    現有配置狀態
-    Repos（主力/臨時/工具）
-    Commands / Agents / Rules
-    Hooks / Permissions / Keybindings
-    技術棧 Stacks
-    ECC 外部資源
-    zsh 模組"]
+    Entry([從 phaseAnalyze 進入]) --> Display
 
-    Display --> Choice{安裝方式}
-
-    Choice -->|安裝全部| Full[返回完整 plan]
-    Choice -->|精簡安裝| Minimal[generateMinimalPlan]
-    Choice -->|逐項確認| Detail[detailConfirm]
-    Choice -->|← 上一步| Back([BACK → 回 Step 1])
-
-    subgraph Detail [detailConfirm 細項調整]
-        D1[角色調整：main ↔ temp]
-        D1 --> D2[Commands 選擇]
-        D2 --> D3[Agents 選擇]
-        D3 --> D4[Rules 選擇]
-        D4 --> D5{有 ECC?}
-        D5 -->|Yes| D6[ECC 資源選擇]
-        D5 -->|No| D7
-        D6 --> D7{有 zsh?}
-        D7 -->|Yes| D8[zsh 模組選擇]
-        D7 -->|No| D9[返回調整後的 plan]
-        D8 --> D9
-
-        D2 -->|ESC| Back
-        D3 -->|ESC| Back
-        D4 -->|ESC| Back
-        D6 -->|ESC| Back
-        D8 -->|ESC| Back
+    subgraph Display ["安裝計畫展示"]
+        D1[/"**現有配置狀態**
+        commands N · agents N · rules N
+        settings ✔ · hooks ✔"/]
+        D1 --> D2[/"**Repos（N ⭐主力 · M 🔄臨時）**
+        各 repo 角色 + 本機路徑"/]
+        D2 --> D3[/"**全局安裝項目**
+        Commands · Agents · Rules
+        Hooks · Permissions · Model"/]
+        D3 --> D4[/"**技術棧 Stacks（N 個）**
+        react · typescript · vue…"/]
+        D4 --> D5[/"**ECC 外部資源（N 個）**"/]
+        D5 --> D6[/"**zsh 模組（N 個）**"/]
+        D6 --> D7[/"**AI 費用估算 ~$X.XX**"/]
     end
 
-    Minimal --> Return([返回 plan])
-    Full --> Return
-    D9 --> Return
+    Display --> Choice{"`**安裝方式**`"}
 
-    Return --> Execute["phaseExecute →"]
+    Choice -->|"✅ 安裝全部（Enter）"| Full[返回完整 plan]
+    Choice -->|"📋 逐項確認"| Detail
+    Choice -->|"⚡ 精簡安裝"| Minimal["generateMinimalPlan
+    只保留核心：
+    code-review · pr-workflow
+    coder · reviewer · debugger"]
+    Choice -->|"← 上一步"| Back([BACK → 回 Step 1])
+
+    subgraph Detail ["逐項確認 detailConfirm"]
+        direction TB
+        DC1["**1. 角色調整**
+        smartSelect：選擇主力 repos
+        未選中 → 自動設為臨時"]
+        DC1 -->|ESC| Back
+        DC1 --> DC2["**2. Commands 選擇**
+        smartSelect from pool"]
+        DC2 -->|ESC| Back
+        DC2 --> DC3["**3. Agents 選擇**
+        smartSelect from pool"]
+        DC3 -->|ESC| Back
+        DC3 --> DC4["**4. Rules 選擇**
+        smartSelect from pool"]
+        DC4 -->|ESC| Back
+        DC4 --> DC5{"有 ECC?"}
+        DC5 -->|Yes| DC6["**5. ECC 選擇**
+        smartSelect 推薦項目"]
+        DC5 -->|No| DC7
+        DC6 -->|ESC| Back
+        DC6 --> DC7{"有 zsh?"}
+        DC7 -->|Yes| DC8["**6. zsh 模組選擇**
+        smartSelect"]
+        DC7 -->|No| DC9
+        DC8 -->|ESC| Back
+        DC8 --> DC9["返回調整後 plan"]
+    end
+
+    Full --> Exec["phaseExecute →"]
+    DC9 --> Exec
+    Minimal --> Exec
+
+    click Exec "#phase-execute"
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef info fill:#1c2128,color:#8b949e,stroke:#30363d
+    classDef success fill:#238636,color:#fff,stroke:#238636
+
+    class Choice,DC5,DC7 decision
+    class D1,D2,D3,D4,D5,D6,D7 info
+    class Exec success

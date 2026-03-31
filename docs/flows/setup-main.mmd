@@ -1,61 +1,106 @@
 ---
 title: 主流程 — pnpm run setup
-description: 入口分支：--quick / 重入選單 / 全新安裝
+description: 所有入口分支：--quick / 重入選單 / 完整安裝
 links:
   - setup-status: 查看/調整配置
-  - phase-execute: 安裝執行 8 步
-  - phase-plan: 計畫確認
+  - phase-execute: 安裝執行
+  - feature-map: 功能選擇
 ---
 flowchart TD
-    Start([pnpm run setup]) --> Backup[首次備份 → ~/.ab-dotfiles-original/]
-    Backup --> Splash[顯示版本 + 上次安裝資訊]
+    Start(["`**pnpm run setup**`"]) --> OrigBackup[/"首次備份 → ~/.ab-dotfiles-original/
+    zshrc · claude/ · zsh/ · ripgreprc"/]
+    OrigBackup --> Splash[/顯示 ab-dotfiles vX.X.X + 上次 session 摘要/]
 
-    Splash --> QuickCheck{--quick?}
-    QuickCheck -->|Yes| QuickMode[Quick 模式：重放上次 session]
-    QuickMode --> QAnalyze[phaseAnalyze]
-    QAnalyze --> QExecute[phaseExecute]
-    QExecute --> QComplete[phaseComplete]
-    QComplete --> End([設定完成])
+    Splash --> QuickCheck{"`**--quick flag?**`"}
+    QuickCheck -->|"Yes （跳過所有互動）"| QSession{有上次 session?}
+    QSession -->|No| QError[/"❌ 無歷史記錄，退出"/] --> QExit([退出])
+    QSession -->|Yes| QLoad["載入 session repos/roles/stacks"]
+    QLoad --> QEnv["環境檢查 ✓"]
+    QEnv --> QAnalyze["phaseAnalyze（用 session 資料）"]
+    QAnalyze --> QExec["phaseExecute"]
+    QExec --> QComp["phaseComplete"]
+    QComp --> End(["`**設定完成 ✔**`"])
 
-    QuickCheck -->|No| PrevCheck{有上次 session?}
-    PrevCheck -->|No| FreshSetup
+    QuickCheck -->|No| AllCheck{--all flag?}
+    AllCheck -->|Yes| FreshEntry
+    AllCheck -->|No| PrevCheck{有上次 session?}
+    PrevCheck -->|No| FreshEntry
 
-    PrevCheck -->|Yes| ReentryMenu{重入選單}
-    ReentryMenu -->|重新安裝| Reinstall[用上次設定重裝]
-    Reinstall --> RLegacy[舊配置偵測] --> RAnalyze[phaseAnalyze] --> RExecute[phaseExecute] --> RComplete[phaseComplete] --> End
-    ReentryMenu -->|調整設定| AdjustSetup[清除 org → 進入完整流程]
-    AdjustSetup --> ALegacy[舊配置偵測] --> FreshSetup
-    ReentryMenu -->|"查看/調整配置 →"| StatusLink([setup-status])
-    ReentryMenu -->|查看上次報告| OpenReport[開啟 HTML 報告] --> End
-    ReentryMenu -->|ESC| CancelExit([已取消])
+    PrevCheck -->|Yes| Reentry{"`**重入選單**
+    上次：N repos · M stacks`"}
 
-    subgraph FreshSetup [完整安裝流程]
-        Legacy[舊配置偵測清理]
-        Legacy --> EnvCheck[環境檢查: brew/nvm/node/pnpm/gh/claude]
-        EnvCheck --> FeatureSelect["功能選擇 multiselect →"]
-        FeatureSelect --> SlackSetup[Slack 通知設定]
-        SlackSetup --> GmailSetup[Gmail 5-Tier 分級設定]
-        GmailSetup --> ServiceSummary[外部服務設定摘要]
-        ServiceSummary --> PhaseLoop
+    Reentry -->|"🔄 重新安裝
+    （用上次設定）"| RLegacy["舊配置偵測清理"]
+    RLegacy --> RAnalyze["phaseAnalyze"] --> RExec["phaseExecute"] --> RComp["phaseComplete"] --> End
+
+    Reentry -->|"⚙️ 調整設定
+    （重選所有）"| AdjLegacy["舊配置偵測清理"]
+    AdjLegacy --> FreshEntry
+
+    Reentry -->|"📊 查看/調整配置"| StatusLink["setup-status →"]
+    Reentry -->|"📄 查看上次報告"| Report["開啟 dist/report.html"] --> End
+    Reentry -->|ESC| Cancel([已取消])
+
+    subgraph FreshEntry ["完整安裝流程"]
+        direction TB
+        F0["舊配置偵測清理"]
+        F0 --> F1["✅ 環境檢查
+        brew · nvm · node · pnpm · gh · claude"]
+        F1 --> F2["☑️ 功能選擇 multiselect"]
+        F2 --> F3{"has Slack?"}
+        F3 -->|Yes| F3a["🔔 Slack 通知設定"] --> F4
+        F3 -->|No| F4
+        F4{"has Gmail?"}
+        F4 -->|Yes| F4a["📧 Gmail 5-Tier 設定"] --> F5
+        F4 -->|No| F5
+        F5[/"外部服務設定摘要
+        Slack ✔ · Gmail ✔"/]
+        F5 --> Loop
     end
 
-    subgraph PhaseLoop [Phase Loop — 支持 BACK]
-        Step1[Step 1/3: 選擇倉庫]
-        Step1 --> RepoSelect[interactiveRepoSelect]
-        RepoSelect -->|ESC| CancelExit
-        RepoSelect --> RoleLoop["角色分類 →"]
-        RoleLoop -->|確認| Step2
-        RoleLoop -->|← 上一步| Step1
+    subgraph Loop ["Phase Loop（支持 BACK 回退）"]
+        direction TB
+        L1["`**Step 1/3**
+        選擇倉庫`"]
+        L1 --> L1a["interactiveRepoSelect"]
+        L1a -->|ESC| Cancel
+        L1a --> L2["角色分類 loop
+        ⭐主力 · 🔄臨時 · 🔧工具"]
+        L2 -->|"← 上一步"| L1
+        L2 -->|確認| L3
 
-        Step2[phaseAnalyze 自動分析]
-        Step2 --> PlanReview["Step 2/3: 確認計畫 →"]
-        PlanReview -->|確認| DryCheck
-        PlanReview -->|← 上一步| Step1
+        L3["`**phaseAnalyze**
+        自動分析 + 快取`"]
+        L3 --> L4["`**Step 2/3**
+        確認安裝計畫`"]
+        L4 -->|"← 上一步"| L1
 
-        DryCheck{--dry-run?}
-        DryCheck -->|Yes| DryEnd([顯示計畫，不執行])
-        DryCheck -->|No| Execute["Step 3/3: phaseExecute →"]
-        Execute --> Complete[phaseComplete]
+        L4 -->|"安裝全部 / 逐項 / 精簡"| L5{--dry-run?}
+        L5 -->|Yes| DryEnd([/"顯示計畫，不執行"/])
+        L5 -->|No| L6["`**Step 3/3**
+        phaseExecute`"]
+        L6 --> L7["phaseComplete
+        報告 · session · Slack 通知"]
     end
 
-    Complete --> End
+    L7 --> End
+
+    click StatusLink "#setup-status"
+    click F2 "#feature-map"
+    click F4a "#gmail-setup"
+    click L1a "#repo-select"
+    click L2 "#role-system"
+    click L4 "#phase-plan"
+    click L6 "#phase-execute"
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef action fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef success fill:#238636,color:#fff,stroke:#238636
+    classDef error fill:#da3633,color:#fff,stroke:#da3633
+    classDef data fill:#8b949e,color:#fff,stroke:#8b949e
+
+    class QuickCheck,AllCheck,PrevCheck,F3,F4,L5 decision
+    class QLoad,QEnv,QAnalyze,QExec,QComp,RLegacy,RAnalyze,RExec,RComp,AdjLegacy action
+    class End,DryEnd success
+    class QError error
+    class OrigBackup,Splash,F5 data

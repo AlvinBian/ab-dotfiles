@@ -1,52 +1,104 @@
 ---
 title: 查看/調整配置
-description: 配置健康度展示 + 6 項快速調整
+description: 完整健康度展示 + 6 項快速調整（含即時狀態 hint）
 links:
   - setup-main: 返回主流程
-  - gmail-setup: Gmail 分級設定
+  - gmail-setup: Gmail 設定流程
 ---
 flowchart TD
-    Entry([從主流程進入]) --> Health[顯示配置健康度]
+    Entry([從主流程進入]) --> Health[/"`**配置健康度**
+    ██████████░░░ 85%（42/50）`"/]
 
-    Health --> Details["完整展開：
-    Claude commands/agents/rules/hooks/settings
-    CLAUDE.md repo 數量
-    zsh 模組安裝狀態
-    Slack 模式及頻道
-    Gmail Script ID
-    AI 模型設定"]
+    Health --> Claude[/"**Claude 配置**
+    Commands  12 個  code-review, pr-workflow…
+    Agents    14 個  coder, debugger, reviewer…
+    Rules      8 個  code-style, git-workflow…
+    Hooks     已啟用
+    Settings  已配置
+    CLAUDE.md 4 個 repo"/]
 
-    Details --> Select{選擇調整項目}
+    Claude --> ZshInfo[/"**zsh 模組**
+    已安裝 10/10  aliases, fzf, git, tools…"/]
 
-    Select -->|Claude 配置| Claude[adjustClaude]
-    Claude --> B1[備份 commands/agents/rules]
-    B1 --> I1[handleInstallClaude 重新選擇安裝]
-    I1 --> Done([調整完成])
+    ZshInfo --> SlackInfo[/"**Slack 通知**
+    模式：Channel #xxx"/]
 
-    Select -->|全局設定| Settings[adjustGlobalSettings]
-    Settings --> S1[deploySettings smart merge]
-    S1 --> Done
+    SlackInfo --> GmailInfo[/"**Gmail 分級**
+    Script ID: 1wu1ps…
+    設定時間: 2026-03-30"/]
 
-    Select -->|CLAUDE.md| ClaudeMd[adjustClaudeMd]
-    ClaudeMd --> CM1{session 有 repos?}
-    CM1 -->|No| CMWarn[提示重新 setup]
-    CM1 -->|Yes| CM2[AI 確認？]
-    CM2 -->|Yes| CM3[generateClaudeMd × N repos]
-    CM3 --> CM4[deployAllProjectClaudeMd]
-    CM4 --> Done
-    CM2 -->|No| Done
+    GmailInfo --> AiInfo[/"**AI 設定**
+    模型：sonnet"/]
 
-    Select -->|zsh 模組| Zsh[adjustZsh]
-    Zsh --> Z1[備份 ~/.zsh/modules]
-    Z1 --> Z2[handleInstallModules 重新選擇]
-    Z2 --> Done
+    AiInfo --> Select{"`**選擇調整項目**`"}
 
-    Select -->|Slack 通知| Slack[adjustSlack]
-    Slack --> SK1[setupSlackNotify 互動設定]
-    SK1 --> Done
+    Select -->|"🔧 Claude 配置
+    commands 12 · agents 14 · rules 8"| AClaude
+    Select -->|"⚙️ 全局設定
+    settings ✔"| ASettings
+    Select -->|"📝 CLAUDE.md
+    4 個 repo · 需 AI"| AClaudeMd
+    Select -->|"🐚 zsh 模組
+    10/10 已安裝"| AZsh
+    Select -->|"🔔 Slack 通知
+    channel"| ASlack
+    Select -->|"📧 Gmail 分級
+    已設定"| AGmail
+    Select -->|"← 返回"| Exit([已取消])
 
-    Select -->|Gmail 分級| Gmail[adjustGmail]
-    Gmail --> G1["setupGmailFilters 互動設定 →"]
-    G1 --> Done
+    subgraph AClaude ["adjustClaude"]
+        AC1["備份 commands/agents/rules"] --> AC2["smartSelect 重選"]
+        AC2 --> AC3["生成 preview"] --> AC4["執行安裝腳本"]
+        AC4 --> AC5["patchSession"]
+    end
 
-    Select -->|← 返回| Exit([已取消])
+    subgraph ASettings ["adjustGlobalSettings"]
+        AS1["讀取 settings-template.json"]
+        AS1 --> AS2["deploySettings smart merge
+        只添加新 permissions，不刪除現有"]
+        AS2 --> AS3["patchSession"]
+    end
+
+    subgraph AClaudeMd ["adjustClaudeMd"]
+        CM1{session 有 repos?}
+        CM1 -->|No| CMW["⚠ 提示重新 setup"] --> Done
+        CM1 -->|Yes| CM2["AI 確認（約 30 秒）"]
+        CM2 --> CM3["generateClaudeMd × N repos"]
+        CM3 --> CM4["deployAllProjectClaudeMd"]
+        CM4 --> CM5["patchSession"]
+    end
+
+    subgraph AZsh ["adjustZsh"]
+        AZ1["備份 ~/.zsh/modules"]
+        AZ1 --> AZ2["smartSelect 重選模組"]
+        AZ2 --> AZ3["生成 preview"] --> AZ4["執行安裝腳本
+        個人設定 → .zshrc.local"]
+        AZ4 --> AZ5["patchSession"]
+    end
+
+    subgraph ASlack ["adjustSlack"]
+        SK1["setupSlackNotify 互動設定"]
+        SK1 --> SK2["Channel / DM / 關閉"]
+        SK2 --> SK3["patchSession"]
+    end
+
+    subgraph AGmail ["adjustGmail"]
+        G1["setupGmailFilters →"]
+    end
+
+    AClaude --> Done([調整完成])
+    ASettings --> Done
+    AClaudeMd -.-> Done
+    AZsh --> Done
+    ASlack --> Done
+    AGmail --> Done
+
+    click G1 "#gmail-setup"
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef info fill:#1c2128,color:#8b949e,stroke:#30363d
+    classDef success fill:#238636,color:#fff,stroke:#238636
+
+    class Select,CM1 decision
+    class Health,Claude,ZshInfo,SlackInfo,GmailInfo,AiInfo info
+    class Done success

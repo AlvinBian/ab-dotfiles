@@ -1,42 +1,75 @@
 ---
 title: 角色分類系統
-description: repo 自動分析 → 角色判定 → CLAUDE.md 策略
+description: 自動分析 → 角色判定 → CLAUDE.md 生成策略 → 用戶調整
 links:
-  - setup-main: 返回主流程
-  - phase-plan: 計畫確認（可調整角色）
+  - repo-select: 倉庫選擇
+  - phase-execute: 安裝執行（CLAUDE.md 生成在 Step 5）
 ---
 flowchart TD
-    Repos["GitHub repos (interactiveRepoSelect)"] --> Contrib["貢獻分析
-    gh api → commits + pct"]
+    Entry(["從倉庫選擇進入"]) --> Analyze
 
-    Contrib --> Auto{自動角色判定}
-
-    Auto -->|"commits ≥ 50 且 pct ≥ 10%"| Main["⭐ 主力 (main)"]
-    Auto -->|"commits < 50 或 pct < 10%"| Temp["🔄 臨時 (temp)"]
-    Auto -->|"工具/腳本類 repo"| Tool["🔧 工具 (tool)"]
-
-    Main --> MainEffect["完整 CLAUDE.md（AI 生成）
-    技術棧 + 架構要點 + 開發規範 + 常用指令
-    所有技術棧規則注入"]
-
-    Temp --> TempEffect["精簡 CLAUDE.md
-    快速上手 + 技術棧列表 + 注意事項"]
-
-    Tool --> ToolEffect["最小 CLAUDE.md
-    一句描述 + 使用方式"]
-
-    MainEffect --> Deploy["deployProjectClaudeMd
-    → ~/.claude/projects/{encoded}/CLAUDE.md"]
-    TempEffect --> Deploy
-    ToolEffect --> Deploy
-
-    subgraph UserAdjust [用戶可手動調整]
-        UA1["角色分配確認選單"]
-        UA1 --> UA2["全部 → 主力"]
-        UA1 --> UA3["全部 → 臨時"]
-        UA1 --> UA4["逐一選擇主力 repos"]
-        UA1 --> UA5["← 上一步 (重選 repos)"]
+    subgraph Analyze ["自動角色判定"]
+        A1["每個 repo 分析：
+        commits 數量 + 貢獻百分比
+        repo 描述 + stars"]
+        A1 --> A2{判定規則}
+        A2 -->|"commits ≥ 50 且 pct ≥ 10%"| Main["⭐ **主力 (main)**"]
+        A2 -->|"commits < 50 或 pct < 10%"| Temp["🔄 **臨時 (temp)**"]
+        A2 -->|"工具/腳本/Docker"| Tool["🔧 **工具 (tool)**"]
     end
 
-    Auto --> UserAdjust
-    UserAdjust -->|確認| Deploy
+    subgraph Effects ["角色效果"]
+        Main --> ME[/"**主力 repo 配置**
+        ─────────
+        CLAUDE.md：完整版（AI 生成）
+        → 技術棧 + 架構要點
+        → 開發規範 + 常用指令
+        ─────────
+        所有技術棧規則注入
+        ECC 資源完整融合"/]
+
+        Temp --> TE[/"**臨時 repo 配置**
+        ─────────
+        CLAUDE.md：精簡版
+        → 快速上手 + 技術棧
+        → 注意事項
+        ─────────
+        基礎規則"/]
+
+        Tool --> TLE[/"**工具 repo 配置**
+        ─────────
+        CLAUDE.md：最小版
+        → 一句描述
+        → 使用方式"/]
+    end
+
+    subgraph UserAdjust ["用戶調整 loop"]
+        U1[/"**角色分配展示**
+        3 ⭐主力 · 9 🔄臨時
+        ⭐ repo-a
+        ⭐ repo-b
+        🔄 repo-c
+        …"/]
+        U1 --> U2{操作}
+        U2 -->|"✅ 確認"| Confirmed([確認 → 進入 phaseAnalyze])
+        U2 -->|"⭐ 全部 → 主力"| U3["所有 repo.role = main"] --> U1
+        U2 -->|"🔄 全部 → 臨時"| U4["所有 repo.role = temp"] --> U1
+        U2 -->|"✏️ 選擇主力"| U5["smartSelect：
+        勾選的 → main
+        未勾選 → temp"] --> U1
+        U2 -->|"← 上一步"| Back([BACK → 重選倉庫])
+    end
+
+    ME --> UserAdjust
+    TE --> UserAdjust
+    TLE --> UserAdjust
+
+    classDef main fill:#d29922,color:#000,stroke:#d29922
+    classDef temp fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef tool fill:#8b949e,color:#fff,stroke:#8b949e
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+
+    class Main,ME main
+    class Temp,TE temp
+    class Tool,TLE tool
+    class A2,U2 decision

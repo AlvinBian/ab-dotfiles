@@ -1,78 +1,115 @@
 ---
 title: 功能選擇結構
-description: 6 大功能模組及其子項和依賴關係
+description: 6 大功能模組、子項、依賴關係、部署目標
 links:
   - setup-main: 返回主流程
   - phase-execute: 安裝執行
+  - gmail-setup: Gmail 設定流程
 ---
 flowchart TD
-    MS["功能選擇 (multiselect)
-    ━━━━━━━━━━━
-    首次安裝預選：Claude
-    重裝預選：上次選擇"] --> C1
+    MS(["`**功能選擇 multiselect**
+    Space 切換 · Enter 確認
+    首次預選：Claude
+    重裝預選：上次選擇`"]) --> C1 & C2 & C3 & C4 & C5 & C6
 
-    MS --> C2
-    MS --> C3
-    MS --> C4
-    MS --> C5
-    MS --> C6
-
-    subgraph Claude ["Claude Code 開發配置"]
-        C1[Claude Code] --> CC1["commands (smartSelect)
-        code-review, pr-workflow, tdd,
-        build-fix, test-gen, plan..."]
-        C1 --> CC2["agents (smartSelect)
-        coder, debugger, reviewer,
-        architect, tdd-guide..."]
-        C1 --> CC3["rules (smartSelect)
-        code-style, git-workflow,
-        testing, performance..."]
-        C1 --> CC4["hooks
-        PostToolUse, PreToolUse..."]
-        C1 --> CC5["settings.json
-        permissions + model + autoMemory"]
+    subgraph C1G ["Claude Code 開發配置"]
+        C1["☑️ Claude Code"]
+        C1 --> CC1["**commands** (smartSelect)
+        code-review · pr-workflow · tdd
+        build-fix · test-gen · plan
+        changeset · refactor-clean…"]
+        C1 --> CC2["**agents** (smartSelect)
+        coder · debugger · reviewer
+        architect · tdd-guide
+        chief-of-staff…"]
+        C1 --> CC3["**rules** (smartSelect/fixed)
+        code-style · git-workflow
+        testing · performance
+        project-conventions…"]
+        C1 --> CC4["**hooks**
+        PostToolUse · PreToolUse
+        prettier · lint · 檔案保護…"]
+        C1 --> CC5["**settings.json**
+        permissions · model · autoMemory"]
+        CC1 --> T1["→ ~/.claude/commands/"]
+        CC2 --> T2["→ ~/.claude/agents/"]
+        CC3 --> T3["→ ~/.claude/rules/"]
+        CC4 --> T4["→ settings.json hooks 區段"]
+        CC5 --> T5["→ ~/.claude/settings.json"]
     end
 
-    subgraph ClaudeMd ["專案 CLAUDE.md"]
-        C2["CLAUDE.md (需要 repos)"] --> CM1["per-repo AI 生成"]
-        CM1 --> CM2["main → 完整版"]
-        CM1 --> CM3["temp → 精簡版"]
-        CM1 --> CM4["tool → 最小版"]
+    subgraph C2G ["專案 CLAUDE.md（需要 repos）"]
+        C2["☑️ CLAUDE.md"]
+        C2 --> CM1["per-repo AI 生成"]
+        CM1 --> CM2["⭐ main → 完整版"]
+        CM1 --> CM3["🔄 temp → 精簡版"]
+        CM1 --> CM4["🔧 tool → 最小版"]
+        CM2 --> CMT["→ ~/.claude/projects/{encoded}/"]
+        CM3 --> CMT
+        CM4 --> CMT
     end
 
-    subgraph ECC ["ECC 外部資源"]
-        C3["ECC (需要 repos)"] --> EC1["社群 commands/agents/rules"]
-        EC1 --> EC2["AI 推薦匹配"]
-        EC2 --> EC3["融合到 ~/.claude/"]
+    subgraph C3G ["ECC 外部資源（需要 repos）"]
+        C3["☑️ ECC"]
+        C3 --> EC1["AI 分析技術棧
+        → 推薦匹配資源"]
+        EC1 --> EC2["社群 commands"]
+        EC1 --> EC3["社群 agents"]
+        EC1 --> EC4["社群 rules"]
+        EC2 --> ECT["→ ~/.claude/ 融合"]
+        EC3 --> ECT
+        EC4 --> ECT
     end
 
-    subgraph Slack ["Slack 通知"]
-        C4[Slack] --> S1["Channel 模式
-        搜尋/建立專屬頻道"]
+    subgraph C4G ["Slack 通知"]
+        C4["☑️ Slack"]
+        C4 --> S1["Channel 模式
+        搜尋/建立頻道"]
         C4 --> S2["DM 模式
         私發給自己"]
         C4 --> S3["關閉"]
+        S1 --> ST["→ .env SLACK_NOTIFY_*
+        → hooks/slack-dispatch.sh"]
+        S2 --> ST
     end
 
-    subgraph Zsh ["zsh 環境模組"]
-        C5[zsh] --> Z1["modules (smartSelect)
-        aliases, completion, fzf,
-        git, history, keybindings,
-        nvm, plugins, pnpm, tools"]
+    subgraph C5G ["zsh 環境模組"]
+        C5["☑️ zsh"]
+        C5 --> Z1["**modules** (smartSelect)
+        aliases · completion · fzf
+        git · history · keybindings
+        nvm · plugins · pnpm · tools"]
+        Z1 --> ZT1["→ ~/.zsh/modules/*.zsh"]
         C5 --> Z2["~/.zshrc 部署
         個人設定 → .zshrc.local"]
-        C5 --> Z3["~/.ripgreprc
-        已有則跳過"]
+        Z2 --> ZT2["→ ~/.zshrc + ~/.zshrc.local"]
+        C5 --> Z3["ripgreprc（已有跳過）"]
+        Z3 --> ZT3["→ ~/.ripgreprc"]
     end
 
-    subgraph Gmail ["Gmail 5-Tier 分級"]
-        C6[Gmail] --> G1["clasp + Apps Script"]
-        G1 --> G2["Tier 0: github/noise"]
-        G1 --> G3["Tier 1: auto/skip"]
-        G1 --> G4["Tier 2: auto/info"]
-        G1 --> G5["Tier 3: auto/meeting"]
-        G1 --> G6["Tier 4: action/required ⭐"]
+    subgraph C6G ["Gmail 5-Tier 分級"]
+        C6["☑️ Gmail"]
+        C6 --> G1["clasp 環境檢查"]
+        G1 --> G2["建立/複用 Apps Script"]
+        G2 --> G3["push 腳本"]
+        G3 --> G4["引導執行 setupAndApply"]
+        G4 --> GT["→ Gmail Filters + Labels
+        github/noise · auto/skip
+        auto/info · auto/meeting
+        action/required ⭐"]
     end
 
-    C2 -.->|依賴| Repos["需要選擇 repos"]
-    C3 -.->|依賴| Repos
+    C2 -.->|"依賴：需要選擇 repos"| RepoLink["倉庫選擇 →"]
+    C3 -.->|"依賴：需要選擇 repos"| RepoLink
+
+    click RepoLink "#repo-select"
+    click G1 "#gmail-setup"
+    click C6 "#gmail-setup"
+
+    classDef feature fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef target fill:#238636,color:#fff,stroke:#238636
+    classDef dep fill:#d29922,color:#000,stroke:#d29922
+
+    class C1,C2,C3,C4,C5,C6 feature
+    class T1,T2,T3,T4,T5,CMT,ECT,ST,ZT1,ZT2,ZT3,GT target
+    class RepoLink dep

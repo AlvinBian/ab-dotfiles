@@ -1,64 +1,142 @@
 ---
 title: 安裝執行 — phaseExecute 8 步
-description: 備份 → 設定 → 安裝 → 生成 → 打包 → 驗證
+description: Listr2 任務序列：備份 → 設定 → 安裝 → 生成 → 打包 → 驗證
 links:
+  - config-protection: 配置保護策略
   - setup-main: 返回主流程
-  - config-protection: 配置保護鏈
 ---
 flowchart TD
-    E1["[1/8] 完整備份現有配置
-    ─────────────────
-    ~/.claude/commands, agents, rules
-    ~/.claude/hooks.json, settings.json, keybindings.json
-    ~/.zshrc, ~/.zshrc.local, ~/.ripgreprc
-    ~/.zsh/modules/
-    → dist/backup/YYYY-MM-DD/"]
+    Start([phaseExecute 開始]) --> E1
+
+    subgraph E1 ["[1/8] 完整備份 → dist/backup/"]
+        direction LR
+        B1["~/.claude/
+        commands/ agents/ rules/
+        hooks.json · settings.json
+        keybindings.json"]
+        B2["~/.zshrc
+        ~/.zshrc.local
+        ~/.ripgreprc"]
+        B3["~/.zsh/modules/"]
+    end
+
     E1 --> E2
 
-    E2["[2/8] 全局配置 → ~/.claude/
-    ─────────────────
-    settings.json — smart merge permissions
-    hooks/slack-dispatch.sh — Slack 分發器"]
+    subgraph E2 ["[2/8] 全局配置 → ~/.claude/"]
+        direction TB
+        S1["settings.json
+        ────────
+        smart merge
+        只添加新 permissions
+        不刪除用戶現有規則"]
+        S1 --> S2["hooks/slack-dispatch.sh
+        ────────
+        Slack 通知分發器
+        (僅 Slack feature 啟用時)"]
+    end
+
     E2 --> E3
 
-    E3["[3/8] Claude 安裝 → ~/.claude/
-    ─────────────────
-    commands (smartSelect 選擇)
-    agents (smartSelect 選擇)
-    rules (smartSelect 或 fixed)
-    hooks (smartSelect 選擇)
-    manifest MD5 追蹤"]
+    subgraph E3 ["[3/8] Claude 安裝 → ~/.claude/"]
+        direction TB
+        C1["runTarget: claude-dev"]
+        C1 --> C2["commands/*.md
+        manifest MD5 追蹤
+        用戶修改過 → 跳過"]
+        C1 --> C3["agents/*.md
+        同上"]
+        C1 --> C4["rules/*.md
+        fixed:all 或 smartSelect"]
+        C1 --> C5["hooks.json
+        smart merge（保留用戶自訂 hook）"]
+    end
+
     E3 --> E4
 
-    E4["[4/8] ECC + Stacks (並行)
-    ─────────────────
-    ECC: 外部 commands/agents/rules 融合
-    Stacks: 技術棧規則生成 (scan.mjs)"]
+    subgraph E4 ["[4/8] ECC + Stacks（並行）"]
+        direction LR
+        EC1["ECC 外部資源
+        ────────
+        fetchAllSources
+        buildSyncResult
+        writeSyncedFiles
+        → ~/.claude/"]
+        EC2["技術棧 Stacks
+        ────────
+        scan.mjs --init
+        per-skill 規則生成"]
+    end
+
     E4 --> E5
 
-    E5["[5/8] CLAUDE.md 生成
-    ─────────────────
-    per-repo AI 生成 (role → 模板)
-    main: 完整版 / temp: 精簡版 / tool: 最小版
-    → ~/.claude/projects/{encoded}/CLAUDE.md"]
+    subgraph E5 ["[5/8] CLAUDE.md → ~/.claude/projects/"]
+        direction TB
+        MD1["per-repo 迭代"]
+        MD1 --> MD2{"repo.role?"}
+        MD2 -->|"⭐ main"| MD3["AI 生成完整版
+        技術棧 + 架構 + 規範 + 指令"]
+        MD2 -->|"🔄 temp"| MD4["AI 生成精簡版
+        快速上手 + 技術棧"]
+        MD2 -->|"🔧 tool"| MD5["AI 生成最小版
+        一句描述 + 使用方式"]
+        MD3 --> MD6["deployProjectClaudeMd
+        → ~/.claude/projects/{encoded}/CLAUDE.md"]
+        MD4 --> MD6
+        MD5 --> MD6
+    end
+
     E5 --> E6
 
-    E6["[6/8] Plugin 打包
-    ─────────────────
-    ab-claude-dev.plugin → dist/release/
-    ab-slack-message.plugin → dist/release/"]
+    subgraph E6 ["[6/8] Plugin 打包 → dist/release/"]
+        direction LR
+        P1["ab-claude-dev.plugin
+        (build-claude-dev-plugin.sh)"]
+        P2["ab-slack-message.plugin
+        (build-slack-plugin.sh)"]
+    end
+
     E6 --> E7
 
-    E7["[7/8] zsh 模組安裝
-    ─────────────────
-    modules/*.zsh → ~/.zsh/modules/
-    zshrc → ~/.zshrc (個人設定 → .zshrc.local)
-    ripgreprc (已有則跳過)"]
+    subgraph E7 ["[7/8] zsh 模組 → ~/.zsh/modules/"]
+        direction TB
+        Z1["modules/*.zsh 部署
+        diff 比較，無變更跳過"]
+        Z1 --> Z2["~/.zshrc 部署
+        個人設定自動遷移 → .zshrc.local"]
+        Z2 --> Z3["~/.ripgreprc
+        已有則跳過"]
+    end
+
     E7 --> E8
 
-    E8["[8/8] 驗證安裝完整性
-    ─────────────────
-    檢查所有已安裝檔案是否就位
-    驗證 settings.json / hooks.json
-    驗證 CLAUDE.md (per-repo)
-    缺失 → Slack 警告通知"]
+    subgraph E8 ["[8/8] 驗證安裝完整性"]
+        direction TB
+        V1["✓ 檢查 commands/*.md"]
+        V2["✓ 檢查 agents/*.md"]
+        V3["✓ 檢查 rules/*.md"]
+        V4["✓ 檢查 settings.json"]
+        V5["✓ 檢查 hooks.json"]
+        V6["✓ 檢查 CLAUDE.md × N repos"]
+        V1 --> V7{"全部就位?"}
+        V2 --> V7
+        V3 --> V7
+        V4 --> V7
+        V5 --> V7
+        V6 --> V7
+        V7 -->|Yes| V8["✅ N/N 就位"]
+        V7 -->|No| V9["⚠ 缺少 M 個 → Slack 警告"]
+    end
+
+    E8 --> End([phaseExecute 完成])
+
+    click E1 "#config-protection"
+
+    classDef backup fill:#8b5cf6,color:#fff,stroke:#8b5cf6
+    classDef merge fill:#2ea043,color:#fff,stroke:#2ea043
+    classDef ai fill:#d29922,color:#000,stroke:#d29922
+    classDef verify fill:#1f6feb,color:#fff,stroke:#1f6feb
+
+    class B1,B2,B3 backup
+    class S1,C5 merge
+    class MD2,MD3,MD4,MD5 ai
+    class V1,V2,V3,V4,V5,V6,V7 verify

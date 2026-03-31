@@ -169,6 +169,7 @@ ${c.mermaid}
   <script>
     mermaid.initialize({
       startOnLoad: true, theme: 'dark',
+      securityLevel: 'loose',  // 允許 click 跳轉
       themeVariables: {
         primaryColor: '#1f6feb', primaryTextColor: '#e6edf3', primaryBorderColor: '#388bfd',
         lineColor: '#8b949e', secondaryColor: '#161b22', tertiaryColor: '#21262d', fontSize: '14px',

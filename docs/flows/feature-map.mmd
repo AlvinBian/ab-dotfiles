@@ -7,30 +7,15 @@ links:
   - gmail-setup: Gmail 設定流程
 ---
 flowchart TD
-    MS(["`**功能選擇 multiselect**
-    Space 切換 · Enter 確認
-    首次預選：Claude
-    重裝預選：上次選擇`"]) --> C1 & C2 & C3 & C4 & C5 & C6
+    MS(["功能選擇 multiselect<br/>Space 切換 · Enter 確認<br/>首次預選：Claude<br/>重裝預選：上次選擇"]) --> C1 & C2 & C3 & C4 & C5 & C6
 
     subgraph C1G ["Claude Code 開發配置"]
-        C1["☑️ Claude Code"]
-        C1 --> CC1["**commands** (smartSelect)
-        code-review · pr-workflow · tdd
-        build-fix · test-gen · plan
-        changeset · refactor-clean…"]
-        C1 --> CC2["**agents** (smartSelect)
-        coder · debugger · reviewer
-        architect · tdd-guide
-        chief-of-staff…"]
-        C1 --> CC3["**rules** (smartSelect/fixed)
-        code-style · git-workflow
-        testing · performance
-        project-conventions…"]
-        C1 --> CC4["**hooks**
-        PostToolUse · PreToolUse
-        prettier · lint · 檔案保護…"]
-        C1 --> CC5["**settings.json**
-        permissions · model · autoMemory"]
+        C1["Claude Code"]
+        C1 --> CC1["commands smartSelect<br/>code-review · pr-workflow · tdd<br/>build-fix · test-gen · plan<br/>changeset · refactor-clean..."]
+        C1 --> CC2["agents smartSelect<br/>coder · debugger · reviewer<br/>architect · tdd-guide<br/>chief-of-staff..."]
+        C1 --> CC3["rules smartSelect/fixed<br/>code-style · git-workflow<br/>testing · performance<br/>project-conventions..."]
+        C1 --> CC4["hooks<br/>PostToolUse · PreToolUse<br/>prettier · lint · 檔案保護..."]
+        C1 --> CC5["settings.json<br/>permissions · model · autoMemory"]
         CC1 --> T1["→ ~/.claude/commands/"]
         CC2 --> T2["→ ~/.claude/agents/"]
         CC3 --> T3["→ ~/.claude/rules/"]
@@ -39,20 +24,19 @@ flowchart TD
     end
 
     subgraph C2G ["專案 CLAUDE.md（需要 repos）"]
-        C2["☑️ CLAUDE.md"]
+        C2["CLAUDE.md"]
         C2 --> CM1["per-repo AI 生成"]
-        CM1 --> CM2["⭐ main → 完整版"]
-        CM1 --> CM3["🔄 temp → 精簡版"]
-        CM1 --> CM4["🔧 tool → 最小版"]
+        CM1 --> CM2["main → 完整版"]
+        CM1 --> CM3["temp → 精簡版"]
+        CM1 --> CM4["tool → 最小版"]
         CM2 --> CMT["→ ~/.claude/projects/{encoded}/"]
         CM3 --> CMT
         CM4 --> CMT
     end
 
     subgraph C3G ["ECC 外部資源（需要 repos）"]
-        C3["☑️ ECC"]
-        C3 --> EC1["AI 分析技術棧
-        → 推薦匹配資源"]
+        C3["ECC"]
+        C3 --> EC1["AI 分析技術棧<br/>→ 推薦匹配資源"]
         EC1 --> EC2["社群 commands"]
         EC1 --> EC3["社群 agents"]
         EC1 --> EC4["社群 rules"]
@@ -62,41 +46,31 @@ flowchart TD
     end
 
     subgraph C4G ["Slack 通知"]
-        C4["☑️ Slack"]
-        C4 --> S1["Channel 模式
-        搜尋/建立頻道"]
-        C4 --> S2["DM 模式
-        私發給自己"]
+        C4["Slack"]
+        C4 --> S1["Channel 模式<br/>搜尋/建立頻道"]
+        C4 --> S2["DM 模式<br/>私發給自己"]
         C4 --> S3["關閉"]
-        S1 --> ST["→ .env SLACK_NOTIFY_*
-        → hooks/slack-dispatch.sh"]
+        S1 --> ST["→ .env SLACK_NOTIFY_*<br/>→ hooks/slack-dispatch.sh"]
         S2 --> ST
     end
 
     subgraph C5G ["zsh 環境模組"]
-        C5["☑️ zsh"]
-        C5 --> Z1["**modules** (smartSelect)
-        aliases · completion · fzf
-        git · history · keybindings
-        nvm · plugins · pnpm · tools"]
+        C5["zsh"]
+        C5 --> Z1["modules smartSelect<br/>aliases · completion · fzf<br/>git · history · keybindings<br/>nvm · plugins · pnpm · tools"]
         Z1 --> ZT1["→ ~/.zsh/modules/*.zsh"]
-        C5 --> Z2["~/.zshrc 部署
-        個人設定 → .zshrc.local"]
+        C5 --> Z2["~/.zshrc 部署<br/>個人設定 → .zshrc.local"]
         Z2 --> ZT2["→ ~/.zshrc + ~/.zshrc.local"]
         C5 --> Z3["ripgreprc（已有跳過）"]
         Z3 --> ZT3["→ ~/.ripgreprc"]
     end
 
     subgraph C6G ["Gmail 5-Tier 分級"]
-        C6["☑️ Gmail"]
+        C6["Gmail"]
         C6 --> G1["clasp 環境檢查"]
         G1 --> G2["建立/複用 Apps Script"]
         G2 --> G3["push 腳本"]
         G3 --> G4["引導執行 setupAndApply"]
-        G4 --> GT["→ Gmail Filters + Labels
-        github/noise · auto/skip
-        auto/info · auto/meeting
-        action/required ⭐"]
+        G4 --> GT["→ Gmail Filters + Labels<br/>github/noise · auto/skip<br/>auto/info · auto/meeting<br/>action/required"]
     end
 
     C2 -.->|"依賴：需要選擇 repos"| RepoLink["倉庫選擇 →"]

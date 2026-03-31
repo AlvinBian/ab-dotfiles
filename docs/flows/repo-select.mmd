@@ -6,57 +6,38 @@ links:
   - role-system: 角色分類
 ---
 flowchart TD
-    Entry([interactiveRepoSelect]) --> Auth{"gh auth status
-    GitHub CLI 已登入?"}
-    Auth -->|"❌ 失敗"| AuthFail["⚠ 請先執行 gh auth login"] --> Exit([退出])
-    Auth -->|"✔ 成功"| FetchOrgs
+    Entry([interactiveRepoSelect]) --> Auth{"gh auth status<br/>GitHub CLI 已登入?"}
+    Auth -->|"失敗"| AuthFail["請先執行 gh auth login"] --> Exit([退出])
+    Auth -->|"成功"| FetchOrgs
 
-    FetchOrgs["取得帳號列表
-    gh api user → 個人帳號
-    gh api user/orgs → 組織列表"]
+    FetchOrgs["取得帳號列表<br/>gh api user → 個人帳號<br/>gh api user/orgs → 組織列表"]
 
-    FetchOrgs --> HasSession{session 有 org?}
-    HasSession -->|Yes| AutoOrg["自動選擇上次帳號
-    ── 已連結 xxx · N 個組織"]
+    FetchOrgs --> HasSession{"session 有 org?"}
+    HasSession -->|Yes| AutoOrg["自動選擇上次帳號<br/>已連結 xxx · N 個組織"]
     HasSession -->|No| OrgSelect
 
-    OrgSelect{"`**選擇帳號/組織**
-    ↑↓ 選擇 · Enter 確認`"}
+    OrgSelect{"選擇帳號/組織<br/>上下選擇 · Enter 確認"}
     OrgSelect -->|"AlvinBian 個人倉庫"| Selected
-    OrgSelect -->|"kkday-it 組織"| Selected
+    OrgSelect -->|"組織倉庫"| Selected
     OrgSelect -->|ESC| Back([BACK])
 
     AutoOrg --> Selected["已選擇：xxx"]
     Selected --> FetchRepos
 
-    FetchRepos["📦 取得倉庫列表
-    gh api repos · per_page=100
-    ── 找到 N 個倉庫"]
+    FetchRepos["取得倉庫列表<br/>gh api repos · per_page=100<br/>找到 N 個倉庫"]
 
-    FetchRepos --> Contrib["📊 貢獻分析
-    gh api commits?author=
-    ── N 個有貢獻（共 M commits）"]
+    FetchRepos --> Contrib["貢獻分析<br/>gh api commits?author=<br/>N 個有貢獻（共 M commits）"]
 
-    Contrib --> RepoList[/"**倉庫列表（按貢獻排序）**
-    1. repo-a  70% · 1336 commits · ★3
-    2. repo-b  16% · 294 commits
-    3. repo-c  14% · 265 commits
-    4. repo-d  1 commits
-    ─────
-    有貢獻的自動預選 ✔"/]
+    Contrib --> RepoList["倉庫列表（按貢獻排序）<br/>1. repo-a 70% · 1336 commits<br/>2. repo-b 16% · 294 commits<br/>3. repo-c 14% · 265 commits<br/>4. repo-d 1 commit<br/>有貢獻的自動預選"]
 
-    RepoList --> Confirm{"`**操作**`"}
+    RepoList --> Confirm{"操作"}
     Confirm -->|"確認預選（N 個）"| Return
-    Confirm -->|"調整選擇"| MultiSelect["smartSelect
-    Space 切換 · Enter 確認
-    可選所有 86 個倉庫"]
+    Confirm -->|"調整選擇"| MultiSelect["smartSelect<br/>Space 切換 · Enter 確認<br/>可選所有 86 個倉庫"]
     Confirm -->|ESC| Back
 
     MultiSelect --> Return
 
-    Return[/"**返回 repo 物件陣列**
-    { fullName, commits, pct, stars }
-    → 進入角色分類"/]
+    Return["返回 repo 物件陣列<br/>fullName, commits, pct, stars<br/>→ 進入角色分類"]
 
     Return --> RoleLink["角色分類 →"]
 

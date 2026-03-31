@@ -64,13 +64,6 @@ async function main() {
   let prev = loadSession()
   let projectFolders = loadProjectFolders(config, prev)
 
-  // 首次使用：備份原始配置（~/.zshrc、~/.claude/ 等）
-  const { ensureOriginalBackup } = await import('./backup-original.mjs')
-  const origBackup = ensureOriginalBackup()
-  if (origBackup && origBackup.length > 0) {
-    p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
-  }
-
   // 斷點續裝偵測
   const incomplete = checkIncompleteSession()
   if (incomplete.hasIncomplete && prev) {
@@ -109,6 +102,14 @@ async function main() {
     p.log.info(`Quick 模式：重放上次安裝（${prev.repos?.length} repos）`)
 
     if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
+
+    // 首次使用：備份原始配置（~/.zshrc、~/.claude/ 等）
+    const { ensureOriginalBackup: ensureOriginalBackupQuick } = await import('./backup-original.mjs')
+    const origBackupQuick = ensureOriginalBackupQuick()
+    if (origBackupQuick && origBackupQuick.length > 0) {
+      p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackupQuick.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
+    }
+
     phaseHeader('環境檢查')
     await ensureEnvironment()
     warmupCli()
@@ -282,6 +283,14 @@ async function main() {
       await runLegacyCheckIfNeeded()
       // 等同 --quick
       if (fs.existsSync(PREVIEW_DIR)) fs.rmSync(PREVIEW_DIR, { recursive: true })
+
+      // 首次使用：備份原始配置（~/.zshrc、~/.claude/ 等）
+      const { ensureOriginalBackup: ensureOriginalBackupReinstall } = await import('./backup-original.mjs')
+      const origBackupReinstall = ensureOriginalBackupReinstall()
+      if (origBackupReinstall && origBackupReinstall.length > 0) {
+        p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackupReinstall.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
+      }
+
       phaseHeader('環境檢查')
       await ensureEnvironment()
       warmupCli()
@@ -325,6 +334,13 @@ async function main() {
 
   // 舊配置偵測（新安裝流程入口）
   await runLegacyCheckIfNeeded()
+
+  // 首次使用：備份原始配置（~/.zshrc、~/.claude/ 等）
+  const { ensureOriginalBackup } = await import('./backup-original.mjs')
+  const origBackup = ensureOriginalBackup()
+  if (origBackup && origBackup.length > 0) {
+    p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
+  }
 
   // 環境檢查
   phaseHeader('環境檢查')

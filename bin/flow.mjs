@@ -177,7 +177,7 @@ ${c.mermaid}
     .modal-body {
       flex: 1; overflow: hidden; position: relative; cursor: grab;
     }
-    .modal-panzoom { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+    .modal-panzoom { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     .modal-panzoom svg { max-width: 95vw; max-height: 85vh; }
 
     @media (max-width: 768px) {
@@ -343,18 +343,23 @@ ${c.mermaid}
       document.getElementById('modal-title').textContent = section.querySelector('h2').textContent;
 
       container.innerHTML = '';
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'display:inline-block;';
       const clone = svg.cloneNode(true);
       clone.style.maxWidth = '95vw';
       clone.style.maxHeight = '85vh';
-      container.appendChild(clone);
+      wrapper.appendChild(clone);
+      container.appendChild(wrapper);
 
       modal.classList.add('active');
       document.body.style.overflow = 'hidden';
 
       if (modalPz) modalPz.destroy();
-      modalPz = Panzoom(container, { maxScale: 6, minScale: 0.2, step: 0.15, contain: false, cursor: 'grab' });
-      document.querySelector('.modal-body').addEventListener('wheel', e => {
-        if (e.ctrlKey || e.metaKey) { e.preventDefault(); modalPz.zoomWithWheel(e); }
+      // Panzoom 綁在 wrapper 上，container 作為 viewport（固定尺寸）
+      modalPz = Panzoom(wrapper, { maxScale: 6, minScale: 0.2, step: 0.15, contain: false, cursor: 'grab' });
+      container.addEventListener('wheel', e => {
+        e.preventDefault();
+        modalPz.zoomWithWheel(e);
       }, { passive: false });
     }
     function closeModal() {

@@ -74,6 +74,7 @@ function generateHTML(charts) {
       </div>
       <div class="chart-body">
         <div class="zoom-controls">
+          <button class="zoom-btn" onclick="openModal('${c.name}')" title="全螢幕">⛶</button>
           <button class="zoom-btn" onclick="zoomIn('${c.name}')" title="放大">+</button>
           <button class="zoom-btn" onclick="zoomOut('${c.name}')" title="縮小">−</button>
           <button class="zoom-btn" onclick="zoomReset('${c.name}')" title="重置">⟲</button>
@@ -161,6 +162,24 @@ ${c.mermaid}
 
     footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
 
+    /* Modal 全螢幕彈窗 */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+    }
+    .modal-overlay.active { display: flex; flex-direction: column; }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.8rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 { font-size: 1rem; color: var(--text); }
+    .modal-controls { display: flex; gap: 6px; }
+    .modal-body {
+      flex: 1; overflow: hidden; position: relative; cursor: grab;
+    }
+    .modal-panzoom { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+    .modal-panzoom svg { max-width: 95vw; max-height: 85vh; }
+
     @media (max-width: 768px) {
       .container { flex-direction: column; }
       .sidebar { width: 100%; min-width: 100%; height: auto; position: static; display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem; }
@@ -181,6 +200,22 @@ ${c.mermaid}
       ${sections}
       <footer>Generated from docs/flows/*.mmd · ${new Date().toISOString().slice(0, 19)}</footer>
     </main>
+  </div>
+
+  <!-- Modal 全螢幕彈窗 -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal-header">
+      <h3 id="modal-title"></h3>
+      <div class="modal-controls">
+        <button class="zoom-btn" onclick="modalZoomIn()" title="放大">+</button>
+        <button class="zoom-btn" onclick="modalZoomOut()" title="縮小">−</button>
+        <button class="zoom-btn" onclick="modalZoomReset()" title="重置">⟲</button>
+        <button class="zoom-btn" onclick="closeModal()" title="關閉 (ESC)">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-panzoom" id="modal-panzoom"></div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"></script>
@@ -243,6 +278,47 @@ ${c.mermaid}
     function zoomIn(id) { const p = pzInstances[id]; if (p) p.zoomIn(); }
     function zoomOut(id) { const p = pzInstances[id]; if (p) p.zoomOut(); }
     function zoomReset(id) { const p = pzInstances[id]; if (p) p.reset(); }
+
+    // Modal 全螢幕
+    let modalPz = null;
+    function openModal(id) {
+      const section = document.getElementById(id);
+      if (!section) return;
+      const svg = section.querySelector('.mermaid svg');
+      if (!svg) return;
+
+      const modal = document.getElementById('modal');
+      const container = document.getElementById('modal-panzoom');
+      document.getElementById('modal-title').textContent = section.querySelector('h2').textContent;
+
+      container.innerHTML = '';
+      const clone = svg.cloneNode(true);
+      clone.style.maxWidth = '95vw';
+      clone.style.maxHeight = '85vh';
+      container.appendChild(clone);
+
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+
+      if (modalPz) modalPz.destroy();
+      modalPz = Panzoom(container, { maxScale: 6, minScale: 0.2, step: 0.15, contain: false, cursor: 'grab' });
+      document.querySelector('.modal-body').addEventListener('wheel', e => {
+        if (e.ctrlKey || e.metaKey) { e.preventDefault(); modalPz.zoomWithWheel(e); }
+      }, { passive: false });
+    }
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+      document.body.style.overflow = '';
+      if (modalPz) { modalPz.destroy(); modalPz = null; }
+    }
+    function modalZoomIn() { if (modalPz) modalPz.zoomIn(); }
+    function modalZoomOut() { if (modalPz) modalPz.zoomOut(); }
+    function modalZoomReset() { if (modalPz) modalPz.reset(); }
+
+    // ESC 關閉 modal
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+    // 點擊背景關閉
+    document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 
     // Init after mermaid renders
     setTimeout(initPanzoom, 1500);

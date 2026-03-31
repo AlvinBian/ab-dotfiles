@@ -180,9 +180,12 @@ function generateHTML(charts) {
       background: var(--card); color: var(--text); cursor: pointer; font-size: 16px;
     }
     .modal-controls button:hover { border-color: var(--accent); color: var(--accent); }
-    .modal-body { flex: 1; overflow: hidden; cursor: grab; }
+    .modal-body {
+      flex: 1; overflow: hidden; cursor: grab;
+      display: flex; align-items: center; justify-content: center;
+    }
     .modal-body:active { cursor: grabbing; }
-    #modal-inner { display: inline-block; transform-origin: 0 0; }
+    #modal-inner { display: inline-block; transform-origin: center center; }
 
     footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
     @media (max-width: 768px) {
@@ -264,13 +267,26 @@ function generateHTML(charts) {
       const source = document.querySelector('#svg-' + id + ' svg') || document.querySelector('#mmd-' + id + ' svg');
       if (!source) return;
       const clone = source.cloneNode(true);
-      clone.style.cssText = 'max-width:90vw;max-height:85vh;display:block;';
+      clone.style.cssText = 'display:block;';
       inner.appendChild(clone);
 
       document.getElementById('modal').classList.add('active');
       document.body.style.overflow = 'hidden';
 
-      pz = Panzoom(inner, { maxScale:5, minScale:0.3, step:0.12, contain:false, cursor:'grab' });
+      // 自動縮放：讓 SVG 填滿視窗（fit to screen）
+      requestAnimationFrame(() => {
+        const bodyRect = body.getBoundingClientRect();
+        const svgW = clone.getBoundingClientRect().width || clone.viewBox?.baseVal?.width || 800;
+        const svgH = clone.getBoundingClientRect().height || clone.viewBox?.baseVal?.height || 600;
+        const scaleX = (bodyRect.width * 0.95) / svgW;
+        const scaleY = (bodyRect.height * 0.95) / svgH;
+        const fitScale = Math.min(scaleX, scaleY, 2);
+        clone.style.width = svgW + 'px';
+        clone.style.height = svgH + 'px';
+        inner.style.transformOrigin = 'center center';
+
+        pz = Panzoom(inner, { maxScale:8, minScale:0.2, step:0.12, startScale: fitScale, contain:false, cursor:'grab' });
+      });
       wheelH = e => { if (e.ctrlKey||e.metaKey) { e.preventDefault(); pz.zoomWithWheel(e,{animate:false}); } };
       body.addEventListener('wheel', wheelH, {passive:false});
       body.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});

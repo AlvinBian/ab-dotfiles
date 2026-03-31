@@ -79,10 +79,11 @@ setup 會修改以下檔案/目錄，**每次安裝前自動備份**：
 | `~/.claude/rules/`           | 寫入 rules                   | `dist/backup/{timestamp}/claude/rules`            |
 | `~/.claude/hooks.json`       | 寫入 hooks 設定              | `dist/backup/{timestamp}/claude/hooks.json`       |
 | `~/.claude/settings.json`    | 合併 permissions + model     | `dist/backup/{timestamp}/claude/settings.json`    |
-| `~/.claude/keybindings.json` | 寫入快捷鍵（skip if exists） | `dist/backup/{timestamp}/claude/keybindings.json` |
 | `~/.claude/projects/`        | 寫入 CLAUDE.md               | 不備份（可重生）                                  |
 | `~/.zshrc`                   | 替換為模組化版本             | `dist/backup/{timestamp}/zshrc`                   |
-| `~/.zsh/modules/`            | 寫入 zsh 模組                | `dist/backup/{timestamp}/zsh/modules`             |
+| `~/.zshrc.local`             | 個人設定自動遷移（不覆蓋）   | `dist/backup/{timestamp}/zshrc.local`             |
+| `~/.zsh/modules/`            | 寫入 zsh 模組（diff 跳過）   | `dist/backup/{timestamp}/zsh/modules`             |
+| `~/.ripgreprc`               | 首次建立（已有跳過）         | `dist/backup/{timestamp}/ripgreprc`               |
 
 不想直接部署？用 `--manual` 模式：
 
@@ -106,9 +107,9 @@ pnpm run setup
   │
   ├─ 舊配置偵測（自動清理殘留）
   ├─ 環境檢查 + CLI 預熱
-  ├─ 功能選擇（claude / claudemd / ecc / slack / zsh）
+  ├─ 功能選擇（claude / claudemd / ecc / slack / zsh / gmail）
   ├─ Step 1：選擇倉庫
-  │   ├─ GitHub 帳號 → 組織/個人 → 選 repos
+  │   ├─ GitHub 帳號 → 組織/個人（可多選）→ 選 repos
   │   └─ 角色分配（⭐主力 / 🔄臨時 / 🔧工具）
   ├─ 自動分析（Listr2 並行）
   │   ├─ Per-repo AI 技術棧分析（並行，各自快取）
@@ -120,7 +121,7 @@ pnpm run setup
   │   └─ 全部安裝 / 逐項確認 / 精簡安裝
   ├─ 安裝（listr2 8 步）
   │   ├─ [1/8] 備份現有配置
-  │   ├─ [2/8] 全局配置（settings + keybindings + slack-dispatch）
+  │   ├─ [2/8] 全局配置（settings + slack-dispatch）
   │   ├─ [3/8] Claude 安裝（commands + agents + rules + hooks）
   │   ├─ [4/8] ECC 融合 + Stacks 生成
   │   ├─ [5/8] CLAUDE.md 生成（~/.claude/projects/）
@@ -151,6 +152,7 @@ pnpm run setup
 | `pnpm run hooks`              | 互動式管理個別 hook 啟用/停用      |
 | `pnpm run doctor`             | 環境健康檢查                       |
 | `pnpm run status`             | 查看已安裝配置的健康狀態           |
+| `pnpm run flow`               | 瀏覽器查看完整流程圖（9 張）       |
 | `pnpm run workspace`          | 生成 .code-workspace               |
 | `pnpm run taxonomy:build`     | 重建 awesome-* 分類索引            |
 

@@ -74,6 +74,7 @@ function generateHTML(charts) {
       </div>
       <div class="chart-body">
         <div class="zoom-controls">
+          <button class="zoom-btn" onclick="popOut('${c.name}')" title="獨立視窗">⧉</button>
           <button class="zoom-btn" onclick="openModal('${c.name}')" title="全螢幕">⛶</button>
           <button class="zoom-btn" onclick="zoomIn('${c.name}')" title="放大">+</button>
           <button class="zoom-btn" onclick="zoomOut('${c.name}')" title="縮小">−</button>
@@ -114,6 +115,13 @@ ${c.mermaid}
     }
     .sidebar h1 { font-size: 1.1rem; padding: 0 1.2rem 1rem; color: var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
     .sidebar .subtitle { font-size: 0.75rem; color: var(--dim); padding: 0 1.2rem 1rem; }
+    .open-all-btn {
+      display: block; width: calc(100% - 2.4rem); margin: 0.5rem 1.2rem;
+      padding: 0.5rem; background: rgba(88,166,255,0.1); color: var(--accent);
+      border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+      font-size: 0.8rem; transition: all 0.15s;
+    }
+    .open-all-btn:hover { background: rgba(88,166,255,0.2); border-color: var(--accent); }
     .nav-item {
       display: block; padding: 0.6rem 1.2rem; text-decoration: none;
       border-left: 3px solid transparent; transition: all 0.15s;
@@ -194,6 +202,7 @@ ${c.mermaid}
     <nav class="sidebar">
       <h1>ab-dotfiles v2.1</h1>
       <div class="subtitle">${charts.length} 張流程圖 · 所有流程和分支</div>
+      <button class="open-all-btn" onclick="popOutAll()">全部獨立視窗打開</button>
       ${navItems}
     </nav>
     <main class="main">
@@ -278,6 +287,56 @@ ${c.mermaid}
     function zoomIn(id) { const p = pzInstances[id]; if (p) p.zoomIn(); }
     function zoomOut(id) { const p = pzInstances[id]; if (p) p.zoomOut(); }
     function zoomReset(id) { const p = pzInstances[id]; if (p) p.reset(); }
+
+    // 獨立視窗彈出
+    function popOut(id) {
+      const section = document.getElementById(id);
+      if (!section) return;
+      const title = section.querySelector('h2')?.textContent || id;
+      const mermaidEl = section.querySelector('.mermaid');
+      if (!mermaidEl) return;
+
+      const svg = mermaidEl.querySelector('svg');
+      const svgHtml = svg ? svg.outerHTML : '<p>SVG not rendered yet</p>';
+
+      const w = window.open('', id, 'width=1200,height=800,menubar=no,toolbar=no');
+      w.document.write(\`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>\${title}</title>
+<script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.1/dist/panzoom.min.js"><\\/script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d1117; color:#e6edf3; font-family:-apple-system,sans-serif; overflow:hidden; }
+  header { padding:0.5rem 1rem; background:#161b22; border-bottom:1px solid #30363d; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:1rem; color:#58a6ff; }
+  .controls { display:flex; gap:4px; }
+  .btn { width:28px; height:28px; border:1px solid #30363d; border-radius:4px; background:#161b22; color:#e6edf3; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; }
+  .btn:hover { border-color:#58a6ff; color:#58a6ff; }
+  #canvas { width:100vw; height:calc(100vh - 40px); display:flex; align-items:center; justify-content:center; cursor:grab; overflow:hidden; }
+  #canvas svg { max-width:95vw; max-height:90vh; }
+</style></head><body>
+<header>
+  <h1>\${title}</h1>
+  <div class="controls">
+    <button class="btn" onclick="pz.zoomIn()" title="放大">+</button>
+    <button class="btn" onclick="pz.zoomOut()" title="縮小">−</button>
+    <button class="btn" onclick="pz.reset()" title="重置">⟲</button>
+  </div>
+</header>
+<div id="canvas">\${svgHtml}</div>
+<script>
+  var pz = Panzoom(document.getElementById('canvas'), { maxScale:6, minScale:0.2, step:0.15, contain:false, cursor:'grab' });
+  document.getElementById('canvas').addEventListener('wheel', function(e) {
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); pz.zoomWithWheel(e); }
+  }, { passive:false });
+<\\/script></body></html>\`);
+      w.document.close();
+    }
+
+    function popOutAll() {
+      const ids = Array.from(document.querySelectorAll('.chart-section')).map(s => s.id);
+      let delay = 0;
+      ids.forEach(id => { setTimeout(() => popOut(id), delay); delay += 300; });
+    }
 
     // Modal 全螢幕
     let modalPz = null;

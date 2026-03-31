@@ -185,7 +185,7 @@ function generateHTML(charts) {
       display: flex; align-items: center; justify-content: center;
     }
     .modal-body:active { cursor: grabbing; }
-    #modal-inner { display: inline-block; transform-origin: center center; }
+    #modal-inner { transform-origin: center center; }
 
     footer { text-align: center; color: var(--dim); font-size: 0.75rem; padding: 2rem 0; }
     @media (max-width: 768px) {
@@ -272,10 +272,9 @@ function generateHTML(charts) {
       document.getElementById('modal').classList.add('active');
       document.body.style.overflow = 'hidden';
 
-      // fit-to-screen：直接設定 SVG 尺寸填滿，panzoom 從 1x 開始
+      // 居中 fit + 手寫拖動縮放（以操作點為中心）
       requestAnimationFrame(() => {
-        const vw = body.clientWidth;
-        const vh = body.clientHeight;
+        const vw = body.clientWidth, vh = body.clientHeight;
         const vb = clone.viewBox?.baseVal;
         const natW = vb?.width || clone.getBoundingClientRect().width || 800;
         const natH = vb?.height || clone.getBoundingClientRect().height || 600;
@@ -284,25 +283,58 @@ function generateHTML(charts) {
         clone.setAttribute('height', natH * fit);
         clone.style.display = 'block';
 
-        pz = Panzoom(inner, { maxScale:8, minScale:0.2, step:0.12, contain:false, cursor:'grab' });
+        let sc = 1, tx = 0, ty = 0, drag = false, ox = 0, oy = 0;
+        const set = () => { inner.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+sc+')'; };
+
+        // 拖動
+        body.addEventListener('pointerdown', e => { if(e.button===0){drag=true; ox=e.clientX-tx; oy=e.clientY-ty;} });
+        body.addEventListener('pointermove', e => { if(drag){tx=e.clientX-ox; ty=e.clientY-oy; set();} });
+        body.addEventListener('pointerup', ()=>{drag=false;});
+
+        // 以指定點為中心縮放
+        const zoomAt = (cx, cy, factor) => {
+          const prev = sc;
+          sc = Math.min(Math.max(sc * factor, 0.15), 10);
+          const r = sc / prev;
+          tx = cx - r * (cx - tx);
+          ty = cy - r * (cy - ty);
+          set();
+        };
+
+        // Ctrl+滾輪：以光標為中心
+        wheelH = e => {
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const br = body.getBoundingClientRect();
+            zoomAt(e.clientX - br.left, e.clientY - br.top, e.deltaY > 0 ? 0.9 : 1.1);
+          }
+        };
+        body.addEventListener('wheel', wheelH, {passive:false});
+
+        // 觸控板捏合
+        body.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
+        body.addEventListener('gesturechange', e=>{
+          e.preventDefault();
+          zoomAt(body.clientWidth/2, body.clientHeight/2, e.scale>1?1.04:0.96);
+        }, {passive:false});
+
+        // 按鈕：以屏幕中心
+        pz = {
+          zoomIn: ()=>zoomAt(body.clientWidth/2, body.clientHeight/2, 1.25),
+          zoomOut: ()=>zoomAt(body.clientWidth/2, body.clientHeight/2, 0.8),
+          reset: ()=>{sc=1;tx=0;ty=0;set();},
+          destroy: ()=>{},
+        };
       });
-      wheelH = e => { if (e.ctrlKey||e.metaKey) { e.preventDefault(); pz.zoomWithWheel(e,{animate:false}); } };
-      body.addEventListener('wheel', wheelH, {passive:false});
-      body.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
-      body.addEventListener('gesturechange', e=>{
-        e.preventDefault();
-        pz.zoom(Math.min(Math.max(pz.getScale()*(e.scale>1?1.04:0.96),0.3),5),{animate:false});
-      }, {passive:false});
     }
     function mClose() {
       document.getElementById('modal').classList.remove('active');
       document.body.style.overflow = '';
       if (wheelH) { document.getElementById('modal-body').removeEventListener('wheel',wheelH); wheelH=null; }
-      if (pz) { pz.destroy(); pz=null; }
+      pz=null;
     }
-    function mFocal() { const r=document.getElementById('modal-body'); return {x:r.clientWidth/2, y:r.clientHeight/2}; }
-    function mZoomIn() { if(pz) pz.zoomIn({focal:mFocal(),animate:false}); }
-    function mZoomOut() { if(pz) pz.zoomOut({focal:mFocal(),animate:false}); }
+    function mZoomIn() { if(pz) pz.zoomIn(); }
+    function mZoomOut() { if(pz) pz.zoomOut(); }
     function mReset() { if(pz) pz.reset(); }
 
     document.addEventListener('keydown', e => { if(e.key==='Escape') mClose(); });

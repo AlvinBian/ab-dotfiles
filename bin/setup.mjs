@@ -343,9 +343,8 @@ async function main() {
         .replace(/^SLACK_NOTIFY_CHANNEL=.*/m, '')
         .replace(/^SLACK_NOTIFY_MODE=.*/m, '')
         .replace(/^SLACK_NOTIFY_CHANNEL_NAME=.*/m, '')
-        .replace(/^SLACK_WORKSPACE_URL=.*/m, '')  // 清理舊版
-        .replace(/^SLACK_WEBHOOK_URL=.*/m, '')    // 清理舊版
         .replace(/^SLACK_NOTIFY_USER_ID=.*/m, '')
+        .replace(/^SLACK_DM_CHANNEL=.*/m, '')     // v2.0.x 舊版清理
         .trim()
       envContent += `\nSLACK_NOTIFY_CHANNEL=${slackResult.channelId}\nSLACK_NOTIFY_MODE=${slackResult.mode}`
       if (slackResult.channelName) envContent += `\nSLACK_NOTIFY_CHANNEL_NAME=${slackResult.channelName}`

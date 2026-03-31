@@ -142,8 +142,9 @@ function buildRules(labelIds) {
     // ══════════════════════════════════════════════════
     // TIER 2 — info（公告、系統通知、設計稿）
     // ══════════════════════════════════════════════════
-    { desc: "IT system notifications", criteria: { from: "it@kkday.com OR noreply@kkday.com OR no-reply@kkday.com" },
-      action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: ["IMPORTANT"] } },
+    // 自訂：加入你的公司 IT / noreply 信箱，例如：
+    // { desc: "IT system notifications", criteria: { from: "it@yourcompany.com OR noreply@yourcompany.com" },
+    //   action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: ["IMPORTANT"] } },
     { desc: "Company announcements", criteria: { subject: "[全員公告] OR [All Staff] OR [公司公告] OR [Company Notice] OR [HR Announcement] OR [人力資源處公告]" },
       action: { addLabelIds: [labelIds["auto/info"]], removeLabelIds: [] } },
     { desc: "Receipt / invoice", criteria: { subject: "receipt OR invoice OR billing OR 收據 OR 發票 OR 帳單" },
@@ -161,8 +162,9 @@ function buildRules(labelIds) {
     // TIER 4 — action_required（需要行動的重要郵件）
     // 最後執行，IMPORTANT + STARRED 會覆蓋前面的移除
     // ══════════════════════════════════════════════════
-    { desc: "HR team direct", criteria: { from: "hr@kkday.com OR people@kkday.com OR payroll@kkday.com" },
-      action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
+    // 自訂：加入你的 HR / 主管 / 財務信箱，例如：
+    // { desc: "HR team direct", criteria: { from: "hr@yourcompany.com OR people@yourcompany.com" },
+    //   action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
     { desc: "HR / payroll keywords", criteria: { subject: "薪資 OR Payroll OR 考績 OR 績效 OR 調薪 OR offer OR 請假 OR 假單 OR onboarding OR offboarding OR 離職 OR performance review OR salary OR Bonus OR 年終 OR 晉升 OR promotion" },
       action: { addLabelIds: ["IMPORTANT", "STARRED", labelIds["action/required"]], removeLabelIds: [] } },
     { desc: "Finance / expense", criteria: { subject: "報帳 OR 費用申請 OR 核銷 OR expense OR reimbursement OR 審核通過 OR 請款" },

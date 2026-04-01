@@ -844,6 +844,22 @@ async function main() {
 		break;
 	}
 
+	// 檢查 ~/.zshrc 是否為最新模板（可能用戶只選了 Claude 沒選 ZSH）
+	const zshrcTemplate = path.join(REPO, "zsh", "zshrc");
+	const zshrcInstalled = path.join(HOME, ".zshrc");
+	if (fs.existsSync(zshrcTemplate) && fs.existsSync(zshrcInstalled)) {
+		const tpl = fs.readFileSync(zshrcTemplate, "utf8");
+		const cur = fs.readFileSync(zshrcInstalled, "utf8");
+		// 檢查關鍵行是否存在
+		if (!cur.includes(".local/bin") && tpl.includes(".local/bin")) {
+			p.log.warn(
+				`~/.zshrc 缺少 ~/.local/bin PATH（Claude CLI 官方安裝路徑）\n` +
+					`  執行 ${pc.cyan("pnpm run setup")} 並選擇 ZSH 模組可自動修復\n` +
+					`  或手動加入：${pc.dim('[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"')}`,
+			);
+		}
+	}
+
 	p.outro("設定完成");
 }
 

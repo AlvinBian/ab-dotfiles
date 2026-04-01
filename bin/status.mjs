@@ -11,7 +11,7 @@ import path from 'path'
 import { execFileSync } from 'child_process'
 import * as p from '@clack/prompts'
 import pc from 'picocolors'
-import { collectFullStatus, formatBytes } from '../lib/core/usage-scanner.mjs'
+import { collectFullStatus, formatBytes, humanizeProjectPath } from '../lib/core/usage-scanner.mjs'
 import { getDirname } from '../lib/core/paths.mjs'
 
 const __dirname = getDirname(import.meta)
@@ -40,7 +40,8 @@ async function main() {
 // ═══════════════════════════════════════════════════════════════
 
 async function terminalMode(data) {
-  showOverview(data)
+  let currentData = data
+  showOverview(currentData)
 
   while (true) {
     const action = await p.select({
@@ -49,13 +50,35 @@ async function terminalMode(data) {
         { value: 'detail', label: '📋 查看詳情', hint: '展開某個分類' },
         { value: 'manage', label: '⚙️  管理配置', hint: '增/刪/啟用/關閉' },
         { value: 'report', label: '📊 生成 HTML 報告', hint: '在瀏覽器中查看完整 Dashboard' },
+        { value: 'refresh', label: '🔄 重新掃描', hint: '更新使用數據' },
         { value: 'exit', label: '👋 退出' },
       ],
     })
     if (p.isCancel(action) || action === 'exit') break
-    if (action === 'detail') await showDetail(data)
-    if (action === 'manage') await manageConfig(data)
-    if (action === 'report') await generateHtmlReport(data)
+    if (action === 'detail') {
+      while (true) {
+        const cont = await showDetail(currentData)
+        if (!cont) break
+      }
+    }
+    if (action === 'manage') {
+      const changed = await manageConfig(currentData)
+      if (changed) {
+        const spinner = p.spinner()
+        spinner.start('重新掃描…')
+        currentData = await collectFullStatus()
+        spinner.stop('已更新')
+        showOverview(currentData)
+      }
+    }
+    if (action === 'report') await generateHtmlReport(currentData)
+    if (action === 'refresh') {
+      const spinner = p.spinner()
+      spinner.start('重新掃描…')
+      currentData = await collectFullStatus()
+      spinner.stop('已更新')
+      showOverview(currentData)
+    }
   }
   p.outro(pc.dim('再見'))
 }
@@ -90,6 +113,8 @@ async function showDetail(data) {
       { value: 'rules', label: `📐 Rules (${data.rules.length})` },
       { value: 'hooks', label: `🪝 Hooks (${data.hooks.length} 事件)` },
       { value: 'zsh', label: `🐚 ZSH (${data.zsh.installed.length}/${data.zsh.available.length})` },
+      { value: 'slack', label: `💬 Slack (${data.slack.mode})` },
+      { value: 'ai', label: `🧠 AI (${data.ai.model})` },
       { value: 'permissions', label: `🔐 Permissions (${data.permissions.allow.length} allow / ${data.permissions.deny.length} deny)` },
       { value: 'claudemd', label: `📝 CLAUDE.md (${data.claudeMd.length} 項目)` },
       { value: 'plugins', label: `📦 Plugins (${data.plugins.length})` },
@@ -99,7 +124,7 @@ async function showDetail(data) {
       { value: 'back', label: '← 返回' },
     ],
   })
-  if (p.isCancel(category) || category === 'back') return
+  if (p.isCancel(category) || category === 'back') return false
 
   switch (category) {
     case 'commands':
@@ -172,14 +197,26 @@ async function showDetail(data) {
       if (data.plugins.length === 0) console.log(pc.dim('  無已構建的 plugin'))
       for (const pl of data.plugins) console.log(`  ${pl.name}  ${pc.dim(pl.mtime.slice(0, 10))}`)
       break
+    case 'slack':
+      console.log()
+      p.log.step(pc.bold('💬 Slack 配置'))
+      console.log(`  模式：${data.slack.mode === 'off' ? pc.dim('未啟用') : pc.cyan(data.slack.mode)}`)
+      if (data.slack.channel) console.log(`  頻道：${pc.cyan(data.slack.channel)}${data.slack.channelName ? ` (#${data.slack.channelName})` : ''}`)
+      break
+    case 'ai':
+      console.log()
+      p.log.step(pc.bold('🧠 AI 設定'))
+      console.log(`  模型：${pc.cyan(data.ai.model)}`)
+      console.log(`  推理強度：${pc.cyan(data.ai.effort)}`)
+      console.log(`  Repo 分類模型：${pc.cyan(data.ai.repoModel)}`)
+      break
     case 'sessions':
       console.log()
       p.log.step(pc.bold('📈 Sessions'))
       console.log(`  總計 ${pc.cyan(data.sessions.total)} 個 session`)
       console.log()
       for (const [proj, count] of data.sessions.byProject) {
-        const name = proj.replace(/-Users-alvin-?/g, '').replace(/-/g, '/') || '~'
-        console.log(`  ${pc.dim(name)}  ${count} sessions`)
+        console.log(`  ${pc.dim(humanizeProjectPath(proj))}  ${count} sessions`)
       }
       break
     case 'env':
@@ -208,6 +245,7 @@ async function showDetail(data) {
       break
   }
   console.log()
+  return true // 繼續循環
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -215,20 +253,21 @@ async function showDetail(data) {
 // ═══════════════════════════════════════════════════════════════
 
 async function manageConfig(data) {
+  let changed = false
   const category = await p.select({
     message: '管理哪個分類？',
     options: [
       { value: 'commands', label: '⌨️  Commands — 刪除 / 從 ECC 新增' },
       { value: 'agents', label: '🤖 Agents — 刪除 / 從 ECC 新增' },
       { value: 'rules', label: '📐 Rules — 啟用 / 停用 / 刪除 / 從 ECC 新增' },
-      { value: 'hooks', label: '🪝 Hooks — 啟用 / 停用 事件' },
+      { value: 'hooks', label: '🪝 Hooks — 移除事件' },
       { value: 'zsh', label: '🐚 ZSH — 安裝 / 卸載模組' },
       { value: 'permissions', label: '🔐 Permissions — 新增 / 刪除規則' },
-      { value: 'claudemd', label: '📝 CLAUDE.md — 刪除 / 重新生成' },
+      { value: 'claudemd', label: '📝 CLAUDE.md — 刪除' },
       { value: 'back', label: '← 返回' },
     ],
   })
-  if (p.isCancel(category) || category === 'back') return
+  if (p.isCancel(category) || category === 'back') return false
 
   if (category === 'commands' || category === 'agents') {
     const items = category === 'commands' ? data.commands : data.agents
@@ -259,7 +298,7 @@ async function manageConfig(data) {
       if (!p.isCancel(selected) && selected.length > 0) {
         for (const name of selected) {
           const fp = path.join(dir, `${name}.md`)
-          if (fs.existsSync(fp)) { fs.unlinkSync(fp); p.log.success(`已刪除 ${name}`) }
+          if (fs.existsSync(fp)) { fs.unlinkSync(fp); p.log.success(`已刪除 ${name}`); changed = true }
         }
       }
     } else if (action === 'add') {
@@ -273,7 +312,7 @@ async function manageConfig(data) {
         for (const name of selected) {
           const src = path.join(eccDir, `${name}.md`)
           const dest = path.join(dir, `${name}.md`)
-          if (fs.existsSync(src)) { fs.copyFileSync(src, dest); p.log.success(`已新增 ${name}`) }
+          if (fs.existsSync(src)) { fs.copyFileSync(src, dest); p.log.success(`已新增 ${name}`); changed = true }
         }
       }
     }
@@ -353,8 +392,10 @@ async function manageConfig(data) {
     try { hooksData = JSON.parse(fs.readFileSync(hooksPath, 'utf8')) } catch {}
     const events = Object.keys(hooksData.hooks || {})
 
+    if (events.length === 0) { p.log.info('沒有已配置的 Hook 事件'); return false }
+
     const selected = await p.multiselect({
-      message: '切換 Hook 事件（啟用 ↔ 停用）',
+      message: '選擇要移除的 Hook 事件（移除後可透過 pnpm run setup 重新安裝）',
       options: events.map(e => ({
         value: e,
         label: e,
@@ -364,18 +405,12 @@ async function manageConfig(data) {
     })
     if (!p.isCancel(selected) && selected.length > 0) {
       for (const event of selected) {
-        // 透過前綴 _disabled_ 來標記停用
-        if (event.startsWith('_disabled_')) {
-          hooksData.hooks[event.replace('_disabled_', '')] = hooksData.hooks[event]
-          delete hooksData.hooks[event]
-          p.log.success(`已啟用 ${event.replace('_disabled_', '')}`)
-        } else {
-          hooksData.hooks[`_disabled_${event}`] = hooksData.hooks[event]
-          delete hooksData.hooks[event]
-          p.log.info(`已停用 ${event}`)
-        }
+        delete hooksData.hooks[event]
+        p.log.info(`已移除 ${event}`)
       }
       fs.writeFileSync(hooksPath, JSON.stringify(hooksData, null, 2) + '\n')
+      p.log.success(`已移除 ${selected.length} 個 Hook 事件（pnpm run setup 可重新安裝）`)
+      return true
     }
   }
 
@@ -472,6 +507,8 @@ async function manageConfig(data) {
       }
     }
   }
+
+  return changed
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -547,7 +584,7 @@ async function generateHtmlReport(data) {
     </tr>`).join('')
 
   const sessionRows = [...data.sessions.byProject].sort((a, b) => b[1] - a[1]).map(([proj, count]) => {
-    const name = proj.replace(/-Users-alvin-?/g, '').replace(/-/g, '/') || '~'
+    const name = humanizeProjectPath(proj)
     return `<tr><td class="px-3 py-2 text-sm">${escHtml(name)}</td><td class="px-3 py-2 text-right">${count}</td></tr>`
   }).join('')
 
@@ -757,7 +794,7 @@ function generateScript() {
   for (const a of selectedAgents) lines.push('rm -f ~/.claude/agents/' + a + '.md');
   const el = document.getElementById('mgmt-output');
   el.style.display = lines.length ? 'block' : 'none';
-  el.textContent = lines.length ? '#!/bin/bash\\n# 刪除未使用的配置\\n' + lines.join('\\n') : '';
+  el.textContent = lines.length ? '#!/bin/bash\n# 刪除未使用的配置\n' + lines.join('\n') : '';
 }
 
 function copyScript() {

@@ -55,14 +55,42 @@ async function main() {
   }
 
   // 互動式選擇
+  const ORIGINAL_DIR = path.join(HOME, '.ab-dotfiles-original')
+  const hasOriginal = fs.existsSync(ORIGINAL_DIR)
+
   const selected = await p.select({
-    message: '選擇要還原的備份版本  ↑↓ 選擇 · Enter 確認',
-    options: backups.map(b => ({
-      value: b.name,
-      label: `${b.name}  ${pc.dim(b.contents.join(', '))}`,
-    })),
+    message: '選擇還原方式  ↑↓ 選擇 · Enter 確認',
+    options: [
+      ...(hasOriginal ? [{ value: '__original__', label: `${pc.red('完全還原')}  恢復到首次 setup 前的原始狀態`, hint: '~/.ab-dotfiles-original/' }] : []),
+      ...backups.map(b => ({
+        value: b.name,
+        label: `${b.name}  ${pc.dim(b.contents.join(', '))}`,
+      })),
+    ],
   })
   if (p.isCancel(selected)) { p.cancel('已取消'); process.exit(0) }
+
+  // 完全還原（合併自 restore-original）
+  if (selected === '__original__') {
+    const items = fs.readdirSync(ORIGINAL_DIR)
+    p.log.info(`即將從 ${pc.cyan('~/.ab-dotfiles-original/')} 恢復：\n  ${items.join(', ')}`)
+    const confirm = await p.confirm({ message: '確認完全還原？這會覆蓋當前所有 Claude 和 ZSH 配置', initialValue: false })
+    if (p.isCancel(confirm) || !confirm) { p.cancel('已取消'); process.exit(0) }
+    const s = p.spinner()
+    s.start('完全還原中...')
+    for (const item of items) {
+      const src = path.join(ORIGINAL_DIR, item)
+      const dest = path.join(HOME, item.startsWith('.') ? item : `.${item}`)
+      try {
+        const stat = fs.statSync(src)
+        if (stat.isDirectory()) cpDir(src, dest)
+        else fs.copyFileSync(src, dest)
+      } catch (err) { p.log.warn(`還原 ${item} 失敗：${err.message}`) }
+    }
+    s.stop('已恢復到首次 setup 前的原始狀態')
+    p.outro(`執行 ${pc.cyan('source ~/.zshrc')} 讓設定生效`)
+    return
+  }
 
   const backup = backups.find(b => b.name === selected)
 

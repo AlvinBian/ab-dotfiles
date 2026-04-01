@@ -98,7 +98,7 @@ async function main() {
     const { ensureOriginalBackup } = await import('./backup-original.mjs')
     const origBackup = ensureOriginalBackup()
     if (origBackup && origBackup.length > 0) {
-      p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
+      p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore → 選擇「完全還原」`)
     }
 
     phaseHeader('環境檢查')
@@ -289,7 +289,7 @@ async function main() {
   const { ensureOriginalBackup } = await import('./backup-original.mjs')
   const origBackup = ensureOriginalBackup()
   if (origBackup && origBackup.length > 0) {
-    p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore-original`)
+    p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore → 選擇「完全還原」`)
   }
 
   // 環境檢查

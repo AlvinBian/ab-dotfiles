@@ -3,7 +3,7 @@
  * 移除 ab-dotfiles 安裝的所有配置
  *
  * 只刪除 ab-dotfiles 管理的項目，保留用戶自訂的。
- * 使用 pnpm run restore-original 可恢復到首次 setup 前的狀態。
+ * 使用 pnpm run restore 可選擇恢復到首次 setup 前的狀態。
  */
 
 import fs from 'fs'
@@ -63,7 +63,7 @@ async function main() {
   ${claudeMdCount} 個 CLAUDE.md（~/.claude/projects/）
 
 用戶自訂的 commands/agents/rules 不會被刪除。
-完全恢復到 setup 前：pnpm run restore-original`)
+完全恢復到 setup 前：pnpm run restore → 選擇「完全還原」`)
 
   const confirm = await p.confirm({ message: '確定卸載？', initialValue: false })
   if (!confirm || p.isCancel(confirm)) {

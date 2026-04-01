@@ -101,8 +101,7 @@ pnpm run setup -- --manual
 #   cp dist/preview/zsh/modules/*.zsh ~/.zsh/modules/
 ```
 
-還原：`pnpm run restore`（互動式選擇備份版本）
-完全還原到首次安裝前：`pnpm run restore-original`
+還原：`pnpm run restore`（互動式選擇備份版本，含完全還原到首次安裝前）
 
 ---
 
@@ -151,16 +150,15 @@ pnpm run setup
 | `pnpm run setup -- --manual`  | 手動模式（只生成到 dist/preview/） |
 | `pnpm run setup -- --quick`   | 用上次選擇快速安裝（0 次互動）     |
 | `pnpm run setup -- --dry-run` | 只顯示安裝計畫，不寫入檔案         |
+| `pnpm run status`             | 配置管理中心（查看 + 互動管理）    |
+| `pnpm run report`             | 瀏覽器 HTML Dashboard              |
 | `pnpm run scan`               | 技術棧掃描，生成 .cache/stacks/    |
-| `pnpm run restore`            | 從備份還原（互動式選擇版本）       |
-| `pnpm run restore-original`   | 還原到首次 setup 前的原始狀態      |
+| `pnpm run restore`            | 從備份還原（含完全還原到安裝前）   |
 | `pnpm run uninstall`          | 移除 ab-dotfiles 管理的所有配置    |
 | `pnpm run hooks`              | 互動式管理個別 hook 啟用/停用      |
 | `pnpm run doctor`             | 環境健康檢查                       |
-| `pnpm run status`             | 查看已安裝配置的健康狀態           |
-| `pnpm run flow`               | 瀏覽器查看完整流程圖（9 張）       |
+| `pnpm run flow`               | 瀏覽器查看完整流程圖               |
 | `pnpm run workspace`          | 生成 .code-workspace               |
-| `pnpm run taxonomy:build`     | 重建 awesome-* 分類索引            |
 
 ### 互動導航
 
@@ -183,9 +181,8 @@ ab-dotfiles/
 │   ├── status.mjs               # 配置健康狀態檢查
 │   ├── flow.mjs                 # 9 張流程圖瀏覽器檢視
 │   ├── scan.mjs                 # 技術棧掃描 & stacks/ 生成
-│   ├── restore.mjs              # 備份還原
-│   ├── restore-original.mjs     # 還原到首次安裝前
-│   ├── backup-original.mjs      # 首次安裝前備份原始配置
+│   ├── restore.mjs              # 備份還原（含完全還原到安裝前）
+│   ├── backup-original.mjs      # 首次安裝前自動備份（setup 內部呼叫）
 │   ├── hooks.mjs                # hooks 互動式管理
 │   └── uninstall.mjs            # 卸載工具
 │
@@ -557,8 +554,7 @@ pnpm run doctor
 # 還原到上次備份
 pnpm run restore
 
-# 還原到首次 setup 前的原始狀態
-pnpm run restore-original
+# 還原時選擇「完全還原」可恢復到首次 setup 前的原始狀態
 
 # 重建分類索引
 pnpm run taxonomy:build
@@ -595,5 +591,5 @@ brew install nvm
 ```bash
 pnpm run uninstall
 # 只移除 ab-dotfiles 管理的項目，保留用戶自訂配置
-# 完全還原到安裝前：pnpm run restore-original
+# 完全還原到安裝前：pnpm run restore → 選擇「完全還原」
 ```

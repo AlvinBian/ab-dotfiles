@@ -1,0 +1,127 @@
+---
+title: Session 生命週期
+description: loadSession → checkIncompleteSession → updateSessionProgress（安裝中）→ patchSession（Gmail/Slack 結果）→ saveSession（phase-complete 最終）→ clearSessionProgress → 下次 loadSession 循環，以 .cache/last-session.json 為中央存儲
+links:
+  - setup-main: 主流程（session 讀寫貫穿全程）
+  - slack-setup: patchSession slackChannel/slackMode
+  - gmail-setup: patchSession scriptId/scriptUrl
+  - phase-execute: updateSessionProgress 斷點續裝
+  - ecc-pipeline: eccSelections 存入 session
+---
+flowchart TD
+    JsonFile[(".cache/last-session.json<br/>{ targets, mode, org, repos,<br/>techCategories, techStacks,<br/>eccSelections, install,<br/>progress?, timestamp }")]
+
+    subgraph Boot ["啟動時讀取"]
+        B1(["pnpm run setup 啟動"])
+        B2["loadSession()<br/>JSON.parse last-session.json"]
+        B3{"parse 成功?"}
+        B4["return session object"]
+        B5["return null"]
+        B1 --> B2 --> B3
+        B3 -->|Yes| B4
+        B3 -->|"No / 檔案不存在"| B5
+    end
+
+    B4 --> CheckIncomplete
+    B5 --> CheckIncomplete
+
+    subgraph CheckIncomplete ["checkIncompleteSession()"]
+        CI1["loadSession()"]
+        CI2{"session?.progress<br/>?.pendingTargets<br/>?.length > 0?"}
+        CI3["return { hasIncomplete: false }"]
+        CI4["return {<br/>  hasIncomplete: true,<br/>  lastPhase,<br/>  completedTargets,<br/>  pendingTargets<br/>}"]
+        CI1 --> CI2
+        CI2 -->|No| CI3
+        CI2 -->|Yes| CI4
+    end
+
+    CI4 --> ResumePrompt{"提示用戶<br/>繼續未完成安裝?"}
+    ResumePrompt -->|"Yes（斷點續裝）"| ResumeInstall["跳過已完成 targets<br/>從 pendingTargets 繼續"]
+    ResumePrompt -->|No| FreshInstall["重新開始完整安裝"]
+    CI3 --> FreshInstall
+
+    FreshInstall --> GatherChoices
+
+    subgraph GatherChoices ["收集用戶選擇（setup 互動流程）"]
+        GC1["選擇 targets/mode/org/repos"]
+        GC2["選擇 techCategories/techStacks"]
+        GC3["選擇 eccSelections"]
+        GC4["選擇 install 功能"]
+        GC1 --> GC2 --> GC3 --> GC4
+    end
+
+    GatherChoices --> PatchExternal
+
+    subgraph PatchExternal ["patchSession — 外部服務設定結果"]
+        direction LR
+        PS1["Slack 設定完成<br/>patchSession({ slackChannel, slackMode })"]
+        PS2["Gmail 設定完成<br/>patchSession({ scriptId, scriptUrl })"]
+        PS1 -.->|"各自獨立 patch"| PS2
+    end
+
+    PatchExternal --> PhaseInstall
+
+    subgraph PhaseInstall ["phaseExecute — 安裝中斷點追蹤"]
+        direction TB
+        PE1["開始安裝 target"]
+        PE2["updateSessionProgress({<br/>  lastPhase: 'execute',<br/>  completedTargets: [...done],<br/>  pendingTargets: [...remaining]<br/>})"]
+        PE3["loadSession() + spread existing<br/>saveSession({ ...existing, progress })"]
+        PE4["每完成一個 target 更新一次"]
+        PE1 --> PE2 --> PE3 --> PE4
+        PE4 -->|"下一個 target"| PE1
+    end
+
+    PE4 --> PhaseComplete
+
+    subgraph PhaseComplete ["phaseComplete — 最終保存"]
+        PC1["saveSession({<br/>  targets, mode, org, repos,<br/>  techCategories, techStacks,<br/>  eccSelections, install,<br/>  slackChannel, slackMode,<br/>  scriptId, scriptUrl,<br/>  timestamp: new Date().toISOString()<br/>})"]
+        PC2["mkdirSync .cache/ recursive<br/>writeFileSync last-session.json"]
+        PC1 --> PC2
+    end
+
+    PhaseComplete --> ClearProgress
+
+    subgraph ClearProgress ["clearSessionProgress()"]
+        CP1["loadSession()"]
+        CP2{"existing?.progress<br/>存在?"}
+        CP3["解構 { progress, ...rest }<br/>saveSession(rest)（去除 progress 欄位）"]
+        CP4["直接 return（無需清除）"]
+        CP1 --> CP2
+        CP2 -->|Yes| CP3
+        CP2 -->|No| CP4
+    end
+
+    CP3 --> NextRun
+    CP4 --> NextRun
+
+    subgraph NextRun ["下次執行 — 讀取歷史"]
+        NR1["loadSession() 讀到乾淨 session<br/>（無 progress 欄位）"]
+        NR2["顯示上次安裝資訊<br/>重入選單：重新安裝 / 調整設定"]
+        NR1 --> NR2
+    end
+
+    Boot --> JsonFile
+    JsonFile --> Boot
+    PatchExternal --> JsonFile
+    PhaseInstall --> JsonFile
+    PhaseComplete --> JsonFile
+    ClearProgress --> JsonFile
+
+    ResumeInstall --> PhaseInstall
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef success fill:#238636,color:#fff,stroke:#238636
+    classDef store fill:#6e40c9,color:#fff,stroke:#6e40c9
+    classDef action fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef patch fill:#0d6efd,color:#fff,stroke:#0d6efd
+
+    class B3,CI2,ResumePrompt,CP2 decision
+    class PC2,NR2 success
+    class JsonFile store
+    class B2,CI1,CP1 action
+    class PS1,PS2 patch
+
+    click PhaseInstall "#phase-execute"
+    click PS1 "#slack-setup"
+    click PS2 "#gmail-setup"
+    click GC3 "#ecc-pipeline"

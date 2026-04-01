@@ -1,0 +1,49 @@
+---
+title: 角色分類系統
+description: 自動分析 → 角色判定 → CLAUDE.md 生成策略 → 用戶調整
+links:
+  - repo-select: 倉庫選擇
+  - phase-execute: 安裝執行（CLAUDE.md 生成在 Step 5）
+---
+flowchart TD
+    Entry(["從倉庫選擇進入"]) --> Analyze
+
+    subgraph Analyze ["自動角色判定"]
+        A1["每個 repo 分析：<br/>commits 數量 + 貢獻百分比<br/>repo 描述 + stars"]
+        A1 --> A2{"判定規則"}
+        A2 -->|"commits >= 50 且 pct >= 10%"| Main["主力 main"]
+        A2 -->|"commits < 50 或 pct < 10%"| Temp["臨時 temp"]
+        A2 -->|"工具/腳本/Docker"| Tool["工具 tool"]
+    end
+
+    subgraph Effects ["角色效果"]
+        Main --> ME["主力 repo 配置<br/>CLAUDE.md：完整版（AI 生成）<br/>技術棧 + 架構要點<br/>開發規範 + 常用指令<br/>所有技術棧規則注入<br/>ECC 資源完整融合"]
+
+        Temp --> TE["臨時 repo 配置<br/>CLAUDE.md：精簡版<br/>快速上手 + 技術棧<br/>注意事項<br/>基礎規則"]
+
+        Tool --> TLE["工具 repo 配置<br/>CLAUDE.md：最小版<br/>一句描述<br/>使用方式"]
+    end
+
+    subgraph UserAdjust ["用戶調整 loop"]
+        U1["角色分配展示<br/>3 主力 · 9 臨時<br/>repo-a repo-b 主力<br/>repo-c... 臨時"]
+        U1 --> U2{"操作"}
+        U2 -->|"確認"| Confirmed([確認 → 進入 phaseAnalyze])
+        U2 -->|"全部設為主力"| U3["所有 repo.role = main"] --> U1
+        U2 -->|"全部設為臨時"| U4["所有 repo.role = temp"] --> U1
+        U2 -->|"選擇主力"| U5["smartSelect：<br/>勾選的 → main<br/>未勾選 → temp"] --> U1
+        U2 -->|"上一步"| Back([BACK 重選倉庫])
+    end
+
+    ME --> UserAdjust
+    TE --> UserAdjust
+    TLE --> UserAdjust
+
+    classDef main fill:#d29922,color:#000,stroke:#d29922
+    classDef temp fill:#1f6feb,color:#fff,stroke:#1f6feb
+    classDef tool fill:#8b949e,color:#fff,stroke:#8b949e
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+
+    class Main,ME main
+    class Temp,TE temp
+    class Tool,TLE tool
+    class A2,U2 decision

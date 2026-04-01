@@ -1,0 +1,47 @@
+---
+title: 配置保護鏈
+description: 三層保護：首次備份 → 增量備份 → 智慧覆蓋 + 兩種還原
+links:
+  - phase-execute: 安裝流程（備份在 Step 1）
+  - setup-main: 返回主流程
+---
+flowchart TD
+    subgraph Layer1 ["第一層：首次備份（一次性）"]
+        direction TB
+        L1T["觸發時機<br/>pnpm run setup 首次執行<br/>~/.ab-dotfiles-original/ 不存在"]
+        L1T --> L1F["備份內容<br/>~/.zshrc → zshrc<br/>~/.zshrc.local → zshrc.local<br/>~/.zsh/ → zsh/<br/>~/.claude/ → claude/<br/>~/.zsh_history → zsh_history<br/>~/.ripgreprc → ripgreprc"]
+        L1F --> L1R["還原<br/>pnpm run restore-original<br/>→ 完全回滾到安裝前狀態"]
+    end
+
+    subgraph Layer2 ["第二層：增量備份（每次 setup）"]
+        direction TB
+        L2T["觸發時機<br/>phaseExecute [1/8]<br/>adjustClaude / adjustZsh"]
+        L2T --> L2F["備份內容<br/>claude/commands, agents, rules<br/>hooks.json · settings.json · keybindings.json<br/>.zshrc · .zshrc.local · .ripgreprc<br/>.zsh/modules/<br/>→ dist/backup/YYYY-MM-DD/"]
+        L2F --> L2R["還原<br/>pnpm run restore<br/>→ 選擇版本互動式還原"]
+        L2F --> L2C["自動清理<br/>保留最近 10 份<br/>超出自動刪除最舊的"]
+    end
+
+    subgraph Layer3 ["第三層：智慧覆蓋（無痛遷移）"]
+        direction TB
+        S1[".zshrc<br/>個人設定自動提取<br/>→ ~/.zshrc.local<br/>永遠不被覆蓋"]
+
+        S2["settings.json<br/>smart merge<br/>只添加新 permissions<br/>不刪除用戶現有規則"]
+
+        S3["hooks.json<br/>smart merge<br/>只添加新 hook<br/>保留用戶自訂 hook"]
+
+        S4["commands/agents/rules<br/>manifest MD5 追蹤<br/>用戶修改過 → 跳過<br/>.bak 備份後更新"]
+
+        S5[".ripgreprc<br/>已有 → 跳過不動<br/>只在不存在時建立"]
+
+        S6["modules/*.zsh<br/>diff 比較<br/>無變更 → 跳過"]
+    end
+
+    Layer1 --> Layer2 --> Layer3
+
+    classDef backup fill:#8b5cf6,color:#fff,stroke:#8b5cf6
+    classDef restore fill:#238636,color:#fff,stroke:#238636
+    classDef strategy fill:#1f6feb,color:#fff,stroke:#1f6feb
+
+    class L1F,L2F backup
+    class L1R,L2R restore
+    class S1,S2,S3,S4,S5,S6 strategy

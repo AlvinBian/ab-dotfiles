@@ -28,3 +28,7 @@ for _zsh_module in ~/.zsh/modules/*.zsh(N); do
   source "$_zsh_module"
 done
 unset _zsh_module
+
+# ── 個人設定（不會被 ab-dotfiles 覆蓋）────────────────────────
+# 環境變數、PATH、alias 等個人設定請放在 ~/.zshrc.local
+_safe_source "$HOME/.zshrc.local"

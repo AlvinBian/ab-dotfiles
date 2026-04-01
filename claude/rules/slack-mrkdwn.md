@@ -42,3 +42,15 @@ matchWhen:
 - 特定用戶：`<@USERID>`（必須是真實 ID，`@名字` 不觸發通知）
 - 頻道在線成員：`<!here>`
 - 頻道所有成員：`<!channel>`（謹慎使用）
+
+## 發送目標規範
+
+| 用戶說 | 發送目標 | 使用的環境變數 |
+|--------|---------|--------------|
+| 「發到頻道」「通知頻道」「頻道發送」 | 指定頻道 | `$SLACK_NOTIFY_CHANNEL` |
+| 「發給我」「傳給我」「發我」「DM 我」 | 私訊用戶 | `$SLACK_NOTIFY_USER_ID` |
+| 未指定目標 | 指定頻道（預設）| `$SLACK_NOTIFY_CHANNEL` |
+
+- **不詢問確認**，直接按上表規則發送
+- `$SLACK_NOTIFY_USER_ID` 未設定時：呼叫 `mcp__claude_ai_Slack__slack_search_users` 查詢用戶自己的 ID，找到後：1) 立即用於發送 2) 寫入 `~/.claude/.env`（`SLACK_NOTIFY_USER_ID=Uxxxxxxx`）3) 寫入 `~/.claude/settings.json` env 區塊供後續 session 使用
+- `$SLACK_NOTIFY_CHANNEL` 未設定時，才詢問用戶頻道

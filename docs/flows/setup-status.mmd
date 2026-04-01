@@ -1,0 +1,84 @@
+---
+title: 查看/調整配置
+description: 完整健康度展示 + 6 項快速調整（含即時狀態 hint）
+links:
+  - setup-main: 返回主流程
+  - gmail-setup: Gmail 設定流程
+---
+flowchart TD
+    Entry([從主流程進入]) --> Health["配置健康度<br/>85% 42/50"]
+
+    Health --> Claude["Claude 配置<br/>Commands 12 個 code-review, pr-workflow...<br/>Agents 14 個 coder, debugger, reviewer...<br/>Rules 8 個 code-style, git-workflow...<br/>Hooks 已啟用 / Settings 已配置<br/>CLAUDE.md 4 個 repo"]
+
+    Claude --> ZshInfo["ZSH 模組<br/>已安裝 10/10 aliases, fzf, git, tools..."]
+
+    ZshInfo --> SlackInfo["Slack 通知<br/>模式：Channel #xxx"]
+
+    SlackInfo --> GmailInfo["Gmail 分級<br/>Script ID: 1wu1ps...<br/>設定時間: 2026-03-30"]
+
+    GmailInfo --> AiInfo["AI 設定<br/>模型：sonnet"]
+
+    AiInfo --> Select{"選擇調整項目"}
+
+    Select -->|"Claude 配置 commands 12 agents 14 rules 8"| AClaude
+    Select -->|"全局設定 settings"| ASettings
+    Select -->|"CLAUDE.md 4 個 repo 需 AI"| AClaudeMd
+    Select -->|"ZSH 模組 10/10 已安裝"| AZsh
+    Select -->|"Slack 通知 channel"| ASlack
+    Select -->|"Gmail 分級 已設定"| AGmail
+    Select -->|"返回"| Exit([已取消])
+
+    subgraph AClaude ["adjustClaude"]
+        AC1["備份 commands/agents/rules"] --> AC2["smartSelect 重選"]
+        AC2 --> AC3["生成 preview"] --> AC4["執行安裝腳本"]
+        AC4 --> AC5["patchSession"]
+    end
+
+    subgraph ASettings ["adjustGlobalSettings"]
+        AS1["讀取 settings-template.json"]
+        AS1 --> AS2["deploySettings smart merge<br/>只添加新 permissions，不刪除現有"]
+        AS2 --> AS3["patchSession"]
+    end
+
+    subgraph AClaudeMd ["adjustClaudeMd"]
+        CM1{"session 有 repos?"}
+        CM1 -->|No| CMW["提示重新 setup"] --> Done
+        CM1 -->|Yes| CM2["AI 確認（約 30 秒）"]
+        CM2 --> CM3["generateClaudeMd x N repos"]
+        CM3 --> CM4["deployAllProjectClaudeMd"]
+        CM4 --> CM5["patchSession"]
+    end
+
+    subgraph AZsh ["adjustZsh"]
+        AZ1["備份 ~/.zsh/modules"]
+        AZ1 --> AZ2["smartSelect 重選模組"]
+        AZ2 --> AZ3["生成 preview"] --> AZ4["執行安裝腳本<br/>個人設定 → .zshrc.local"]
+        AZ4 --> AZ5["patchSession"]
+    end
+
+    subgraph ASlack ["adjustSlack"]
+        SK1["setupSlackNotify 互動設定"]
+        SK1 --> SK2["Channel / DM / 關閉"]
+        SK2 --> SK3["patchSession"]
+    end
+
+    subgraph AGmail ["adjustGmail"]
+        G1["setupGmailFilters →"]
+    end
+
+    AClaude --> Done([調整完成])
+    ASettings --> Done
+    AClaudeMd -.-> Done
+    AZsh --> Done
+    ASlack --> Done
+    AGmail --> Done
+
+    click G1 "#gmail-setup"
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef info fill:#1c2128,color:#8b949e,stroke:#30363d
+    classDef success fill:#238636,color:#fff,stroke:#238636
+
+    class Select,CM1 decision
+    class Health,Claude,ZshInfo,SlackInfo,GmailInfo,AiInfo info
+    class Done success

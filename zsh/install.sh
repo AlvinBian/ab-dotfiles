@@ -164,13 +164,41 @@ step "部署 ~/.zshrc"
 if [[ -f ~/.zshrc ]]; then
   cp ~/.zshrc "$HOME/.zshrc.backup.$(date +%Y%m%d_%H%M%S)"
   info "原 .zshrc 已備份"
+
+  # 自動遷移：從舊 .zshrc 提取個人設定到 ~/.zshrc.local（不會被覆蓋）
+  if [[ ! -f ~/.zshrc.local ]]; then
+    # ab-dotfiles 內部識別碼 — 這些行不屬於使用者個人設定
+    local _ab_internal='ab-dotfiles|BREW_PREFIX|PYENV_ROOT|_zsh_module|_safe_source|_command_exists|\.zsh/modules|zsh/modules|ZSH_DIR|SELECTED_MODULES|_AB_'
+    # 擷取策略：
+    #   1. export / alias / 任意變數賦值（含小寫、含引號）
+    #   2. PATH += / path += / typeset -x
+    #   3. eval / source（含縮寫 .）
+    #   4. setopt / unsetopt / bindkey
+    #   5. function 宣告行（含 func() { 寫法）
+    #   6. autoload
+    grep -E '^\s*(export |alias |eval |source |\. |setopt |unsetopt |bindkey |autoload |typeset |[A-Za-z_][A-Za-z0-9_]*=|[A-Za-z_][A-Za-z0-9_]*\+?=|function [A-Za-z_]|[A-Za-z_][A-Za-z0-9_]*\s*\(\))' ~/.zshrc \
+      | grep -vE "$_ab_internal" \
+      > ~/.zshrc.local 2>/dev/null || true
+    if [[ -s ~/.zshrc.local ]]; then
+      echo "" >> ~/.zshrc.local
+      echo "# ── 以上由 ab-dotfiles 從舊 .zshrc 自動遷移 ──" >> ~/.zshrc.local
+      echo "# 如有遺漏請查看備份：ls ~/.zshrc.backup.*" >> ~/.zshrc.local
+      info "個人設定已遷移到 ~/.zshrc.local（$(wc -l < ~/.zshrc.local | tr -d ' ') 行）"
+    else
+      rm -f ~/.zshrc.local  # 沒有可遷移的設定，不建立空檔案
+    fi
+  fi
 fi
 cp "$ZSH_DIR/zshrc" ~/.zshrc
-success "~/.zshrc 部署完成"
+success "~/.zshrc 部署完成（個人設定在 ~/.zshrc.local）"
 
 # ── ~/.ripgreprc ──────────────────────────────────────────────────
 if [[ " ${SELECTED_MODULES[*]} " == *" tools "* ]]; then
-  cat > ~/.ripgreprc << 'RGEOF'
+  # 保留用戶已有的 ripgreprc，只在不存在時建立
+  if [[ -f ~/.ripgreprc ]]; then
+    info "~/.ripgreprc 已存在，保留不動"
+  else
+    cat > ~/.ripgreprc << 'RGEOF'
 --line-number
 --color=auto
 --hidden
@@ -180,7 +208,8 @@ if [[ " ${SELECTED_MODULES[*]} " == *" tools "* ]]; then
 --glob=!dist/*
 --glob=!build/*
 RGEOF
-  success "~/.ripgreprc 完成"
+    success "~/.ripgreprc 建立完成"
+  fi
 fi
 
 echo ""

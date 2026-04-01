@@ -1,0 +1,138 @@
+---
+title: 主流程 — pnpm run setup
+description: 所有入口分支、CLI flags、session 狀態、完整安裝到完成
+links:
+  - setup-status: 查看/調整配置
+  - phase-execute: 安裝執行
+  - feature-map: 功能選擇
+  - env-check: 環境檢查
+  - upgrade-legacy: 舊配置偵測
+  - slack-setup: Slack 設定
+  - gmail-setup: Gmail 設定
+  - session-lifecycle: Session 生命週期
+---
+flowchart TD
+    Start(["pnpm run setup"]) --> Init["cleanOldBackups<br/>保留最近 10 份備份"]
+    Init --> LoadCfg["載入 config.json + .env<br/>解析 CLI flags"]
+
+    LoadCfg --> Flags["CLI Flags:<br/>--quick 零互動重裝<br/>--all 跳過重入選單<br/>--manual 只生成 preview<br/>--dry-run 只顯示計畫"]
+
+    Flags --> LoadSession["loadSession<br/>讀取 .cache/last-session.json"]
+    LoadSession --> IncompleteCheck{"checkIncompleteSession<br/>上次安裝中斷?"}
+    IncompleteCheck -->|Yes| IncompleteWarn["warn: 上次未完成<br/>剩餘: xxx targets"]
+    IncompleteCheck -->|No| Splash
+    IncompleteWarn --> Splash
+
+    Splash["顯示 ab-dotfiles vX.X.X<br/>上次: N repos / M stacks / 日期"]
+
+    Splash --> QuickCheck{"--quick?"}
+
+    subgraph QuickPath ["--quick 快速重裝（零互動）"]
+        QSession{"有 session?"}
+        QSession -->|No| QError["錯誤: 無歷史記錄"] --> QExit([退出])
+        QSession -->|Yes| QBackup["ensureOriginalBackup"]
+        QBackup --> QEnvCheck["環境檢查 →"]
+        QEnvCheck --> QWarmup["warmupCli"]
+        QWarmup --> QBuild["從 session 建構 repoObjects<br/>commits:10 / roleOverride:prev.roles"]
+        QBuild --> QAnalyze["phaseAnalyze"]
+        QAnalyze --> QRoles["套用 session 角色<br/>重算 mainCount/tempCount"]
+        QRoles --> QManual{"--manual?"}
+        QManual -->|Yes| QManualMode["plan.mode = manual<br/>只寫 dist/preview/"]
+        QManual -->|No| QExec
+        QManualMode --> QExec["phaseExecute →"]
+        QExec --> QComplete["phaseComplete →"]
+    end
+
+    QuickCheck -->|Yes| QSession
+    QuickCheck -->|No| AllCheck{"--all?"}
+    AllCheck -->|Yes| FreshEntry
+    AllCheck -->|No| PrevCheck{"有 session?"}
+    PrevCheck -->|No| FreshEntry
+    PrevCheck -->|Yes| Reentry
+
+    subgraph Reentry ["重入選單"]
+        RMenu{"上次: N repos / mode<br/>選擇操作"}
+        RMenu -->|"重新安裝<br/>用上次設定"| RLegacy["舊配置偵測 →"]
+        RLegacy --> RQuick["runQuickInstall<br/>同 --quick 路徑"]
+        RMenu -->|"調整設定<br/>重選所有"| RAdjust["清除 org<br/>進入完整流程"]
+        RMenu -->|"查看/調整配置"| RStatus["→ setup-status"]
+        RMenu -->|"查看上次報告"| RReport["開啟 dist/report.html"]
+        RMenu -->|ESC| RCancel([已取消])
+    end
+
+    RAdjust --> AdjLegacy["舊配置偵測 →"] --> FreshEntry
+    RReport --> End([設定完成])
+    RQuick --> End
+
+    subgraph FreshEntry ["完整安裝流程"]
+        FLegacy["舊配置偵測 →"]
+        FLegacy --> FBackup["ensureOriginalBackup<br/>首次使用備份原始配置"]
+        FBackup --> FEnv["環境檢查 →<br/>brew/nvm/node/pnpm/gh/claude"]
+        FEnv --> FWarmup["warmupCli<br/>背景預熱 Claude CLI"]
+        FWarmup --> FFeature["功能選擇 multiselect →<br/>claude/claudemd/ecc/slack/zsh/gmail"]
+        FFeature -->|ESC| FCancel([已取消])
+        FFeature --> FNeedsRepos["needsRepos =<br/>has claudemd or ecc"]
+
+        FNeedsRepos --> FSlack{"has Slack<br/>且未設定?"}
+        FSlack -->|Yes| FSlackSetup["Slack 通知設定 →"]
+        FSlack -->|No| FGmail
+        FSlackSetup --> FGmail{"has Gmail<br/>且未設定?"}
+        FGmail -->|Yes| FGmailSetup["Gmail 5-Tier 設定 →"]
+        FGmail -->|No| FSummary
+        FGmailSetup --> FSummary["外部服務設定摘要<br/>Slack / Gmail 結果"]
+        FSummary --> PhaseLoop
+    end
+
+    subgraph PhaseLoop ["Phase Loop — BACK 支持"]
+        PL1["Step 1/3 選擇倉庫"]
+        PL1 --> PLRepo["interactiveRepoSelect →<br/>多組織選擇 + 貢獻分析"]
+        PLRepo -->|ESC| PLCancel([已取消])
+        PLRepo --> PLRole["角色分類 loop<br/>主力/臨時/工具 分配"]
+        PLRole -->|"上一步"| PL1
+        PLRole -->|確認| PLCache{"analyzeCache<br/>repos+roles 相同?"}
+        PLCache -->|"命中"| PLTrim["cloneDeep plan<br/>按 features 裁剪"]
+        PLCache -->|"未命中"| PLAnalyze["phaseAnalyze<br/>Listr2 4 任務"]
+        PLAnalyze --> PLTrim
+
+        PLTrim --> PL2["Step 2/3 確認計畫 →"]
+        PL2 -->|"上一步"| PL1
+        PL2 -->|確認| PLDry{"--dry-run?"}
+        PLDry -->|Yes| PLDryEnd(["顯示計畫 不執行"])
+        PLDry -->|No| PLManual{"--manual?"}
+        PLManual -->|Yes| PLManualMode["plan.mode = manual"]
+        PLManual -->|No| PL3
+        PLManualMode --> PL3
+        PL3["Step 3/3 phaseExecute →"]
+        PL3 --> PL4["phaseComplete →<br/>報告/session/Slack"]
+    end
+
+    PL4 --> End
+    QComplete --> End
+
+    click RStatus "#setup-status"
+    click FFeature "#feature-map"
+    click FGmailSetup "#gmail-setup"
+    click FSlackSetup "#slack-setup"
+    click FEnv "#env-check"
+    click FLegacy "#upgrade-legacy"
+    click AdjLegacy "#upgrade-legacy"
+    click RLegacy "#upgrade-legacy"
+    click PLRepo "#repo-select"
+    click PLRole "#role-system"
+    click PL2 "#phase-plan"
+    click PL3 "#phase-execute"
+    click PLAnalyze "#ecc-pipeline"
+    click LoadSession "#session-lifecycle"
+
+    classDef decision fill:#d29922,color:#000
+    classDef action fill:#1f6feb,color:#fff
+    classDef success fill:#238636,color:#fff
+    classDef error fill:#da3633,color:#fff
+    classDef flag fill:#8b5cf6,color:#fff
+
+    class QuickCheck,AllCheck,PrevCheck,IncompleteCheck,QSession,QManual,FSlack,FGmail,PLCache,PLDry,PLManual,RMenu decision
+    class QBackup,QEnvCheck,QWarmup,QBuild,QAnalyze,QRoles,QExec,QComplete action
+    class FLegacy,FBackup,FEnv,FWarmup,FSlackSetup,FGmailSetup,PLRepo,PLRole,PLAnalyze action
+    class End,PLDryEnd success
+    class QError error
+    class Flags flag

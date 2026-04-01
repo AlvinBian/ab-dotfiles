@@ -1,6 +1,6 @@
-# ab-dotfiles
+# ab-dotfiles v2.1.0
 
-開發環境統一管理工具 — AI 驅動的技術棧偵測、Claude Code 技能庫生成、zsh 環境模組。
+開發環境統一管理工具 — AI 驅動的技術棧偵測、Claude Code 技能庫生成、ZSH 環境模組。
 
 ## 零基礎安裝
 
@@ -79,10 +79,17 @@ setup 會修改以下檔案/目錄，**每次安裝前自動備份**：
 | `~/.claude/rules/`           | 寫入 rules                   | `dist/backup/{timestamp}/claude/rules`            |
 | `~/.claude/hooks.json`       | 寫入 hooks 設定              | `dist/backup/{timestamp}/claude/hooks.json`       |
 | `~/.claude/settings.json`    | 合併 permissions + model     | `dist/backup/{timestamp}/claude/settings.json`    |
-| `~/.claude/keybindings.json` | 寫入快捷鍵（skip if exists） | `dist/backup/{timestamp}/claude/keybindings.json` |
 | `~/.claude/projects/`        | 寫入 CLAUDE.md               | 不備份（可重生）                                  |
 | `~/.zshrc`                   | 替換為模組化版本             | `dist/backup/{timestamp}/zshrc`                   |
-| `~/.zsh/modules/`            | 寫入 zsh 模組                | `dist/backup/{timestamp}/zsh/modules`             |
+| `~/.zshrc.local`             | 個人設定自動遷移（不覆蓋）   | `dist/backup/{timestamp}/zshrc.local`             |
+| `~/.zsh/modules/`            | 寫入 ZSH 模組（diff 跳過）   | `dist/backup/{timestamp}/zsh/modules`             |
+| `~/.ripgreprc`               | 首次建立（已有跳過）         | `dist/backup/{timestamp}/ripgreprc`               |
+
+**三層保護機制：**
+
+1. `dist/backup/original/` — 首次安裝前的原始備份（一次性）
+2. `dist/backup/{timestamp}/` — 每次 setup 前的增量備份
+3. Smart deploy — `.zshrc.local` 永不覆蓋；`.ripgreprc` 已有則跳過
 
 不想直接部署？用 `--manual` 模式：
 
@@ -94,8 +101,7 @@ pnpm run setup -- --manual
 #   cp dist/preview/zsh/modules/*.zsh ~/.zsh/modules/
 ```
 
-還原：`pnpm run restore`（互動式選擇備份版本）
-完全還原到首次安裝前：`pnpm run restore-original`
+還原：`pnpm run restore`（互動式選擇備份版本，含完全還原到首次安裝前）
 
 ---
 
@@ -108,7 +114,7 @@ pnpm run setup
   ├─ 環境檢查 + CLI 預熱
   ├─ 功能選擇（claude / claudemd / ecc / slack / zsh）
   ├─ Step 1：選擇倉庫
-  │   ├─ GitHub 帳號 → 組織/個人 → 選 repos
+  │   ├─ GitHub 帳號 → 多組織/個人同時選取 → 選 repos
   │   └─ 角色分配（⭐主力 / 🔄臨時 / 🔧工具）
   ├─ 自動分析（Listr2 並行）
   │   ├─ Per-repo AI 技術棧分析（並行，各自快取）
@@ -120,12 +126,12 @@ pnpm run setup
   │   └─ 全部安裝 / 逐項確認 / 精簡安裝
   ├─ 安裝（listr2 8 步）
   │   ├─ [1/8] 備份現有配置
-  │   ├─ [2/8] 全局配置（settings + keybindings + slack-dispatch）
+  │   ├─ [2/8] 全局配置（settings + slack-dispatch）
   │   ├─ [3/8] Claude 安裝（commands + agents + rules + hooks）
   │   ├─ [4/8] ECC 融合 + Stacks 生成
-  │   ├─ [5/8] CLAUDE.md 生成（~/.claude/projects/）
+  │   ├─ [5/8] CLAUDE.md 並行生成（~/.claude/projects/）
   │   ├─ [6/8] Plugin 打包
-  │   ├─ [7/8] zsh 模組
+  │   ├─ [7/8] ZSH 模組（含 .zshrc.local 個人設定遷移）
   │   └─ [8/8] 驗證安裝完整性
   └─ Step 3：完成
       ├─ 安裝摘要 + 快速上手引導
@@ -144,14 +150,15 @@ pnpm run setup
 | `pnpm run setup -- --manual`  | 手動模式（只生成到 dist/preview/） |
 | `pnpm run setup -- --quick`   | 用上次選擇快速安裝（0 次互動）     |
 | `pnpm run setup -- --dry-run` | 只顯示安裝計畫，不寫入檔案         |
+| `pnpm run status`             | 配置管理中心（查看 + 互動管理）    |
+| `pnpm run report`             | 瀏覽器 HTML Dashboard              |
 | `pnpm run scan`               | 技術棧掃描，生成 .cache/stacks/    |
-| `pnpm run restore`            | 從備份還原（互動式選擇版本）       |
-| `pnpm run restore-original`   | 還原到首次 setup 前的原始狀態      |
+| `pnpm run restore`            | 從備份還原（含完全還原到安裝前）   |
 | `pnpm run uninstall`          | 移除 ab-dotfiles 管理的所有配置    |
 | `pnpm run hooks`              | 互動式管理個別 hook 啟用/停用      |
 | `pnpm run doctor`             | 環境健康檢查                       |
+| `pnpm run flow`               | 瀏覽器查看完整流程圖               |
 | `pnpm run workspace`          | 生成 .code-workspace               |
-| `pnpm run taxonomy:build`     | 重建 awesome-* 分類索引            |
 
 ### 互動導航
 
@@ -171,10 +178,11 @@ pnpm run setup
 ab-dotfiles/
 ├── bin/
 │   ├── setup.mjs                # 安裝精靈入口
+│   ├── status.mjs               # 配置健康狀態檢查
+│   ├── flow.mjs                 # 9 張流程圖瀏覽器檢視
 │   ├── scan.mjs                 # 技術棧掃描 & stacks/ 生成
-│   ├── restore.mjs              # 備份還原
-│   ├── restore-original.mjs     # 還原到首次安裝前
-│   ├── backup-original.mjs      # 首次安裝前備份原始配置
+│   ├── restore.mjs              # 備份還原（含完全還原到安裝前）
+│   ├── backup-original.mjs      # 首次安裝前自動備份（setup 內部呼叫）
 │   ├── hooks.mjs                # hooks 互動式管理
 │   └── uninstall.mjs            # 卸載工具
 │
@@ -239,7 +247,7 @@ ab-dotfiles/
 │   ├── install/                 # 安裝處理器
 │   │   ├── index.mjs            # runTarget() dispatcher
 │   │   ├── install-claude.mjs   # commands / agents / rules / hooks 安裝
-│   │   ├── install-modules.mjs  # zsh 模組安裝
+│   │   ├── install-modules.mjs  # ZSH 模組安裝
 │   │   ├── build-plugin.mjs     # .plugin 打包
 │   │   ├── common.mjs           # selectItems / buildCmdArgs
 │   │   ├── hooks-merge.mjs      # hooks 衝突偵測與合併
@@ -252,7 +260,6 @@ ab-dotfiles/
 │   │   └── phase-complete.mjs   # 完成（報告 + 引導 + session + Slack）
 │   │
 │   ├── slack/                   # Slack 整合
-│   │   ├── slack-notify.mjs     # DM 通知（透過 Claude CLI MCP）
 │   │   └── slack-setup.mjs      # 互動式 Slack 通知設定精靈
 │   │
 │   └── report.mjs               # HTML 安裝報告（ECharts + 5 Tab）
@@ -264,7 +271,7 @@ ab-dotfiles/
 │   ├── hooks/                   # slack-dispatch.sh
 │   ├── hooks.json               # 8 個 hooks 定義
 │   ├── settings-template.json   # settings 模板
-│   └── keybindings-template.json # 快捷鍵模板
+│   └── keybindings-template.json # 快捷鍵模板（保留備用，不主動部署）
 │
 ├── ecc/                         # ECC 外部資源（GitHub Actions 自動同步）
 │   └── everything-claude-code/  # 97 個檔案（60 cmd + 28 agent + 9 rule）
@@ -274,7 +281,7 @@ ab-dotfiles/
 │   ├── build-slack-plugin.sh
 │   └── generate-workspace.sh
 │
-├── zsh/                         # zsh 環境模組
+├── zsh/                         # ZSH 環境模組
 │   ├── zshrc                    # ~/.zshrc 模板
 │   ├── modules/                 # 10 個獨立模組
 │   └── install.sh               # 安裝腳本
@@ -317,23 +324,24 @@ ab-dotfiles/
 | `/multi-frontend`   | 多前端專案協調                    |
 | `/changeset`        | 生成 changeset / CHANGELOG        |
 
-### Agents（13 個）
+### Agents（14 個）
 
-| Agent            | 模型   | 讀/寫 | 用途               |
-| ---------------- | ------ | ----- | ------------------ |
-| `@explorer`      | haiku  | 唯讀  | 快速搜索 codebase  |
-| `@planner`       | sonnet | 唯讀  | 設計方案、拆解任務 |
-| `@coder`         | sonnet | 讀寫  | 實作功能           |
-| `@tester`        | sonnet | 讀寫  | 生成測試、跑測試   |
-| `@reviewer`      | sonnet | 唯讀  | 深度 code review   |
-| `@refactor`      | sonnet | 讀寫  | 重構優化           |
-| `@debugger`      | sonnet | 讀寫  | 定位修復 bug       |
-| `@documenter`    | sonnet | 讀寫  | 生成文件           |
-| `@deployer`      | sonnet | 讀寫  | PR + Release       |
-| `@monitor`       | haiku  | 唯讀  | 日誌分析、效能檢查 |
-| `@security`      | sonnet | 唯讀  | 安全掃描           |
-| `@migrator`      | sonnet | 讀寫  | 版本遷移           |
-| `@perf-analyzer` | sonnet | 唯讀  | 效能分析           |
+| Agent              | 模型   | 讀/寫 | 用途                      |
+| ------------------ | ------ | ----- | ------------------------- |
+| `@explorer`        | haiku  | 唯讀  | 快速搜索 codebase         |
+| `@planner`         | sonnet | 唯讀  | 設計方案、拆解任務        |
+| `@coder`           | sonnet | 讀寫  | 實作功能                  |
+| `@tester`          | sonnet | 讀寫  | 生成測試、跑測試          |
+| `@reviewer`        | sonnet | 唯讀  | 深度 code review          |
+| `@refactor`        | sonnet | 讀寫  | 重構優化                  |
+| `@debugger`        | sonnet | 讀寫  | 定位修復 bug              |
+| `@documenter`      | sonnet | 讀寫  | 生成文件                  |
+| `@deployer`        | sonnet | 讀寫  | PR + Release              |
+| `@monitor`         | haiku  | 唯讀  | 日誌分析、效能檢查        |
+| `@security`        | sonnet | 唯讀  | 安全掃描                  |
+| `@migrator`        | sonnet | 讀寫  | 版本遷移                  |
+| `@perf-analyzer`   | sonnet | 唯讀  | 效能分析                  |
+| `@chief-of-staff`  | sonnet | 讀寫  | 跨 agent 任務協調與排程   |
 
 ### Rules（6 個）
 
@@ -388,6 +396,25 @@ repos fetch + ECC fetch（並行）
 
 ---
 
+## Gmail 5-Tier 分級
+
+透過 XML 匯入方式，一次建立 5 組 Gmail 篩選規則，讓收件匣自動分類。
+所有郵件留在收件匣，重要郵件（Tier 4）自動標星 + 標記重要。
+
+| Tier | Gmail Label | 匹配對象 |
+|------|-------------|----------|
+| 0 | `github/noise` | GitHub、GitLab、Dependabot、CI/CD bot |
+| 1 | `auto/skip` | Jira、Slack、Notion、Sentry、Datadog |
+| 2 | `auto/info` | 全員公告、收據、發票 |
+| 3 | `auto/meeting` | 行事曆邀請（.ics 附件） |
+| 4 | `action/required` | 薪資、考績、offer、expense（**標星 + 重要**） |
+
+**匯入方式：** Gmail → ⚙️ → 設定 → 篩選器和封鎖的地址 → 匯入篩選器 → 選擇 `scripts/gmail-filters/gmail-filters.xml`
+
+詳細說明、自訂規則範例、還原步驟請參考 [docs/gmail-filters.md](docs/gmail-filters.md)。
+
+---
+
 ## Slack 通知
 
 setup 時可選擇啟用 Slack 通知，安裝完成後自動發送 DM 或頻道訊息。
@@ -404,7 +431,7 @@ setup 時可選擇啟用 Slack 通知，安裝完成後自動發送 DM 或頻道
 
 ---
 
-## zsh 環境模組
+## ZSH 環境模組
 
 ### 模組清單
 
@@ -438,32 +465,31 @@ brew install fzf zoxide bat eza fd git-delta lazygit tldr ripgrep \
 首次執行時自動從 `.env.template` 建立。主要配置：
 
 ```bash
-# AI 模型（per-repo 分類）
+# AI（Claude）
+ANTHROPIC_API_KEY=
+AI_MODEL=haiku
+AI_EFFORT=low
+AI_TIMEOUT=60000
+AI_CONCURRENCY=5
+
+# Per-repo AI 分類
 AI_REPO_MODEL=sonnet
 AI_REPO_EFFORT=low
 AI_REPO_TIMEOUT=60000
 AI_REPO_CACHE=true
 
-# ECC 翻譯（背景，haiku 足夠）
-AI_ECC_MODEL=haiku
-AI_ECC_TIMEOUT=90000
-
-# 開發者畫像
-AI_PROFILE_MODEL=haiku
-
 # GitHub
 GITHUB_ORG=
 GH_API_TIMEOUT=15000
+GH_PER_PAGE=100
 
 # ECC 外部來源
 ECC_SOURCES=everything-claude-code|affaan-m/everything-claude-code|10
 
-# AI 並發數
-AI_CONCURRENCY=5
-
-# Slack 通知
+# Slack 通知（channel | dm | off）
+SLACK_NOTIFY_MODE=off
 SLACK_NOTIFY_CHANNEL=
-SLACK_NOTIFY_MODE=dm
+CLAUDE_SLACK_MIN_SESSION_SECS=300
 ```
 
 ### config.json
@@ -480,7 +506,7 @@ SLACK_NOTIFY_MODE=dm
 dist/preview/
 ├── claude/
 │   ├── commands/          # 15 個
-│   ├── agents/            # 13 個
+│   ├── agents/            # 14 個
 │   ├── rules/             # 6 個
 │   └── hooks.json
 └── zsh/
@@ -528,8 +554,7 @@ pnpm run doctor
 # 還原到上次備份
 pnpm run restore
 
-# 還原到首次 setup 前的原始狀態
-pnpm run restore-original
+# 還原時選擇「完全還原」可恢復到首次 setup 前的原始狀態
 
 # 重建分類索引
 pnpm run taxonomy:build
@@ -566,5 +591,5 @@ brew install nvm
 ```bash
 pnpm run uninstall
 # 只移除 ab-dotfiles 管理的項目，保留用戶自訂配置
-# 完全還原到安裝前：pnpm run restore-original
+# 完全還原到安裝前：pnpm run restore → 選擇「完全還原」
 ```

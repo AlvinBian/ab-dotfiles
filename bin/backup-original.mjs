@@ -28,16 +28,57 @@ function backupItem(src, destName) {
 }
 
 export function ensureOriginalBackup() {
-  if (fs.existsSync(BACKUP_DIR)) return false // 已備份過
+  if (fs.existsSync(BACKUP_DIR)) {
+    // 檢查備份是否完整（若有新增項目但備份缺失，補備份）
+    const TIMESTAMP_FILE = path.join(BACKUP_DIR, '.timestamp')
+    const backupTime = fs.existsSync(TIMESTAMP_FILE)
+      ? new Date(fs.readFileSync(TIMESTAMP_FILE, 'utf8').trim()).getTime()
+      : 0
+
+    const CRITICAL_ITEMS = [
+      [path.join(HOME, '.zshrc'), 'zshrc'],
+      [path.join(HOME, '.claude'), 'claude'],
+    ]
+    let needsUpdate = false
+    for (const [src, name] of CRITICAL_ITEMS) {
+      if (!fs.existsSync(src)) continue
+      const dest = path.join(BACKUP_DIR, name)
+      if (!fs.existsSync(dest)) {
+        needsUpdate = true  // 備份存在但缺少此項目
+        break
+      }
+      // 若源文件比備份新且備份不是今天的，標記需要更新（偵測手動修改）
+      const srcMtime = fs.statSync(src).mtimeMs
+      if (srcMtime > backupTime && !fs.existsSync(path.join(BACKUP_DIR, '.manual-preserved'))) {
+        needsUpdate = true
+        break
+      }
+    }
+    if (!needsUpdate) return false  // 已備份且完整
+    // 備份不完整或已過時 — 補備份缺失項目（不覆蓋已有的）
+    const backed = []
+    for (const [src, name] of [[path.join(HOME, '.zshrc'), 'zshrc'], [path.join(HOME, '.zshrc.local'), 'zshrc.local'],
+      [path.join(HOME, '.zsh'), 'zsh'], [path.join(HOME, '.claude'), 'claude'],
+      [path.join(HOME, '.zsh_history'), 'zsh_history'], [path.join(HOME, '.ripgreprc'), 'ripgreprc']]) {
+      const dest = path.join(BACKUP_DIR, name)
+      if (fs.existsSync(dest)) continue  // 已備份，保留不動
+      const result = backupItem(src, name)
+      if (result) backed.push(result)
+    }
+    fs.writeFileSync(TIMESTAMP_FILE, new Date().toISOString())
+    return backed.length > 0 ? backed : false
+  }
 
   fs.mkdirSync(BACKUP_DIR, { recursive: true })
 
   const backed = []
   const items = [
     [path.join(HOME, '.zshrc'), 'zshrc'],
+    [path.join(HOME, '.zshrc.local'), 'zshrc.local'],
     [path.join(HOME, '.zsh'), 'zsh'],
     [path.join(HOME, '.claude'), 'claude'],
     [path.join(HOME, '.zsh_history'), 'zsh_history'],
+    [path.join(HOME, '.ripgreprc'), 'ripgreprc'],
   ]
 
   for (const [src, name] of items) {

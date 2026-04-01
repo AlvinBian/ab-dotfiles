@@ -1,0 +1,61 @@
+---
+title: 計畫確認 — phasePlan
+description: 展示安裝計畫 + 安裝全部/逐項確認/精簡安裝 三種模式
+links:
+  - setup-main: 返回主流程
+  - phase-execute: 進入安裝
+---
+flowchart TD
+    Entry([從 phaseAnalyze 進入]) --> Display
+
+    subgraph Display ["安裝計畫展示"]
+        D1["現有配置狀態<br/>commands N · agents N · rules N<br/>settings · hooks"]
+        D1 --> D2["Repos N 主力 · M 臨時<br/>各 repo 角色 + 本機路徑"]
+        D2 --> D3["全局安裝項目<br/>Commands · Agents · Rules<br/>Hooks · Permissions · Model"]
+        D3 --> D4["技術棧 Stacks N 個<br/>react · typescript · vue..."]
+        D4 --> D5["ECC 外部資源 N 個"]
+        D5 --> D6["ZSH 模組 N 個"]
+        D6 --> D7["AI 費用估算 ~$X.XX"]
+    end
+
+    Display --> Choice{"安裝方式"}
+
+    Choice -->|"安裝全部（Enter）"| Full[返回完整 plan]
+    Choice -->|"逐項確認"| Detail
+    Choice -->|"精簡安裝"| Minimal["generateMinimalPlan<br/>只保留核心：<br/>code-review · pr-workflow<br/>coder · reviewer · debugger"]
+    Choice -->|"上一步"| Back([BACK 回 Step 1])
+
+    subgraph Detail ["逐項確認 detailConfirm"]
+        direction TB
+        DC1["1. 角色調整<br/>smartSelect：選擇主力 repos<br/>未選中 → 自動設為臨時"]
+        DC1 -->|ESC| Back
+        DC1 --> DC2["2. Commands 選擇<br/>smartSelect from pool"]
+        DC2 -->|ESC| Back
+        DC2 --> DC3["3. Agents 選擇<br/>smartSelect from pool"]
+        DC3 -->|ESC| Back
+        DC3 --> DC4["4. Rules 選擇<br/>smartSelect from pool"]
+        DC4 -->|ESC| Back
+        DC4 --> DC5{"有 ECC?"}
+        DC5 -->|Yes| DC6["5. ECC 選擇<br/>smartSelect 推薦項目"]
+        DC5 -->|No| DC7
+        DC6 -->|ESC| Back
+        DC6 --> DC7{"有 zsh?"}
+        DC7 -->|Yes| DC8["6. ZSH 模組選擇<br/>smartSelect"]
+        DC7 -->|No| DC9
+        DC8 -->|ESC| Back
+        DC8 --> DC9["返回調整後 plan"]
+    end
+
+    Full --> Exec["phaseExecute →"]
+    DC9 --> Exec
+    Minimal --> Exec
+
+    click Exec "#phase-execute"
+
+    classDef decision fill:#d29922,color:#000,stroke:#d29922
+    classDef info fill:#1c2128,color:#8b949e,stroke:#30363d
+    classDef success fill:#238636,color:#fff,stroke:#238636
+
+    class Choice,DC5,DC7 decision
+    class D1,D2,D3,D4,D5,D6,D7 info
+    class Exec success

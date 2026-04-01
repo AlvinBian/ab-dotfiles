@@ -283,7 +283,7 @@ async function manageConfig(data) {
         { value: 'back', label: '← 返回' },
       ],
     })
-    if (p.isCancel(action) || action === 'back') return
+    if (p.isCancel(action) || action === 'back') return false
 
     if (action === 'delete') {
       const selected = await p.multiselect({
@@ -328,7 +328,7 @@ async function manageConfig(data) {
         { value: 'back', label: '← 返回' },
       ],
     })
-    if (p.isCancel(action) || action === 'back') return
+    if (p.isCancel(action) || action === 'back') return false
 
     const rulesDir = path.join(CLAUDE_DIR, 'rules')
     if (action === 'toggle') {
@@ -346,10 +346,10 @@ async function manageConfig(data) {
           const rule = data.rules.find(r => r.name === name)
           if (rule.enabled) {
             fs.renameSync(path.join(rulesDir, `${name}.md`), path.join(rulesDir, `${name}.md.disabled`))
-            p.log.info(`已停用 ${name}`)
+            p.log.info(`已停用 ${name}`); changed = true
           } else {
             fs.renameSync(path.join(rulesDir, `${name}.md.disabled`), path.join(rulesDir, `${name}.md`))
-            p.log.success(`已啟用 ${name}`)
+            p.log.success(`已啟用 ${name}`); changed = true
           }
         }
       }
@@ -363,13 +363,13 @@ async function manageConfig(data) {
         for (const name of selected) {
           for (const ext of ['.md', '.md.disabled']) {
             const fp = path.join(rulesDir, `${name}${ext}`)
-            if (fs.existsSync(fp)) { fs.unlinkSync(fp); p.log.success(`已刪除 ${name}`) }
+            if (fs.existsSync(fp)) { fs.unlinkSync(fp); p.log.success(`已刪除 ${name}`); changed = true }
           }
         }
       }
     } else if (action === 'add') {
       const notInstalled = data.ecc.rules.filter(name => !data.rules.find(r => r.name === name))
-      if (notInstalled.length === 0) { p.log.info('所有 ECC rules 已安裝'); return }
+      if (notInstalled.length === 0) { p.log.info('所有 ECC rules 已安裝'); return false }
       const selected = await p.multiselect({
         message: '選擇要新增的 rules',
         options: notInstalled.map(name => ({ value: name, label: name })),
@@ -380,7 +380,7 @@ async function manageConfig(data) {
         for (const name of selected) {
           const src = path.join(eccDir, `${name}.md`)
           const dest = path.join(rulesDir, `${name}.md`)
-          if (fs.existsSync(src)) { fs.copyFileSync(src, dest); p.log.success(`已新增 ${name}`) }
+          if (fs.existsSync(src)) { fs.copyFileSync(src, dest); p.log.success(`已新增 ${name}`); changed = true }
         }
       }
     }
@@ -432,10 +432,10 @@ async function manageConfig(data) {
         const dest = path.join(zshDest, `${m}.zsh`)
         if (data.zsh.installed.includes(m)) {
           fs.unlinkSync(dest)
-          p.log.info(`已卸載 ${m}`)
+          p.log.info(`已卸載 ${m}`); changed = true
         } else {
           fs.copyFileSync(path.join(zshSrc, `${m}.zsh`), dest)
-          p.log.success(`已安裝 ${m}`)
+          p.log.success(`已安裝 ${m}`); changed = true
         }
       }
     }
@@ -450,7 +450,7 @@ async function manageConfig(data) {
         { value: 'back', label: '← 返回' },
       ],
     })
-    if (p.isCancel(action) || action === 'back') return
+    if (p.isCancel(action) || action === 'back') return false
 
     const settingsPath = path.join(CLAUDE_DIR, 'settings.json')
     let settings = {}
@@ -462,7 +462,7 @@ async function manageConfig(data) {
       if (!p.isCancel(rule) && rule) {
         settings.permissions.allow.push(rule)
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n')
-        p.log.success(`已新增: ${rule}`)
+        p.log.success(`已新增: ${rule}`); changed = true
       }
     } else if (action === 'delete') {
       const selected = await p.multiselect({
@@ -473,7 +473,7 @@ async function manageConfig(data) {
       if (!p.isCancel(selected) && selected.length > 0) {
         settings.permissions.allow = settings.permissions.allow.filter(r => !selected.includes(r))
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n')
-        p.log.success(`已刪除 ${selected.length} 條規則`)
+        p.log.success(`已刪除 ${selected.length} 條規則`); changed = true
       }
     }
   }
@@ -486,7 +486,7 @@ async function manageConfig(data) {
         { value: 'back', label: '← 返回' },
       ],
     })
-    if (p.isCancel(action) || action === 'back') return
+    if (p.isCancel(action) || action === 'back') return false
 
     if (action === 'delete') {
       const selected = await p.multiselect({
@@ -502,7 +502,7 @@ async function manageConfig(data) {
         for (const projPath of selected) {
           const realPath = projPath.replace('~', HOME)
           const mdPath = path.join(realPath, 'CLAUDE.md')
-          if (fs.existsSync(mdPath)) { fs.unlinkSync(mdPath); p.log.success(`已刪除 ${projPath}/CLAUDE.md`) }
+          if (fs.existsSync(mdPath)) { fs.unlinkSync(mdPath); p.log.success(`已刪除 ${projPath}/CLAUDE.md`); changed = true }
         }
       }
     }

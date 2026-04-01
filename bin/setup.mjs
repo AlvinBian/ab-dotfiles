@@ -101,7 +101,7 @@ async function main() {
       p.log.success(`首次使用：已備份原始配置 → ~/.ab-dotfiles-original/\n${origBackup.map(r => `  ${r}`).join('\n')}\n還原指令：pnpm run restore → 選擇「完全還原」`)
     }
 
-    phaseHeader('環境檢查')
+    phaseHeader('🔍 環境檢查')
     await ensureEnvironment()
     warmupCli()
 
@@ -113,7 +113,7 @@ async function main() {
       pct: 0,
       _roleOverride: sessionPrev.roles?.[r] || 'temp',
     }))
-    phaseHeader('快速分析')
+    phaseHeader('⚡ 快速分析')
     const plan = await phaseAnalyze({ repos: repoObjects, sources: srcs, baseDir: REPO, projectFolders: folders })
 
     // 應用 session 保存的角色
@@ -131,13 +131,13 @@ async function main() {
 
     if (isManual) plan.mode = 'manual'
 
-    phaseHeader('安裝中')
+    phaseHeader('🚀 安裝中')
     const { installSelections, syncResult, startTime } = await phaseExecute(plan, {
       repoDir: REPO, previewDir: PREVIEW_DIR, targets: tgts, prev: sessionPrev,
       pipelineResult: plan._pipelineResult || null, fetchedSources: plan._fetchedSources || null,
     })
 
-    phaseHeader('完成', 3, 3)
+    phaseHeader('✅ 完成', 3, 3)
     await phaseComplete(plan, { repoDir: REPO, installSelections, syncResult, startTime, pipelineResult: plan._pipelineResult || null, projectFolders: folders })
     p.outro('設定完成')
   }
@@ -160,10 +160,10 @@ async function main() {
     const action = handleCancel(await p.select({
       message: `上次安裝：${prev.repos?.length ?? 0} repos · ${prev.installMode || 'full'}`,
       options: [
-        { value: 'reinstall', label: '重新安裝（用上次設定）', hint: 'Enter 直接裝' },
-        { value: 'adjust', label: '調整設定' },
-        { value: 'status', label: '查看/調整配置', hint: 'Claude / ZSH / Slack 健康狀態' },
-        { value: 'report', label: '查看上次報告' },
+        { value: 'reinstall', label: '🔄 重新安裝（用上次設定）', hint: 'Enter 直接裝' },
+        { value: 'adjust', label: '⚙️ 調整設定' },
+        { value: 'status', label: '📊 查看/調整配置', hint: 'Claude / ZSH / Slack 健康狀態' },
+        { value: 'report', label: '📋 查看上次報告' },
       ],
     }))
     if (action === BACK) { p.outro('已取消'); process.exit(0) }
@@ -247,11 +247,11 @@ async function main() {
       const adjustAction = handleCancel(await p.select({
         message: '選擇要調整的項目',
         options: [
-          { value: 'claude',    label: '重新安裝 Claude 配置', hint: `commands ${claude.installedCommands.length} · agents ${claude.installedAgents.length} · rules ${claude.installedRules.length}` },
-          { value: 'settings',  label: '重新套用全局設定', hint: `settings ${hasSettings ? '✔' : '✘'}` },
-          { value: 'claudemd',  label: '重新生成 CLAUDE.md', hint: `${claudeMd.count} 個 repo · 需 AI` },
-          { value: 'zsh',       label: '重新安裝 ZSH 環境模組', hint: `${zsh.installed.length}/${zsh.expected.length} 已安裝` },
-          { value: 'slack',     label: '重新設定 Slack 通知', hint: slack.mode ? `${slack.mode}` : '未設定' },
+          { value: 'claude',    label: '🤖 重新安裝 Claude 配置', hint: `commands ${claude.installedCommands.length} · agents ${claude.installedAgents.length} · rules ${claude.installedRules.length}` },
+          { value: 'settings',  label: '⚙️ 重新套用全局設定', hint: `settings ${hasSettings ? '✔' : '✘'}` },
+          { value: 'claudemd',  label: '📝 重新生成 CLAUDE.md', hint: `${claudeMd.count} 個 repo · 需 AI` },
+          { value: 'zsh',       label: '🐚 重新安裝 ZSH 環境模組', hint: `${zsh.installed.length}/${zsh.expected.length} 已安裝` },
+          { value: 'slack',     label: '💬 重新設定 Slack 通知', hint: slack.mode ? `${slack.mode}` : '未設定' },
           { value: 'back',      label: '← 返回' },
         ],
       }))
@@ -293,16 +293,16 @@ async function main() {
   }
 
   // 環境檢查
-  phaseHeader('環境檢查')
+  phaseHeader('🔍 環境檢查')
   await ensureEnvironment()
   warmupCli()
 
   // ── 功能選擇 ──
   const featureChoices = [
-    { value: 'claude', label: 'Claude Code 開發配置', hint: 'commands · agents · rules · hooks · settings' },
-    { value: 'project', label: '專案配置（repos + AI）', hint: 'CLAUDE.md + ECC + 技術棧 · 需選 repos' },
-    { value: 'zsh', label: 'ZSH 環境模組', hint: 'aliases · fzf · git · tools · history' },
-    { value: 'slack', label: 'Slack 通知', hint: 'Channel / DM' },
+    { value: 'claude', label: '🤖 Claude Code 開發配置', hint: 'commands · agents · rules · hooks · settings' },
+    { value: 'project', label: '📁 專案配置（repos + AI）', hint: 'CLAUDE.md + ECC + 技術棧 · 需選 repos' },
+    { value: 'zsh', label: '🐚 ZSH 環境模組', hint: 'aliases · fzf · git · tools · history' },
+    { value: 'slack', label: '💬 Slack 通知', hint: 'Channel / DM' },
   ]
   // 首次安裝只預選核心 claude，避免誤覆蓋用戶現有 zsh/Slack 配置
   const prevFeatures = prev?.features || ['claude']
@@ -375,7 +375,7 @@ async function main() {
     // Step 1：選 repos（只有需要 repos 的功能才問）
     let repos = []
     if (needsRepos) {
-      phaseHeader('選擇倉庫', 1, 3)
+      phaseHeader('📁 選擇倉庫', 1, 3)
       repos = await interactiveRepoSelect(prev)
       if (repos === BACK) { p.outro('已取消'); return }
     }
@@ -419,10 +419,10 @@ async function main() {
       const action = handleCancel(await p.select({
         message: '角色分配',
         options: [
-          { value: 'confirm', label: '確認', hint: '繼續安裝' },
-          { value: 'main', label: '調整 ⭐主力', hint: '完整 CLAUDE.md + AI 生成' },
-          { value: 'temp', label: '調整 🔄臨時', hint: '精簡 CLAUDE.md' },
-          { value: 'tool', label: '調整 🔧工具', hint: '最小配置' },
+          { value: 'confirm', label: '✅ 確認', hint: '繼續安裝' },
+          { value: 'main', label: '⭐ 調整主力', hint: '完整 CLAUDE.md + AI 生成' },
+          { value: 'temp', label: '🔄 調整臨時', hint: '精簡 CLAUDE.md' },
+          { value: 'tool', label: '🔧 調整工具', hint: '最小配置' },
           { value: 'back', label: '← 上一步' },
         ],
       }))
@@ -477,7 +477,7 @@ async function main() {
     // 自動分析（快取：repos + 角色沒變就不重跑）
     const reposKey = repos.map(r => `${r.fullName}:${r._roleOverride}`).sort().join(',')
     if (!analyzeCache || analyzeCache.key !== reposKey) {
-      phaseHeader('自動分析')
+      phaseHeader('🔬 自動分析')
       let analyzeSuccess = false
       while (!analyzeSuccess) {
         try {
@@ -491,8 +491,8 @@ async function main() {
           const action = handleCancel(await p.select({
             message: '如何繼續？',
             options: [
-              { value: 'retry', label: '重試', hint: '重新執行分析' },
-              { value: 'skip', label: '跳過', hint: '跳過 AI 分析，使用基礎配置' },
+              { value: 'retry', label: '🔄 重試', hint: '重新執行分析' },
+              { value: 'skip', label: '⏭️ 跳過', hint: '跳過 AI 分析，使用基礎配置' },
               { value: 'back', label: '← 上一步', hint: '返回選擇倉庫' },
             ],
           }))
@@ -550,7 +550,7 @@ async function main() {
     }
 
     // Step 2：確認計畫
-    phaseHeader('確認安裝計畫', 2, 3)
+    phaseHeader('📋 確認安裝計畫', 2, 3)
     const confirmedPlan = await phasePlan(planForReview)
     if (confirmedPlan === BACK) continue // 回到 Step 1
     if (!confirmedPlan) break
@@ -566,7 +566,7 @@ async function main() {
     if (flagManual) confirmedPlan.mode = 'manual'
 
     // 安裝
-    phaseHeader('安裝中', 3, 3)
+    phaseHeader('🚀 安裝中', 3, 3)
     const { installSelections, syncResult, startTime } = await phaseExecute(confirmedPlan, {
       repoDir: REPO,
       previewDir: PREVIEW_DIR,
@@ -577,7 +577,7 @@ async function main() {
     })
 
     // Step 3：完成
-    phaseHeader('完成', 3, 3)
+    phaseHeader('✅ 完成', 3, 3)
     await phaseComplete(confirmedPlan, {
       repoDir: REPO,
       installSelections,

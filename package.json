@@ -1,39 +1,44 @@
 {
-  "name": "ab-dotfiles",
-  "version": "2.1.0",
-  "description": "開發環境統一管理工具 — Claude Code 配置、技術棧技能庫、ZSH 模組、工作區生成",
-  "license": "MIT",
-  "private": true,
-  "packageManager": "pnpm@9.15.5",
-  "engines": {
-    "node": ">=18",
-    "pnpm": ">=9"
-  },
-  "scripts": {
-    "setup": "node bin/setup.mjs",
-    "status": "node bin/status.mjs",
-    "report": "node bin/status.mjs --report",
-    "flow": "node bin/flow.mjs",
-    "scan": "node bin/scan.mjs",
-    "restore": "node bin/restore.mjs",
-    "uninstall": "node bin/uninstall.mjs",
-    "hooks": "node bin/hooks.mjs",
-    "doctor": "node -e \"import('./lib/detect/doctor.mjs').then(m => m.ensureEnvironment())\"",
-    "workspace": "bash scripts/generate-workspace.sh",
-    "taxonomy:build": "node lib/taxonomy/build.mjs",
-    "changeset": "changeset",
-    "version": "changeset version",
-    "release": "changeset version && git add -A && git commit -m 'chore: version packages' && git tag v$(node -p \"require('./package.json').version\") && git push --follow-tags"
-  },
-  "devDependencies": {
-    "@changesets/changelog-github": "^0.6.0",
-    "@changesets/cli": "^2.30.0"
-  },
-  "dependencies": {
-    "@clack/prompts": "^0.9.1",
-    "listr2": "^10.2.1",
-    "lodash-es": "^4.17.23",
-    "picocolors": "^1.1.1",
-    "semver": "^7.7.4"
-  }
+	"name": "ab-dotfiles",
+	"version": "2.1.0",
+	"description": "開發環境統一管理工具 — Claude Code 配置、技術棧技能庫、ZSH 模組、工作區生成",
+	"license": "MIT",
+	"private": true,
+	"packageManager": "pnpm@9.15.5",
+	"engines": {
+		"node": ">=18",
+		"pnpm": ">=9"
+	},
+	"scripts": {
+		"setup": "node bin/setup.mjs",
+		"status": "node bin/status.mjs",
+		"report": "node bin/status.mjs --report",
+		"flow": "node bin/flow.mjs",
+		"scan": "node bin/scan.mjs",
+		"restore": "node bin/restore.mjs",
+		"uninstall": "node bin/uninstall.mjs",
+		"hooks": "node bin/hooks.mjs",
+		"doctor": "node bin/doctor.mjs",
+		"workspace": "bash scripts/generate-workspace.sh",
+		"taxonomy:build": "node lib/taxonomy/build.mjs",
+		"format": "biome format --write .",
+		"lint": "biome lint .",
+		"check": "biome check --write .",
+		"check:ci": "biome check .",
+		"changeset": "changeset",
+		"version": "changeset version",
+		"release": "bash bin/release.sh"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.10",
+		"@changesets/changelog-github": "^0.6.0",
+		"@changesets/cli": "^2.30.0"
+	},
+	"dependencies": {
+		"@clack/prompts": "^0.9.1",
+		"listr2": "^10.2.1",
+		"lodash-es": "^4.17.23",
+		"picocolors": "^1.1.1",
+		"semver": "^7.7.4"
+	}
 }

@@ -29,8 +29,10 @@ corepack prepare pnpm@latest --activate
 brew install gh
 gh auth login
 
-# 5. 安裝 Claude Code CLI
-npm install -g @anthropic-ai/claude-code
+# 5. 安裝 Claude Code CLI（三選一）
+curl -fsSL https://claude.ai/install.sh | sh   # 官方安裝器（推薦）
+brew install claude-code                        # Homebrew
+pnpm add -g @anthropic-ai/claude-code           # pnpm 全局
 
 # 6. clone 並啟動
 git clone https://github.com/AlvinBian/ab-dotfiles.git
@@ -58,7 +60,7 @@ pnpm run setup
 | Node.js     | 18+      | `nvm install 22`                                             |
 | pnpm        | 9+       | `corepack enable && corepack prepare pnpm@latest --activate` |
 | gh CLI      | —        | `brew install gh` → `gh auth login`                          |
-| Claude Code | —        | `npm install -g @anthropic-ai/claude-code`                   |
+| Claude Code | —        | `curl -fsSL https://claude.ai/install.sh \| sh` 或 `brew install claude-code` 或 `pnpm add -g @anthropic-ai/claude-code` |
 
 `pnpm run doctor` 可檢查以上工具是否就緒。
 
@@ -572,7 +574,9 @@ gh auth login --web
 
 **Q: Claude CLI 未安裝？**
 ```bash
-npm install -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | sh   # 官方安裝器（推薦）
+brew install claude-code                        # Homebrew
+pnpm add -g @anthropic-ai/claude-code           # pnpm 全局
 ```
 
 **Q: pnpm 找不到？**

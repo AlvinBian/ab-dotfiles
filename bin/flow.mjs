@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * pnpm run flow — 渲染並打開流程圖
  *
@@ -6,87 +7,127 @@
  * 生成 HTML viewer 在瀏覽器中查看。
  */
 
-import fs from 'fs'
-import path from 'path'
-import { execFileSync } from 'child_process'
-import { getDirname } from '../lib/core/paths.mjs'
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { getDirname } from "../lib/core/paths.mjs";
 
-const __dirname = getDirname(import.meta)
-const REPO = path.resolve(__dirname, '..')
-const FLOWS_DIR = path.join(REPO, 'docs', 'flows')
-const OUTPUT_DIR = path.join(REPO, 'dist', 'flows')
-const OUTPUT_HTML = path.join(REPO, 'dist', 'flowcharts.html')
+const __dirname = getDirname(import.meta);
+const REPO = path.resolve(__dirname, "..");
+const FLOWS_DIR = path.join(REPO, "docs", "flows");
+const OUTPUT_DIR = path.join(REPO, "dist", "flows");
+const OUTPUT_HTML = path.join(REPO, "dist", "flowcharts.html");
 
 // 解析 .mmd frontmatter
 function parseFrontmatter(content) {
-  const meta = { title: '', description: '', links: [] }
-  if (!content.startsWith('---')) return { meta, body: content }
-  const endIdx = content.indexOf('---', 3)
-  if (endIdx === -1) return { meta, body: content }
-  const fm = content.slice(3, endIdx)
-  const body = content.slice(endIdx + 3).trim()
-  const t = fm.match(/title:\s*(.+)/); if (t) meta.title = t[1].trim()
-  const d = fm.match(/description:\s*(.+)/); if (d) meta.description = d[1].trim()
-  const ls = fm.match(/links:\n([\s\S]*?)(?=\n\w|$)/)
-  if (ls) {
-    for (const m of (ls[1].match(/- (\S+):\s*(.+)/g) || [])) {
-      const p = m.match(/- (\S+):\s*(.+)/)
-      if (p) meta.links.push({ target: p[1], label: p[2] })
-    }
-  }
-  return { meta, body }
+	const meta = { title: "", description: "", links: [] };
+	if (!content.startsWith("---")) return { meta, body: content };
+	const endIdx = content.indexOf("---", 3);
+	if (endIdx === -1) return { meta, body: content };
+	const fm = content.slice(3, endIdx);
+	const body = content.slice(endIdx + 3).trim();
+	const t = fm.match(/title:\s*(.+)/);
+	if (t) meta.title = t[1].trim();
+	const d = fm.match(/description:\s*(.+)/);
+	if (d) meta.description = d[1].trim();
+	const ls = fm.match(/links:\n([\s\S]*?)(?=\n\w|$)/);
+	if (ls) {
+		for (const m of ls[1].match(/- (\S+):\s*(.+)/g) || []) {
+			const p = m.match(/- (\S+):\s*(.+)/);
+			if (p) meta.links.push({ target: p[1], label: p[2] });
+		}
+	}
+	return { meta, body };
 }
 
 // 用 mmdc 渲染 .mmd → SVG（先去掉 frontmatter）
 function renderSvg(body, svgPath) {
-  const tmpPath = svgPath.replace('.svg', '.tmp.mmd')
-  try {
-    fs.writeFileSync(tmpPath, body)
-    execFileSync('npx', [
-      '@mermaid-js/mermaid-cli', '-i', tmpPath, '-o', svgPath,
-      '-t', 'dark', '-b', '#0d1117',
-    ], {
-      cwd: REPO, timeout: 30000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-    try { fs.unlinkSync(tmpPath) } catch {}
-    return true
-  } catch {
-    try { fs.unlinkSync(tmpPath) } catch {}
-    return false
-  }
+	const tmpPath = svgPath.replace(".svg", ".tmp.mmd");
+	try {
+		fs.writeFileSync(tmpPath, body);
+		execFileSync(
+			"npx",
+			[
+				"@mermaid-js/mermaid-cli",
+				"-i",
+				tmpPath,
+				"-o",
+				svgPath,
+				"-t",
+				"dark",
+				"-b",
+				"#0d1117",
+			],
+			{
+				cwd: REPO,
+				timeout: 30000,
+				stdio: ["pipe", "pipe", "pipe"],
+			},
+		);
+		try {
+			fs.unlinkSync(tmpPath);
+		} catch {
+			/* 清理失敗不影響結果 */
+		}
+		return true;
+	} catch {
+		try {
+			fs.unlinkSync(tmpPath);
+		} catch {
+			/* 清理失敗不影響結果 */
+		}
+		return false;
+	}
 }
 
-function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') }
+function escHtml(s) {
+	return s
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
+}
 
 function generateHTML(charts) {
-  const navItems = charts.map(c =>
-    `<a href="#${c.name}" class="nav-item" data-target="${c.name}">
+	const navItems = charts
+		.map(
+			(c) =>
+				`<a href="#${c.name}" class="nav-item" data-target="${c.name}">
       <span class="nav-title">${escHtml(c.title)}</span>
       <span class="nav-desc">${escHtml(c.description)}</span>
-    </a>`
-  ).join('\n    ')
+    </a>`,
+		)
+		.join("\n    ");
 
-  const sections = charts.map(c => {
-    const linkHTML = c.links.length > 0
-      ? `<div class="chart-links">${c.links.map(l =>
-          `<a href="#${l.target}" class="link-btn">${escHtml(l.label)} →</a>`
-        ).join(' ')}</div>` : ''
+	const sections = charts
+		.map((c) => {
+			const linkHTML =
+				c.links.length > 0
+					? `<div class="chart-links">${c.links
+							.map(
+								(l) =>
+									`<a href="#${l.target}" class="link-btn">${escHtml(l.label)} →</a>`,
+							)
+							.join(" ")}</div>`
+					: "";
 
-    // 嵌入 SVG inline（如果渲染成功）或 fallback 到 mermaid CDN
-    const svgPath = path.join(OUTPUT_DIR, `${c.name}.svg`)
-    const hasSvg = fs.existsSync(svgPath)
-    let chartContent
-    if (hasSvg) {
-      let svgContent = fs.readFileSync(svgPath, 'utf8')
-      // 確保 SVG 響應式
-      svgContent = svgContent.replace(/<svg /, '<svg style="max-width:100%;height:auto;" ')
-      chartContent = `<div class="svg-wrap" id="svg-${c.name}">${svgContent}</div>`
-    } else {
-      chartContent = `<div class="mermaid" id="mmd-${c.name}">\n${c.body}\n</div>`
-    }
+			// 嵌入 SVG inline（如果渲染成功）或 fallback 到 mermaid CDN
+			const svgPath = path.join(OUTPUT_DIR, `${c.name}.svg`);
+			const hasSvg = fs.existsSync(svgPath);
+			let chartContent;
+			if (hasSvg) {
+				let svgContent = fs.readFileSync(svgPath, "utf8");
+				// 確保 SVG 響應式
+				svgContent = svgContent.replace(
+					/<svg /,
+					'<svg style="max-width:100%;height:auto;" ',
+				);
+				chartContent = `<div class="svg-wrap" id="svg-${c.name}">${svgContent}</div>`;
+			} else {
+				chartContent = `<div class="mermaid" id="mmd-${c.name}">\n${c.body}\n</div>`;
+			}
 
-    return `
+			return `
     <section class="chart-section" id="${c.name}">
       <div class="chart-header">
         <h2>${escHtml(c.title)}</h2>
@@ -96,10 +137,11 @@ function generateHTML(charts) {
       <div class="chart-body" onclick="openModal('${c.name}')" title="點擊放大">
         ${chartContent}
       </div>
-    </section>`
-  }).join('\n')
+    </section>`;
+		})
+		.join("\n");
 
-  const scriptBlock = `
+	const scriptBlock = `
   <script>
     // 導航
     var secs = document.querySelectorAll('.chart-section');
@@ -156,9 +198,9 @@ function generateHTML(charts) {
     function mReset() { if (spz) { spz.resetZoom(); spz.resetPan(); spz.fit(); spz.center(); } }
     document.addEventListener('keydown', function(e) { if (e.key === 'Escape') mClose(); });
     document.getElementById('modal').addEventListener('click', function(e) { if (e.target === e.currentTarget) mClose(); });
-  <\/script>`
+  </script>`;
 
-  return `<!DOCTYPE html>
+	return `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
@@ -277,12 +319,15 @@ function generateHTML(charts) {
     </div>
   </div>
 
-  ${charts.some(c => !fs.existsSync(path.join(OUTPUT_DIR, c.name + '.svg')))
-    ? '<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>\n  <script>mermaid.initialize({ startOnLoad:true, theme:"dark", securityLevel:"loose", themeVariables:{ primaryColor:"#1f6feb", primaryTextColor:"#e6edf3", lineColor:"#8b949e" } });<\/script>' : ''}
+  ${
+		charts.some((c) => !fs.existsSync(path.join(OUTPUT_DIR, `${c.name}.svg`)))
+			? '<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>\n  <script>mermaid.initialize({ startOnLoad:true, theme:"dark", securityLevel:"loose", themeVariables:{ primaryColor:"#1f6feb", primaryTextColor:"#e6edf3", lineColor:"#8b949e" } });</script>'
+			: ""
+	}
 
   ${scriptBlock}
 </body>
-</html>`
+</html>`;
 }
 
 /*
@@ -400,47 +445,74 @@ function generateHTML(charts) {
 */
 
 // ── Main ──
-if (!fs.existsSync(FLOWS_DIR)) { console.error('找不到 docs/flows/'); process.exit(1) }
+if (!fs.existsSync(FLOWS_DIR)) {
+	console.error("找不到 docs/flows/");
+	process.exit(1);
+}
 
 const order = [
-  'setup-main', 'setup-status', 'env-check', 'upgrade-legacy',
-  'phase-plan', 'phase-execute', 'config-protection',
-  'repo-select', 'role-system', 'feature-map',
-  'slack-setup', 'ecc-pipeline', 'session-lifecycle',
-]
+	"setup-main",
+	"setup-status",
+	"env-check",
+	"upgrade-legacy",
+	"phase-plan",
+	"phase-execute",
+	"config-protection",
+	"repo-select",
+	"role-system",
+	"feature-map",
+	"slack-setup",
+	"ecc-pipeline",
+	"session-lifecycle",
+];
 
-const files = fs.readdirSync(FLOWS_DIR).filter(f => f.endsWith('.mmd')).sort((a, b) => {
-  const ia = order.indexOf(a.replace('.mmd', ''))
-  const ib = order.indexOf(b.replace('.mmd', ''))
-  return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
-})
+const files = fs
+	.readdirSync(FLOWS_DIR)
+	.filter((f) => f.endsWith(".mmd"))
+	.sort((a, b) => {
+		const ia = order.indexOf(a.replace(".mmd", ""));
+		const ib = order.indexOf(b.replace(".mmd", ""));
+		return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+	});
 
-if (files.length === 0) { console.error('docs/flows/ 中沒有 .mmd 檔案'); process.exit(1) }
+if (files.length === 0) {
+	console.error("docs/flows/ 中沒有 .mmd 檔案");
+	process.exit(1);
+}
 
 // 渲染 SVG
-fs.mkdirSync(OUTPUT_DIR, { recursive: true })
-console.log(`渲染 ${files.length} 張流程圖...`)
-let rendered = 0, fallback = 0
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+console.log(`渲染 ${files.length} 張流程圖...`);
+let rendered = 0,
+	fallback = 0;
 
-const charts = files.map(f => {
-  const filePath = path.join(FLOWS_DIR, f)
-  const name = f.replace('.mmd', '')
-  const content = fs.readFileSync(filePath, 'utf8')
-  const { meta, body } = parseFrontmatter(content)
+const charts = files.map((f) => {
+	const filePath = path.join(FLOWS_DIR, f);
+	const name = f.replace(".mmd", "");
+	const content = fs.readFileSync(filePath, "utf8");
+	const { meta, body } = parseFrontmatter(content);
 
-  const svgPath = path.join(OUTPUT_DIR, `${name}.svg`)
-  if (renderSvg(body, svgPath)) {
-    rendered++
-    console.log(`  ✔ ${name}`)
-  } else {
-    fallback++
-    console.log(`  ⚠ ${name}（fallback 到 CDN 渲染）`)
-  }
+	const svgPath = path.join(OUTPUT_DIR, `${name}.svg`);
+	if (renderSvg(body, svgPath)) {
+		rendered++;
+		console.log(`  ✔ ${name}`);
+	} else {
+		fallback++;
+		console.log(`  ⚠ ${name}（fallback 到 CDN 渲染）`);
+	}
 
-  return { name, title: meta.title || name, description: meta.description || '', links: meta.links, body }
-})
+	return {
+		name,
+		title: meta.title || name,
+		description: meta.description || "",
+		links: meta.links,
+		body,
+	};
+});
 
-fs.writeFileSync(OUTPUT_HTML, generateHTML(charts))
-console.log(`\n✔ ${rendered} 張 SVG 預渲染 + ${fallback} 張 CDN fallback → dist/flowcharts.html`)
+fs.writeFileSync(OUTPUT_HTML, generateHTML(charts));
+console.log(
+	`\n✔ ${rendered} 張 SVG 預渲染 + ${fallback} 張 CDN fallback → dist/flowcharts.html`,
+);
 
-execFileSync('open', [OUTPUT_HTML])
+execFileSync("open", [OUTPUT_HTML]);

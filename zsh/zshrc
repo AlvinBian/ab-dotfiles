@@ -7,6 +7,10 @@
 _command_exists() { command -v "$1" &>/dev/null; }
 _safe_source()    { [[ -s "$1" ]] && source "$1"; }
 
+# ── 標準使用者二進制路徑 ─────────────────────────────────────────
+# ~/.local/bin: Claude Code 官方安裝器、pipx、cargo install 等
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
 # ── Homebrew ──────────────────────────────────────────────────────
 if _command_exists brew; then
   export BREW_PREFIX=$(brew --prefix)

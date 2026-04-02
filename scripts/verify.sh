@@ -78,7 +78,7 @@ Promise.all(modules.map(m => import(m).then(() => '✓ ' + m).catch(e => '✗ ' 
 # 5. v2 Templates Check
 echo ""
 echo "--- v2 Template Check ---"
-node -e "JSON.parse(require('fs').readFileSync('claude/settings-template.json'))" && echo "✓ settings-template.json"
+node -e "JSON.parse(require('fs').readFileSync('claude/settings.template.json'))" && echo "✓ settings.template.json"
 node -e "JSON.parse(require('fs').readFileSync('claude/keybindings-template.json'))" && echo "✓ keybindings-template.json"
 
 # 6. 檔案統計

@@ -19,5 +19,5 @@ dist/
 
 # Node
 node_modules/
-pnpm-lock.yaml
 .claude/worktrees/
+.claude/settings.local.json

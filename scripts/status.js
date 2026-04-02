@@ -1,34 +1,57 @@
 function generateStatusReport() {
-    const config = loadConfig(); // 加载配置数据
-    const commands = config.commands || [];
-    const agents = config.agents || [];
-    const rules = config.rules || [];
-    const hooks = config.hooks || [];
+	const config = loadConfig(); // 加载配置数据
+	const commands = config.commands || [];
+	const agents = config.agents || [];
+	const rules = config.rules || [];
+	const hooks = config.hooks || [];
 
-    // 添加调试日志（可临时启用）
-    console.log("Commands:", commands.length, "Valid:", commands.filter(c => c.valid).length);
-    console.log("Agents:", agents.length, "Valid:", agents.filter(a => a.valid).length);
-    console.log("Rules:", rules.length, "Valid:", rules.filter(r => r.valid).length);
-    console.log("Hooks:", hooks.length, "Valid:", hooks.filter(h => h.valid).length);
+	// 添加调试日志（可临时启用）
+	console.log(
+		"Commands:",
+		commands.length,
+		"Valid:",
+		commands.filter((c) => c.valid).length,
+	);
+	console.log(
+		"Agents:",
+		agents.length,
+		"Valid:",
+		agents.filter((a) => a.valid).length,
+	);
+	console.log(
+		"Rules:",
+		rules.length,
+		"Valid:",
+		rules.filter((r) => r.valid).length,
+	);
+	console.log(
+		"Hooks:",
+		hooks.length,
+		"Valid:",
+		hooks.filter((h) => h.valid).length,
+	);
 
-    // 计算配置健康度：有效配置项 / 总配置项
-    const totalConfigs = commands.length + agents.length + rules.length + hooks.length;
-    const validConfigs = commands.filter(c => c.valid).length +
-                        agents.filter(a => a.valid).length +
-                        rules.filter(r => r.valid).length +
-                        hooks.filter(h => h.valid).length;
+	// 计算配置健康度：有效配置项 / 总配置项
+	const totalConfigs =
+		commands.length + agents.length + rules.length + hooks.length;
+	const validConfigs =
+		commands.filter((c) => c.valid).length +
+		agents.filter((a) => a.valid).length +
+		rules.filter((r) => r.valid).length +
+		hooks.filter((h) => h.valid).length;
 
-    // 防止除零
-    const healthPercentage = totalConfigs > 0 ? (validConfigs / totalConfigs) * 100 : 0;
+	// 防止除零
+	const healthPercentage =
+		totalConfigs > 0 ? (validConfigs / totalConfigs) * 100 : 0;
 
-    // 确保数字统计正确
-    const commandCount = commands.length;
-    const agentCount = agents.length;
-    const ruleCount = rules.length;
-    const hookCount = hooks.length;
+	// 确保数字统计正确
+	const commandCount = commands.length;
+	const agentCount = agents.length;
+	const ruleCount = rules.length;
+	const hookCount = hooks.length;
 
-    // 生成 HTML 报告
-    const reportHtml = `
+	// 生成 HTML 报告
+	const reportHtml = `
     <style>
         body {
             display: flex;
@@ -160,5 +183,5 @@ function generateStatusReport() {
     </script>
 `;
 
-    fs.writeFileSync('dist/status-report.html', reportHtml);
+	fs.writeFileSync("dist/status-report.html", reportHtml);
 }

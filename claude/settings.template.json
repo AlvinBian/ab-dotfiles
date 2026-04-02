@@ -1,20 +1,20 @@
 {
-  "autoMemoryEnabled": true,
-  "autoUpdatesChannel": "latest",
-  "cleanupPeriodDays": 90,
-  "showThinkingSummaries": true,
-  "enableAllProjectMcpServers": true,
-  "showToolOutputs": true,
-  "showProgress": true,
-  "includeCoAuthoredBy": false,
-  "env": {
-    "MAX_THINKING_TOKENS": "31999",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "haiku",
-    "USE_BUILTIN_RIPGREP": "1",
-    "BASH_DEFAULT_TIMEOUT_MS": "30000",
-    "CLAUDE_BASH_NO_LOGIN": "1",
-    "CLAUDE_CODE_AUTO_SAVE": "1",
-    "CLAUDE_CODE_FAST_MODE": "1"
-  }
+	"autoMemoryEnabled": true,
+	"autoUpdatesChannel": "latest",
+	"cleanupPeriodDays": 90,
+	"showThinkingSummaries": true,
+	"enableAllProjectMcpServers": true,
+	"showToolOutputs": true,
+	"showProgress": true,
+	"includeCoAuthoredBy": false,
+	"env": {
+		"MAX_THINKING_TOKENS": "31999",
+		"CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70",
+		"CLAUDE_CODE_SUBAGENT_MODEL": "haiku",
+		"USE_BUILTIN_RIPGREP": "1",
+		"BASH_DEFAULT_TIMEOUT_MS": "30000",
+		"CLAUDE_BASH_NO_LOGIN": "1",
+		"CLAUDE_CODE_AUTO_SAVE": "1",
+		"CLAUDE_CODE_FAST_MODE": "1"
+	}
 }

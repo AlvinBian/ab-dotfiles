@@ -500,7 +500,7 @@ async function main() {
 	// Slack 通知設定
 	if (has("slack")) {
 		p.log.step(pc.bold("Slack 通知設定"));
-		const { setupSlackNotify } = await import("../lib/slack/slack-setup.mjs");
+		const { setupSlackNotify } = await import("../lib/external/slack-setup.mjs");
 		const slackResult = await setupSlackNotify(prev);
 		if (slackResult) {
 			const envPath = path.join(REPO, ".env");

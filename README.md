@@ -80,7 +80,7 @@ setup 會修改以下檔案/目錄，**每次安裝前自動備份**：
 | `~/.claude/agents/`          | 寫入 agents                  | `dist/backup/{timestamp}/claude/agents`           |
 | `~/.claude/rules/`           | 寫入 rules                   | `dist/backup/{timestamp}/claude/rules`            |
 | `~/.claude/hooks.json`       | 寫入 hooks 設定              | `dist/backup/{timestamp}/claude/hooks.json`       |
-| `~/.claude/settings.json`    | 合併 permissions + model     | `dist/backup/{timestamp}/claude/settings.json`    |
+| `~/.claude/settings.json`    | 合併 model + env（不動 permissions） | `dist/backup/{timestamp}/claude/settings.json`    |
 | `~/.claude/projects/`        | 寫入 CLAUDE.md               | 不備份（可重生）                                  |
 | `~/.zshrc`                   | 替換為模組化版本             | `dist/backup/{timestamp}/zshrc`                   |
 | `~/.zshrc.local`             | 個人設定自動遷移（不覆蓋）   | `dist/backup/{timestamp}/zshrc.local`             |
@@ -272,7 +272,7 @@ ab-dotfiles/
 │   ├── rules/                   # 6 個規則
 │   ├── hooks/                   # slack-dispatch.sh
 │   ├── hooks.json               # 8 個 hooks 定義
-│   ├── settings-template.json   # settings 模板
+│   ├── settings.template.json   # settings 模板
 │   └── keybindings-template.json # 快捷鍵模板（保留備用，不主動部署）
 │
 ├── ecc/                         # ECC 外部資源（GitHub Actions 自動同步）
@@ -461,6 +461,32 @@ brew install fzf zoxide bat eza fd git-delta lazygit tldr ripgrep \
 ---
 
 ## 配置
+
+### Permissions（手動配置）
+
+`pnpm run setup` **不會**自動寫入 permissions，請依需求手動加入 `~/.claude/settings.json`：
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)", "Read(*)", "Write(*)", "Edit(*)", "MultiEdit(*)",
+      "Glob(*)", "Grep(*)", "WebFetch(*)", "Agent(*)", "mcp__*"
+    ],
+    "deny": [
+      "Read(node_modules/**)", "Read(dist/**)", "Read(build/**)",
+      "Read(.next/**)", "Read(.nuxt/**)", "Read(coverage/**)",
+      "Read(*.min.js)", "Read(*.min.css)", "Read(*.map)",
+      "Bash(rm -rf /)", "Bash(rm -rf ~)",
+      "Bash(DROP TABLE *)", "Bash(DROP DATABASE *)"
+    ]
+  }
+}
+```
+
+> **allow `Bash(*)`** 等通配規則會讓 Claude Code 不再彈出權限確認。  
+> **deny `Read(node_modules/**)`** 等規則取代 `.claudeignore`，防止 Claude 掃描大目錄（節省 token）。  
+> 如果你偏好逐一確認權限，可以不加 allow 通配，讓 Claude Code 每次詢問。
 
 ### .env
 

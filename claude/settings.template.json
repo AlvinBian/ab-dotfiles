@@ -1,0 +1,11 @@
+{
+  "autoMemoryEnabled": true,
+  "autoUpdatesChannel": "latest",
+  "enableAllProjectMcpServers": true,
+  "cleanupPeriodDays": 30,
+  "showThinkingSummaries": true,
+  "env": {
+    "MAX_THINKING_TOKENS": "31999",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70"
+  }
+}

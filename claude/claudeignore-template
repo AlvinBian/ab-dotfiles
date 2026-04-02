@@ -1,0 +1,48 @@
+# Build outputs
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.output/
+out/
+coverage/
+.turbo/
+.cache/
+
+# Lock files (huge, no value for AI)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lockb
+
+# Minified/generated
+*.min.js
+*.min.css
+*.map
+*.chunk.js
+
+# Binary & media
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Docker
+Dockerfile*
+docker-compose*
+
+# Logs
+*.log
+logs/

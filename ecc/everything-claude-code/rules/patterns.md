@@ -1,50 +1,52 @@
 ---
 paths:
-  - "**/*.cs"
-  - "**/*.csx"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
 ---
-# C# Patterns
+# TypeScript/JavaScript Patterns
 
-> This file extends [common/patterns.md](../common/patterns.md) with C#-specific content.
+> This file extends [common/patterns.md](../common/patterns.md) with TypeScript/JavaScript specific content.
 
-## API Response Pattern
+## API Response Format
 
-```csharp
-public sealed record ApiResponse<T>(
-    bool Success,
-    T? Data = default,
-    string? Error = null,
-    object? Meta = null);
+```typescript
+interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: string
+  meta?: {
+    total: number
+    page: number
+    limit: number
+  }
+}
+```
+
+## Custom Hooks Pattern
+
+```typescript
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(handler)
+  }, [value, delay])
+
+  return debouncedValue
+}
 ```
 
 ## Repository Pattern
 
-```csharp
-public interface IRepository<T>
-{
-    Task<IReadOnlyList<T>> FindAllAsync(CancellationToken cancellationToken);
-    Task<T?> FindByIdAsync(Guid id, CancellationToken cancellationToken);
-    Task<T> CreateAsync(T entity, CancellationToken cancellationToken);
-    Task<T> UpdateAsync(T entity, CancellationToken cancellationToken);
-    Task DeleteAsync(Guid id, CancellationToken cancellationToken);
+```typescript
+interface Repository<T> {
+  findAll(filters?: Filters): Promise<T[]>
+  findById(id: string): Promise<T | null>
+  create(data: CreateDto): Promise<T>
+  update(id: string, data: UpdateDto): Promise<T>
+  delete(id: string): Promise<void>
 }
 ```
-
-## Options Pattern
-
-Use strongly typed options for config instead of reading raw strings throughout the codebase.
-
-```csharp
-public sealed class PaymentsOptions
-{
-    public const string SectionName = "Payments";
-    public required string BaseUrl { get; init; }
-    public required string ApiKeySecretName { get; init; }
-}
-```
-
-## Dependency Injection
-
-- Depend on interfaces at service boundaries
-- Keep constructors focused; if a service needs too many dependencies, split responsibilities
-- Register lifetimes intentionally: singleton for stateless/shared services, scoped for request data, transient for lightweight pure workers

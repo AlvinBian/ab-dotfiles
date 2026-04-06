@@ -1,46 +1,18 @@
 ---
 paths:
-  - "**/*.cs"
-  - "**/*.csx"
-  - "**/*.csproj"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
 ---
-# C# Testing
+# TypeScript/JavaScript Testing
 
-> This file extends [common/testing.md](../common/testing.md) with C#-specific content.
+> This file extends [common/testing.md](../common/testing.md) with TypeScript/JavaScript specific content.
 
-## Test Framework
+## E2E Testing
 
-- Prefer **xUnit** for unit and integration tests
-- Use **FluentAssertions** for readable assertions
-- Use **Moq** or **NSubstitute** for mocking dependencies
-- Use **Testcontainers** when integration tests need real infrastructure
+Use **Playwright** as the E2E testing framework for critical user flows.
 
-## Test Organization
+## Agent Support
 
-- Mirror `src/` structure under `tests/`
-- Separate unit, integration, and end-to-end coverage clearly
-- Name tests by behavior, not implementation details
-
-```csharp
-public sealed class OrderServiceTests
-{
-    [Fact]
-    public async Task FindByIdAsync_ReturnsOrder_WhenOrderExists()
-    {
-        // Arrange
-        // Act
-        // Assert
-    }
-}
-```
-
-## ASP.NET Core Integration Tests
-
-- Use `WebApplicationFactory<TEntryPoint>` for API integration coverage
-- Test auth, validation, and serialization through HTTP, not by bypassing middleware
-
-## Coverage
-
-- Target 80%+ line coverage
-- Focus coverage on domain logic, validation, auth, and failure paths
-- Run `dotnet test` in CI with coverage collection enabled where available
+- **e2e-runner** - Playwright E2E testing specialist

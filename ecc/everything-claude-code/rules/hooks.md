@@ -1,25 +1,22 @@
 ---
 paths:
-  - "**/*.cs"
-  - "**/*.csx"
-  - "**/*.csproj"
-  - "**/*.sln"
-  - "**/Directory.Build.props"
-  - "**/Directory.Build.targets"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
 ---
-# C# Hooks
+# TypeScript/JavaScript Hooks
 
-> This file extends [common/hooks.md](../common/hooks.md) with C#-specific content.
+> This file extends [common/hooks.md](../common/hooks.md) with TypeScript/JavaScript specific content.
 
 ## PostToolUse Hooks
 
 Configure in `~/.claude/settings.json`:
 
-- **dotnet format**: Auto-format edited C# files and apply analyzer fixes
-- **dotnet build**: Verify the solution or project still compiles after edits
-- **dotnet test --no-build**: Re-run the nearest relevant test project after behavior changes
+- **Prettier**: Auto-format JS/TS files after edit
+- **TypeScript check**: Run `tsc` after editing `.ts`/`.tsx` files
+- **console.log warning**: Warn about `console.log` in edited files
 
 ## Stop Hooks
 
-- Run a final `dotnet build` before ending a session with broad C# changes
-- Warn on modified `appsettings*.json` files so secrets do not get committed
+- **console.log audit**: Check all modified files for `console.log` before session ends
